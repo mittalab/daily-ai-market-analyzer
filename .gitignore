@@ -1,0 +1,37 @@
+# Secrets — never committed
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Logs — keep directory, ignore content
+logs/*.log
+!logs/.gitkeep
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Frontend build artefacts
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+
+# Kite token cache (written by impl_08)
+kite_access_token.txt

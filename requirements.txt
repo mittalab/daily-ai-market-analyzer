@@ -1,0 +1,14 @@
+# Pin versions before production deploy (Week 8).
+# For now, latest compatible versions.
+
+fastapi
+uvicorn[standard]
+supabase
+python-dotenv
+kiteconnect
+requests
+pandas
+numpy
+apscheduler
+pytz
+anthropic
