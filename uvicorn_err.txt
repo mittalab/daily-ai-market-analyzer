@@ -1,0 +1,1061 @@
+INFO:     Started server process [12924]
+INFO:     Waiting for application startup.
+2026-05-23 17:33:30 INFO main — Starting Swing Trading API...
+2026-05-23 17:33:31 INFO database.client — Supabase client initialised (service key)
+2026-05-23 17:33:31 INFO main — Database connection verified
+2026-05-23 17:33:31 INFO apscheduler.scheduler — Scheduler started
+2026-05-23 17:33:31 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-23 17:33:31 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-23 17:33:31 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-23 17:33:31 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-23 17:33:31 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-23 17:33:31 INFO scheduler — Scheduler: 5 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, main_pipeline)
+2026-05-23 17:33:31 INFO main — APScheduler started with 5 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\main.py", line 107, in kite_refresh
+    url = get_login_url()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\kite_oauth.py", line 51, in get_login_url
+    kite = KiteConnect(api_key=_get_api_key())
+                               ~~~~~~~~~~~~^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\kite_oauth.py", line 33, in _get_api_key
+    raise RuntimeError("KITE_API_KEY not set in .env")
+RuntimeError: KITE_API_KEY not set in .env
+2026-05-23 18:58:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\main.py", line 107, in kite_refresh
+    url = get_login_url()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\kite_oauth.py", line 51, in get_login_url
+    """
+    
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\kite_oauth.py", line 33, in _get_api_key
+    if not key:
+        ^^^^^^^
+RuntimeError: KITE_API_KEY not set in .env
+2026-05-23 19:03:13 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\main.py", line 107, in kite_refresh
+    url = get_login_url()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\kite_oauth.py", line 51, in get_login_url
+    """
+    
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\kite_oauth.py", line 33, in _get_api_key
+    if not key:
+        ^^^^^^^
+RuntimeError: KITE_API_KEY not set in .env
+INFO:     Started server process [29464]
+INFO:     Waiting for application startup.
+2026-05-24 20:10:38 INFO main — Starting Swing Trading API...
+2026-05-24 20:10:38 INFO database.client — Supabase client initialised (service key)
+2026-05-24 20:10:38 INFO main — Database connection verified
+2026-05-24 20:10:38 INFO apscheduler.scheduler — Scheduler started
+2026-05-24 20:10:38 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-24 20:10:38 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-24 20:10:38 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-24 20:10:38 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-24 20:10:38 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-24 20:10:38 INFO scheduler — Scheduler: 5 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, main_pipeline)
+2026-05-24 20:10:38 INFO main — APScheduler started with 5 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-24 20:11:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-24 20:12:09 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-24 20:12:37 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-24 20:12:59 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-24 20:12:59 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-24 20:13:14 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-24 20:13:14 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-24 20:13:15 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-24 20:13:15 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-24 20:13:23 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens "HTTP/2 200 OK"
+2026-05-24 20:13:23 INFO integrations.kite_oauth — Kite token exchanged and stored. User: NOK061. Expires: 2026-05-25 00:00 IST
+2026-05-24 20:13:23 INFO main — Kite OAuth: token stored successfully
+2026-05-25 06:08:23 WARNING apscheduler.executors.default — Run time of job "Supabase keepalive (trigger: cron[hour='6', minute='0'], next run at: 2026-05-25 06:00:00 IST)" was missed by 0:08:23.340916
+2026-05-25 06:40:04 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-25 06:40:04 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-25 06:40:04 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-25 06:40:04 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-25 06:40:24 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-25 06:40:24 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-25 06:40:52 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens "HTTP/2 200 OK"
+2026-05-25 06:40:52 INFO integrations.kite_oauth — Kite token exchanged and stored. User: NOK061. Expires: 2026-05-26 00:00 IST
+2026-05-25 06:40:52 INFO main — Kite OAuth: token stored successfully
+2026-05-25 06:41:29 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-25 06:41:29 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-25 06:56:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:15:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:18:23 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-25 07:23:34 INFO main — APScheduler stopped
+2026-05-25 07:23:34 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29464]
+INFO:     Started server process [27188]
+INFO:     Waiting for application startup.
+2026-05-25 07:23:44 INFO main — Starting Swing Trading API...
+2026-05-25 07:23:45 INFO database.client — Supabase client initialised (service key)
+2026-05-25 07:23:45 INFO main — Database connection verified
+2026-05-25 07:23:45 INFO apscheduler.scheduler — Scheduler started
+2026-05-25 07:23:45 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-25 07:23:45 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-25 07:23:45 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-25 07:23:45 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-25 07:23:45 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-25 07:23:45 INFO scheduler — Scheduler: 5 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, main_pipeline)
+2026-05-25 07:23:45 INFO main — APScheduler started with 5 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-25 07:23:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:24:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:24:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 07:24:55 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 07:25:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:25:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:25:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 07:25:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-25 07:25:32 INFO api.manual_analysis — Manual analysis request: symbol=IOC direction=AUTO nifty50=False
+2026-05-25 07:25:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=date%2Copen%2Chigh%2Clow%2Cclose%2Cvolume&symbol=eq.IOC&order=date.desc&limit=180 "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-25 07:27:24 INFO main — APScheduler stopped
+2026-05-25 07:27:24 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27188]
+INFO:     Started server process [19140]
+INFO:     Waiting for application startup.
+2026-05-25 07:27:28 INFO main — Starting Swing Trading API...
+2026-05-25 07:27:30 INFO database.client — Supabase client initialised (service key)
+2026-05-25 07:27:30 INFO main — Database connection verified
+2026-05-25 07:27:30 INFO apscheduler.scheduler — Scheduler started
+2026-05-25 07:27:30 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-25 07:27:30 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-25 07:27:30 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-25 07:27:30 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-25 07:27:30 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-25 07:27:30 INFO scheduler — Scheduler: 5 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, main_pipeline)
+2026-05-25 07:27:30 INFO main — APScheduler started with 5 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-25 07:27:35 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:29:23 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:29:23 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 07:29:24 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 07:29:25 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:29:25 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 07:29:25 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 07:29:51 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-25 07:29:51 INFO api.manual_analysis — Manual analysis request: symbol=IOC direction=AUTO nifty50=False
+2026-05-25 07:29:51 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=date%2Copen%2Chigh%2Clow%2Cclose%2Cvolume&symbol=eq.IOC&order=date.desc&limit=180 "HTTP/2 200 OK"
+2026-05-25 07:29:51 INFO api.manual_analysis — No price history for IOC — attempting on-demand Kite fetch
+2026-05-25 07:29:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 07:29:52 INFO integrations.kite_ohlcv — Loading NSE instruments master (~4MB)...
+2026-05-25 07:29:52 INFO integrations.kite_ohlcv — Instruments loaded: 9792 rows
+2026-05-25 07:29:53 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22date%22%2C%22close%22%2C%22low%22%2C%22open%22%2C%22symbol%22%2C%22volume%22 "HTTP/2 201 Created"
+2026-05-25 07:29:53 INFO api.manual_analysis — On-demand OHLCV fetched for IOC: 120 rows stored
+2026-05-25 07:29:53 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=date%2Copen%2Chigh%2Clow%2Cclose%2Cvolume&symbol=eq.IOC&order=date.desc&limit=180 "HTTP/2 200 OK"
+2026-05-25 07:29:53 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-25 07:29:53 INFO api.manual_analysis — Lot size missing for IOC — trying Kite instruments master
+2026-05-25 07:29:53 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 07:29:55 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?on_conflict=symbol "HTTP/2 201 Created"
+2026-05-25 07:29:55 INFO api.manual_analysis — Lot size fetched from Kite for IOC: 4875 (cached in DB)
+2026-05-25 07:29:55 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/continuous_oi_series?select=%2A&symbol=eq.IOC&order=date.desc&limit=30 "HTTP/2 200 OK"
+2026-05-25 07:29:55 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/futures_continuous_series?select=%2A&symbol=eq.IOC&order=date.desc&limit=30 "HTTP/2 200 OK"
+2026-05-25 07:29:55 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=date%2Copen%2Chigh%2Clow%2Cclose%2Cvolume&symbol=eq.NIFTY_50&order=date.desc&limit=35 "HTTP/2 200 OK"
+2026-05-25 07:29:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=date%2Copen%2Chigh%2Clow%2Cclose%2Cvolume&symbol=eq.INDIA_VIX&order=date.desc&limit=32 "HTTP/2 200 OK"
+2026-05-25 07:29:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=30 "HTTP/2 200 OK"
+2026-05-25 07:29:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=date%2Copen%2Chigh%2Clow%2Cclose%2Cvolume&symbol=eq.NIFTY_50&order=date.desc&limit=65 "HTTP/2 200 OK"
+2026-05-25 07:29:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=date%2Copen%2Chigh%2Clow%2Cclose%2Cvolume&symbol=eq.INDIA_VIX&order=date.desc&limit=35 "HTTP/2 200 OK"
+2026-05-25 07:29:56 INFO pipeline.market_regime — Market regime: SIDEWAYS_WIDE | Nifty=23719.3 | EMA20=23794.1 | EMA50=23989.0 | ret20d=-0.75% | VIX=17.91
+2026-05-25 07:29:56 INFO api.manual_analysis — Calling Claude for deep analysis: IOC direction=AUTO
+2026-05-25 07:30:41 INFO httpx — HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-05-25 07:30:41 INFO api.manual_analysis — Deep analysis done: IOC stage=WATCH score=42 cost=$0.0549
+2026-05-25 07:36:04 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?on_conflict=symbol "HTTP/2 400 Bad Request"
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\api\dashboard.py", line 191, in add_to_watchlist
+    upsert_watchlist_staging({
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+        "symbol":        symbol,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+        "current_stage": "MANUAL_ADD",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "days_in_stage": 0,
+        ^^^^^^^^^^^^^^^^^^^
+    })
+    ^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\database\queries.py", line 465, in upsert_watchlist_staging
+    get_client().table("watchlist_staging").upsert(data, on_conflict="symbol").execute()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\postgrest\_sync\request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': 'there is no unique or exclusion constraint matching the ON CONFLICT specification', 'code': '42P10', 'hint': None, 'details': None}
+2026-05-25 07:36:15 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?on_conflict=symbol "HTTP/2 400 Bad Request"
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\fastapi\routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\api\dashboard.py", line 191, in add_to_watchlist
+    upsert_watchlist_staging({
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+        "symbol":        symbol,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+        "current_stage": "MANUAL_ADD",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "days_in_stage": 0,
+        ^^^^^^^^^^^^^^^^^^^
+    })
+    ^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\database\queries.py", line 465, in upsert_watchlist_staging
+    get_client().table("watchlist_staging").upsert(data, on_conflict="symbol").execute()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\postgrest\_sync\request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': 'there is no unique or exclusion constraint matching the ON CONFLICT specification', 'code': '42P10', 'hint': None, 'details': None}
+2026-05-25 07:36:17 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 08:26:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 08:26:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:26:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 08:26:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:26:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:26:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 08:26:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:26:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 08:27:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:27:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 08:27:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 08:27:22 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 08:27:23 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:27:24 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:27:24 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 08:27:33 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-25 08:27:33 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-25 08:27:45 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-25 08:27:45 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-25 08:27:56 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens "HTTP/2 200 OK"
+2026-05-25 08:27:56 INFO integrations.kite_oauth — Kite token exchanged and stored. User: NOK061. Expires: 2026-05-26 00:00 IST
+2026-05-25 08:27:56 INFO main — Kite OAuth: token stored successfully
+2026-05-25 08:28:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:28:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:28:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 08:28:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:28:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 08:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 08:28:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 08:28:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 15:38:40 WARNING apscheduler.executors.default — Run time of job "Option chain IV snapshot (trigger: cron[day_of_week='mon-fri', hour='15', minute='25'], next run at: 2026-05-25 15:25:00 IST)" was missed by 0:13:40.502746
+2026-05-25 18:42:11 INFO apscheduler.executors.default — Running job "NSE bhavcopy + FII/DII (trigger: cron[day_of_week='mon-fri', hour='18', minute='30'], next run at: 2026-05-26 18:30:00 IST)" (scheduled at 2026-05-25 18:30:00+05:30)
+2026-05-25 18:42:11 INFO scheduler — Bhavcopy job starting
+2026-05-25 18:42:12 INFO integrations.nse_bhavcopy — Equity bhavcopy fetched: 50 Nifty 50 rows for 2026-05-25
+2026-05-25 18:42:14 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22date%22%2C%22close%22%2C%22low%22%2C%22open%22%2C%22symbol%22%2C%22volume%22 "HTTP/2 201 Created"
+2026-05-25 18:42:14 INFO pipeline.data_ingestion — Equity bhavcopy: 50 rows stored for 2026-05-25
+2026-05-25 18:46:18 INFO integrations.nse_bhavcopy — Indices bhavcopy fetched for 2026-05-25 — VIX: 16.7, Nifty50: 24031.7
+2026-05-25 18:46:19 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22date%22%2C%22close%22%2C%22low%22%2C%22open%22%2C%22symbol%22%2C%22volume%22 "HTTP/2 201 Created"
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 1151, in emit
+    msg = self.format(record)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 999, in format
+    return fmt.format(record)
+           ~~~~~~~~~~^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 712, in format
+    record.message = record.getMessage()
+                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 400, in getMessage
+    msg = msg % self.args
+          ~~~~^~~~~~~~~~~
+TypeError: must be real number, not NoneType
+Call stack:
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\threading.py", line 1043, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\threading.py", line 1081, in _bootstrap_inner
+    self._context.run(self.run)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\threading.py", line 1023, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 119, in _worker
+    work_item.run(ctx)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\scheduler.py", line 118, in job_bhavcopy
+    summary = run_bhavcopy_job()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 81, in run_bhavcopy_job
+    logger.info(
+Message: 'Indices bhavcopy: VIX=%.2f, Nifty50=%.2f'
+Arguments: (16.7, None)
+2026-05-25 18:46:46 INFO integrations.nse_fii_dii — FII/DII fetched for 25-May-2026 — FII net: 821.75 Cr, DII net: 3856.88 Cr
+2026-05-25 18:46:46 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?on_conflict=date "HTTP/2 201 Created"
+2026-05-25 18:46:46 INFO pipeline.data_ingestion — FII/DII stored: FII +822 Cr, DII +3857 Cr
+2026-05-25 18:46:46 INFO scheduler — Bhavcopy OK: equity=50 rows, index=10 rows, VIX=16.70, FII OK=True
+2026-05-25 18:46:46 INFO apscheduler.executors.default — Job "NSE bhavcopy + FII/DII (trigger: cron[day_of_week='mon-fri', hour='18', minute='30'], next run at: 2026-05-26 18:30:00 IST)" executed successfully
+2026-05-25 19:00:25 INFO apscheduler.executors.default — Running job "Kite token reminder (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-26 19:00:00 IST)" (scheduled at 2026-05-25 19:00:00+05:30)
+2026-05-25 19:00:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 19:00:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 19:00:26 INFO scheduler — Token expires_at=2026-05-25 18:30:00+00:00 | valid_for_tonight=True
+2026-05-25 19:00:28 INFO integrations.telegram — Telegram message sent (id=17, silent=True)
+2026-05-25 19:00:28 INFO scheduler — Token valid — silent confirmation sent (message_id=17)
+2026-05-25 19:00:28 INFO apscheduler.executors.default — Job "Kite token reminder (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-26 19:00:00 IST)" executed successfully
+2026-05-25 20:48:09 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 20:48:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-25 21:25:33 INFO main — APScheduler stopped
+2026-05-25 21:25:33 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [19140]
+INFO:     Started server process [24880]
+INFO:     Waiting for application startup.
+2026-05-25 21:25:40 INFO main — Starting Swing Trading API...
+2026-05-25 21:25:41 INFO database.client — Supabase client initialised (service key)
+2026-05-25 21:25:41 INFO main — Database connection verified
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Scheduler started
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-25 21:25:41 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-25 21:25:41 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-25 21:25:41 INFO main — APScheduler started with 9 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-25 21:25:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 21:28:08 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-25 21:28:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-25 21:28:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:28:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-25 21:30:00 INFO apscheduler.executors.default — Running job "Pre-flight system check (trigger: cron[day_of_week='mon-fri', hour='21', minute='30'], next run at: 2026-05-25 21:30:00 IST)" (scheduled at 2026-05-25 21:30:00+05:30)
+2026-05-25 21:30:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-25 21:30:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:30:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-25 21:30:00 INFO scheduler — Pre-flight check OK — all systems ready for 22:00 pipeline
+2026-05-25 21:30:00 INFO apscheduler.executors.default — Job "Pre-flight system check (trigger: cron[day_of_week='mon-fri', hour='21', minute='30'], next run at: 2026-05-26 21:30:00 IST)" executed successfully
+2026-05-25 22:07:28 INFO apscheduler.executors.default — Running job "Main analysis pipeline (trigger: cron[day_of_week='mon-fri', hour='22', minute='0'], next run at: 2026-05-26 22:00:00 IST)" (scheduled at 2026-05-25 22:00:00+05:30)
+2026-05-25 22:07:28 INFO pipeline.orchestrator — Pipeline start: SESSION_20260525 | 50 symbols
+2026-05-25 22:30:45 INFO pipeline.orchestrator — Session SESSION_20260525 already exists — continuing
+2026-05-25 22:30:45 ERROR scheduler — Main pipeline failed: [Errno 11001] getaddrinfo failed
+2026-05-25 22:30:45 WARNING integrations.telegram — Telegram attempt 1/3 failed: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8819449715:AAErfcO08JiVHzfiMBF7l_H63YJwtPDWDsI/sendMessage (Caused by NameResolutionError("HTTPSConnection(host='api.telegram.org', port=443): Failed to resolve 'api.telegram.org' ([Errno 11001] getaddrinfo failed)"))
+2026-05-25 23:19:21 WARNING integrations.telegram — Telegram attempt 2/3 failed: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8819449715:AAErfcO08JiVHzfiMBF7l_H63YJwtPDWDsI/sendMessage (Caused by NameResolutionError("HTTPSConnection(host='api.telegram.org', port=443): Failed to resolve 'api.telegram.org' ([Errno 11001] getaddrinfo failed)"))
+2026-05-25 23:19:53 INFO integrations.telegram — Telegram message sent (id=18, silent=False)
+2026-05-25 23:19:53 INFO apscheduler.executors.default — Job "Main analysis pipeline (trigger: cron[day_of_week='mon-fri', hour='22', minute='0'], next run at: 2026-05-26 22:00:00 IST)" executed successfully
+2026-05-26 06:44:29 WARNING apscheduler.executors.default — Run time of job "Supabase keepalive (trigger: cron[hour='6', minute='0'], next run at: 2026-05-27 06:00:00 IST)" was missed by 0:44:29.315589
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 08:11:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 08:11:09 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-26 08:11:09 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-26 08:11:23 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens "HTTP/2 200 OK"
+2026-05-26 08:11:23 INFO integrations.kite_oauth — Kite token exchanged and stored. User: NOK061. Expires: 2026-05-27 00:00 IST
+2026-05-26 08:11:23 INFO main — Kite OAuth: token stored successfully
+2026-05-26 08:11:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 08:11:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 08:11:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:30 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:30 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 08:11:30 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 08:11:30 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 08:11:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-26 08:34:30 INFO main — APScheduler stopped
+2026-05-26 08:34:30 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24880]
+INFO:     Started server process [13676]
+INFO:     Waiting for application startup.
+2026-05-26 08:34:35 INFO main — Starting Swing Trading API...
+2026-05-26 08:34:36 INFO database.client — Supabase client initialised (service key)
+2026-05-26 08:34:36 INFO main — Database connection verified
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Scheduler started
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-26 08:34:36 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-26 08:34:36 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-26 08:34:36 INFO main — APScheduler started with 9 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-26 08:47:46 INFO main — APScheduler stopped
+2026-05-26 08:47:46 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13676]
+INFO:     Started server process [29076]
+INFO:     Waiting for application startup.
+2026-05-26 08:47:51 INFO main — Starting Swing Trading API...
+2026-05-26 08:47:52 INFO database.client — Supabase client initialised (service key)
+2026-05-26 08:47:52 INFO main — Database connection verified
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Scheduler started
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-26 08:47:52 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-26 08:47:52 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-26 08:47:52 INFO main — APScheduler started with 9 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 08:47:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 08:47:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:47:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 08:47:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:47:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:47:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 08:47:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 08:47:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 08:49:21 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-26 08:56:18 INFO main — APScheduler stopped
+2026-05-26 08:56:18 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29076]
+INFO:     Started server process [33368]
+INFO:     Waiting for application startup.
+2026-05-26 08:56:23 INFO main — Starting Swing Trading API...
+2026-05-26 08:56:24 INFO database.client — Supabase client initialised (service key)
+2026-05-26 08:56:24 INFO main — Database connection verified
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Scheduler started
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-26 08:56:24 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-26 08:56:24 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-26 08:56:24 INFO main — APScheduler started with 9 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-26 08:56:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:56:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:56:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 08:56:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 08:56:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 08:56:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 08:56:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 08:56:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 09:06:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:51:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 09:51:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 10:29:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 10:29:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:29:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 10:29:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:29:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:29:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 10:29:29 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 10:35:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:35:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 10:35:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 10:35:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:35:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 10:35:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 10:35:07 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 10:35:07 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 13:36:25 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:25 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 13:36:25 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 13:36:25 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 13:36:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 13:36:28 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 15:20:00 INFO apscheduler.executors.default — Running job "Option chain IV snapshot (trigger: cron[day_of_week='mon-fri', hour='15', minute='20'], next run at: 2026-05-26 15:20:00 IST)" (scheduled at 2026-05-26 15:20:00+05:30)
+2026-05-26 15:20:01 INFO scheduler — Option snapshot job starting for 2026-05-26
+2026-05-26 15:20:08 WARNING integrations.nse_option_chain — Option chain failed for ADANIENT: Option chain for ADANIENT is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:09 WARNING integrations.nse_option_chain — Option chain failed for ADANIPORTS: Option chain for ADANIPORTS is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:09 WARNING integrations.nse_option_chain — Option chain failed for APOLLOHOSP: Option chain for APOLLOHOSP is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:10 WARNING integrations.nse_option_chain — Option chain failed for ASIANPAINT: Option chain for ASIANPAINT is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:10 WARNING integrations.nse_option_chain — Option chain failed for AXISBANK: Option chain for AXISBANK is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:11 WARNING integrations.nse_option_chain — Option chain failed for BAJAJ-AUTO: Option chain for BAJAJ-AUTO is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:11 WARNING integrations.nse_option_chain — Option chain failed for BAJAJFINSV: Option chain for BAJAJFINSV is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:12 WARNING integrations.nse_option_chain — Option chain failed for BAJFINANCE: Option chain for BAJFINANCE is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:12 WARNING integrations.nse_option_chain — Option chain failed for BEL: Option chain for BEL is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:13 WARNING integrations.nse_option_chain — Option chain failed for BHARTIARTL: Option chain for BHARTIARTL is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:13 WARNING integrations.nse_option_chain — Option chain failed for CIPLA: Option chain for CIPLA is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:13 WARNING integrations.nse_option_chain — Option chain failed for COALINDIA: Option chain for COALINDIA is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:14 WARNING integrations.nse_option_chain — Option chain failed for DRREDDY: Option chain for DRREDDY is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:14 WARNING integrations.nse_option_chain — Option chain failed for EICHERMOT: Option chain for EICHERMOT is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:15 WARNING integrations.nse_option_chain — Option chain failed for ETERNAL: Option chain for ETERNAL is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:15 WARNING integrations.nse_option_chain — Option chain failed for GRASIM: Option chain for GRASIM is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:16 WARNING integrations.nse_option_chain — Option chain failed for HCLTECH: Option chain for HCLTECH is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:16 WARNING integrations.nse_option_chain — Option chain failed for HDFCBANK: Option chain for HDFCBANK is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:17 WARNING integrations.nse_option_chain — Option chain failed for HDFCLIFE: Option chain for HDFCLIFE is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:17 WARNING integrations.nse_option_chain — Option chain failed for HINDALCO: Option chain for HINDALCO is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:18 WARNING integrations.nse_option_chain — Option chain failed for HINDUNILVR: Option chain for HINDUNILVR is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:18 WARNING integrations.nse_option_chain — Option chain failed for ICICIBANK: Option chain for ICICIBANK is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:18 WARNING integrations.nse_option_chain — Option chain failed for INDIGO: Option chain for INDIGO is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:19 WARNING integrations.nse_option_chain — Option chain failed for INFY: Option chain for INFY is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:19 WARNING integrations.nse_option_chain — Option chain failed for ITC: Option chain for ITC is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:20 WARNING integrations.nse_option_chain — Option chain failed for JIOFIN: Option chain for JIOFIN is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:20 WARNING integrations.nse_option_chain — Option chain failed for JSWSTEEL: Option chain for JSWSTEEL is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:21 WARNING integrations.nse_option_chain — Option chain failed for KOTAKBANK: Option chain for KOTAKBANK is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:21 WARNING integrations.nse_option_chain — Option chain failed for LT: Option chain for LT is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:22 WARNING integrations.nse_option_chain — Option chain failed for M&M: Option chain for M&M is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:22 WARNING integrations.nse_option_chain — Option chain failed for MARUTI: Option chain for MARUTI is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:23 WARNING integrations.nse_option_chain — Option chain failed for MAXHEALTH: Option chain for MAXHEALTH is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:23 WARNING integrations.nse_option_chain — Option chain failed for NESTLEIND: Option chain for NESTLEIND is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:24 WARNING integrations.nse_option_chain — Option chain failed for NTPC: Option chain for NTPC is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:24 WARNING integrations.nse_option_chain — Option chain failed for ONGC: Option chain for ONGC is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:25 WARNING integrations.nse_option_chain — Option chain failed for POWERGRID: Option chain for POWERGRID is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:25 WARNING integrations.nse_option_chain — Option chain failed for RELIANCE: Option chain for RELIANCE is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:25 WARNING integrations.nse_option_chain — Option chain failed for SBILIFE: Option chain for SBILIFE is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:26 WARNING integrations.nse_option_chain — Option chain failed for SBIN: Option chain for SBIN is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:26 WARNING integrations.nse_option_chain — Option chain failed for SHRIRAMFIN: Option chain for SHRIRAMFIN is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:27 WARNING integrations.nse_option_chain — Option chain failed for SUNPHARMA: Option chain for SUNPHARMA is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:27 WARNING integrations.nse_option_chain — Option chain failed for TATACONSUM: Option chain for TATACONSUM is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:28 WARNING integrations.nse_option_chain — Option chain failed for TATASTEEL: Option chain for TATASTEEL is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:28 WARNING integrations.nse_option_chain — Option chain failed for TCS: Option chain for TCS is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:29 WARNING integrations.nse_option_chain — Option chain failed for TECHM: Option chain for TECHM is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:29 WARNING integrations.nse_option_chain — Option chain failed for TITAN: Option chain for TITAN is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:30 WARNING integrations.nse_option_chain — Option chain failed for TMPV: Option chain for TMPV is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:30 WARNING integrations.nse_option_chain — Option chain failed for TRENT: Option chain for TRENT is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:31 WARNING integrations.nse_option_chain — Option chain failed for ULTRACEMCO: Option chain for ULTRACEMCO is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:31 WARNING integrations.nse_option_chain — Option chain failed for WIPRO: Option chain for WIPRO is empty — market may be closed or outside 9:15 AM – 3:30 PM IST
+2026-05-26 15:20:32 INFO integrations.nse_option_chain — Snapshot batch complete: 0 rows from 0/50 symbols
+2026-05-26 15:20:32 INFO pipeline.data_ingestion — Snapshot job: 0 rows stored, 50 symbols failed
+2026-05-26 15:20:32 ERROR scheduler — Option snapshot FAILED: unknown
+2026-05-26 15:20:36 INFO integrations.telegram — Telegram message sent (id=19, silent=False)
+2026-05-26 15:20:36 INFO apscheduler.executors.default — Job "Option chain IV snapshot (trigger: cron[day_of_week='mon-fri', hour='15', minute='20'], next run at: 2026-05-27 15:20:00 IST)" executed successfully
+2026-05-26 17:23:13 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 17:23:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 17:23:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 17:23:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 17:23:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 17:23:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 17:23:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 17:23:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 18:20:50 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:20:50 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:20:50 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 18:20:50 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 18:20:50 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 18:20:51 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:20:51 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 18:20:51 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 18:20:56 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 18:30:00 INFO apscheduler.executors.default — Running job "NSE bhavcopy + FII/DII (trigger: cron[day_of_week='mon-fri', hour='18', minute='30'], next run at: 2026-05-27 18:30:00 IST)" (scheduled at 2026-05-26 18:30:00+05:30)
+2026-05-26 18:30:00 INFO scheduler — Bhavcopy job starting
+2026-05-26 18:30:00 INFO integrations.nse_bhavcopy — Equity bhavcopy fetched: 50 Nifty 50 rows for 2026-05-26
+2026-05-26 18:30:01 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22low%22%2C%22symbol%22%2C%22volume%22%2C%22date%22%2C%22close%22%2C%22open%22 "HTTP/2 201 Created"
+2026-05-26 18:30:01 INFO pipeline.data_ingestion — Equity bhavcopy: 50 rows stored for 2026-05-26
+2026-05-26 18:30:01 INFO integrations.nse_bhavcopy — Indices bhavcopy fetched for 2026-05-26 — VIX: 16.13, Nifty50: 23913.7
+2026-05-26 18:30:01 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22low%22%2C%22symbol%22%2C%22volume%22%2C%22date%22%2C%22close%22%2C%22open%22 "HTTP/2 201 Created"
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 1151, in emit
+    msg = self.format(record)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 999, in format
+    return fmt.format(record)
+           ~~~~~~~~~~^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 712, in format
+    record.message = record.getMessage()
+                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\logging\__init__.py", line 400, in getMessage
+    msg = msg % self.args
+          ~~~~^~~~~~~~~~~
+TypeError: must be real number, not NoneType
+Call stack:
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\threading.py", line 1043, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\threading.py", line 1081, in _bootstrap_inner
+    self._context.run(self.run)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\threading.py", line 1023, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 119, in _worker
+    work_item.run(ctx)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 86, in run
+    result = ctx.run(self.task)
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\concurrent\futures\thread.py", line 73, in run
+    return fn(*args, **kwargs)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\scheduler.py", line 124, in job_bhavcopy
+    summary = run_bhavcopy_job()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 81, in run_bhavcopy_job
+    logger.info(
+Message: 'Indices bhavcopy: VIX=%.2f, Nifty50=%.2f'
+Arguments: (16.13, None)
+2026-05-26 18:30:08 INFO integrations.nse_fii_dii — FII/DII fetched for 25-May-2026 — FII net: 821.75 Cr, DII net: 3856.88 Cr
+2026-05-26 18:30:09 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?on_conflict=date "HTTP/2 201 Created"
+2026-05-26 18:30:09 INFO pipeline.data_ingestion — FII/DII stored: FII +822 Cr, DII +3857 Cr
+2026-05-26 18:30:09 INFO scheduler — Bhavcopy OK: equity=50 rows, index=10 rows, VIX=16.13, FII OK=True
+2026-05-26 18:30:10 INFO integrations.telegram — Telegram message sent (id=20, silent=True)
+2026-05-26 18:30:10 INFO apscheduler.executors.default — Job "NSE bhavcopy + FII/DII (trigger: cron[day_of_week='mon-fri', hour='18', minute='30'], next run at: 2026-05-27 18:30:00 IST)" executed successfully
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 18:31:11 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 19:00:00 INFO apscheduler.executors.default — Running job "Bhavcopy retry 19:00 (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-27 19:00:00 IST)" (scheduled at 2026-05-26 19:00:00+05:30)
+2026-05-26 19:00:00 INFO apscheduler.executors.default — Running job "Kite token reminder (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-26 19:00:00 IST)" (scheduled at 2026-05-26 19:00:00+05:30)
+2026-05-26 19:00:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:00:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 19:00:00 INFO scheduler — Bhavcopy retry: data for 2026-05-26 already present — skipping
+2026-05-26 19:00:00 INFO apscheduler.executors.default — Job "Bhavcopy retry 19:00 (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-27 19:00:00 IST)" executed successfully
+2026-05-26 19:00:00 INFO scheduler — Token expires_at=2026-05-26 18:30:00+00:00 | valid_for_tonight=True
+2026-05-26 19:00:03 INFO integrations.telegram — Telegram message sent (id=21, silent=True)
+2026-05-26 19:00:03 INFO scheduler — Token valid — silent confirmation sent (message_id=21)
+2026-05-26 19:00:03 INFO apscheduler.executors.default — Job "Kite token reminder (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-27 19:00:00 IST)" executed successfully
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 19:06:10 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:06:36 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 19:19:42 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 19:30:00 INFO apscheduler.executors.default — Running job "Bhavcopy retry 19:30 (trigger: cron[day_of_week='mon-fri', hour='19', minute='30'], next run at: 2026-05-27 19:30:00 IST)" (scheduled at 2026-05-26 19:30:00+05:30)
+2026-05-26 19:30:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 19:30:00 INFO scheduler — Bhavcopy retry: data for 2026-05-26 already present — skipping
+2026-05-26 19:30:00 INFO apscheduler.executors.default — Job "Bhavcopy retry 19:30 (trigger: cron[day_of_week='mon-fri', hour='19', minute='30'], next run at: 2026-05-27 19:30:00 IST)" executed successfully
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-26 19:34:47 INFO main — APScheduler stopped
+2026-05-26 19:34:47 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [33368]
+INFO:     Started server process [14740]
+INFO:     Waiting for application startup.
+2026-05-26 19:34:53 INFO main — Starting Swing Trading API...
+2026-05-26 19:34:54 INFO database.client — Supabase client initialised (service key)
+2026-05-26 19:34:54 INFO main — Database connection verified
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Scheduler started
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-26 19:34:54 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-26 19:34:54 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-26 19:34:54 INFO main — APScheduler started with 9 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-26 20:00:00 INFO apscheduler.executors.default — Running job "Bhavcopy retry 20:00 (trigger: cron[day_of_week='mon-fri', hour='20', minute='0'], next run at: 2026-05-26 20:00:00 IST)" (scheduled at 2026-05-26 20:00:00+05:30)
+2026-05-26 20:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 20:00:01 INFO scheduler — Bhavcopy retry: data for 2026-05-26 already present — skipping
+2026-05-26 20:00:01 INFO apscheduler.executors.default — Job "Bhavcopy retry 20:00 (trigger: cron[day_of_week='mon-fri', hour='20', minute='0'], next run at: 2026-05-27 20:00:00 IST)" executed successfully
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-22&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=claude_cost_usd&session_date=gte.2026-05-01&claude_cost_usd=not.is.null "HTTP/2 200 OK"
+2026-05-26 20:16:57 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"

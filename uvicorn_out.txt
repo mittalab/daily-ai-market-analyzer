@@ -1,0 +1,201 @@
+INFO:     127.0.0.1:49738 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54369 - "GET /kite/refresh HTTP/1.1" 500 Internal Server Error
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 500 Internal Server Error
+INFO:     106.219.121.82:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:65012 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/callback?action=login&type=login&status=success&request_token=seV21aEG1qdMa0kbFzm5PlZt5gVd1Kj2 HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/callback?status=success&request_token=Jc1AcPgHsSUTO74VSRk9BcT01MXD9yMu&action=login&type=login HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:52054 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 400 Bad Request
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 400 Bad Request
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 400 Bad Request
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 400 Bad Request
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 400 Bad Request
+INFO:     106.219.121.82:0 - "OPTIONS /api/analyse HTTP/1.1" 400 Bad Request
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/analyse HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "POST /api/analyse HTTP/1.1" 404 Not Found
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "POST /api/analyse HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "POST /api/watchlist HTTP/1.1" 500 Internal Server Error
+INFO:     106.219.121.82:0 - "POST /api/watchlist HTTP/1.1" 500 Internal Server Error
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /kite/callback?action=login&type=login&status=success&request_token=X3ZoStxUTUK8lr4cQ3fjgMZjvSs0W0FN HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:1cd7:eedd:80c9:a41:f8f6:f967:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /health HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/callback?type=login&status=success&request_token=V3aS34rGWaCS6os3EpgMY296TPguTewI&action=login HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     2401:4900:83ac:32de:c05e:f89a:83f7:c845:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     74.125.215.129:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     74.125.215.138:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     74.125.215.130:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     74.125.215.130:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     74.125.215.128:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     74.125.215.130:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK

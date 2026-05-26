@@ -1,0 +1,1 @@
+Frontend serving C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\dist on port 3001

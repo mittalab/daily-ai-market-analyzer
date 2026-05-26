@@ -1,0 +1,186 @@
+The filename, directory name, or volume label syntax is incorrect.
+The filename, directory name, or volume label syntax is incorrect.
+The filename, directory name, or volume label syntax is incorrect.
+The filename, directory name, or volume label syntax is incorrect.
+The filename, directory name, or volume label syntax is incorrect.
+The filename, directory name, or volume label syntax is incorrect.
+file:///C:/Users/29abh/Projects/Trading/daily-ai-market-analyzer/frontend/serve_frontend.js:7
+require('C:/Users/29abh/AppData/Roaming/npm/node_modules/serve/build/main.js');
+^
+
+ReferenceError: require is not defined in ES module scope, you can use import instead
+This file is being treated as an ES module because it has a '.js' file extension and 'C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+    at file:///C:/Users/29abh/Projects/Trading/daily-ai-market-analyzer/frontend/serve_frontend.js:7:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0
+file:///C:/Users/29abh/Projects/Trading/daily-ai-market-analyzer/frontend/serve_frontend.js:7
+require('C:/Users/29abh/AppData/Roaming/npm/node_modules/serve/build/main.js');
+^
+
+ReferenceError: require is not defined in ES module scope, you can use import instead
+This file is being treated as an ES module because it has a '.js' file extension and 'C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+    at file:///C:/Users/29abh/Projects/Trading/daily-ai-market-analyzer/frontend/serve_frontend.js:7:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0
+file:///C:/Users/29abh/Projects/Trading/daily-ai-market-analyzer/frontend/serve_frontend.js:7
+require('C:/Users/29abh/AppData/Roaming/npm/node_modules/serve/build/main.js');
+^
+
+ReferenceError: require is not defined in ES module scope, you can use import instead
+This file is being treated as an ES module because it has a '.js' file extension and 'C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+    at file:///C:/Users/29abh/Projects/Trading/daily-ai-market-analyzer/frontend/serve_frontend.js:7:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0
+node:internal/modules/cjs/loader:1479
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\serve_frontend.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1476:15)
+    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)
+    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)
+    at Module._load (node:internal/modules/cjs/loader:1262:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.15.0
+node:internal/modules/esm/module_job:537
+      throw new ERR_REQUIRE_ASYNC_MODULE(filename, parentFilename);
+      ^
+
+Error [ERR_REQUIRE_ASYNC_MODULE]: require() cannot be used on an ESM graph with top-level await. Use import() instead. To see where the top-level await comes from, use --experimental-print-required-tla.
+  From C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\serve_frontend.cjs 
+  Requiring C:\Users\29abh\AppData\Roaming\npm\node_modules\serve\build\main.js 
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:537:13)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:366:47)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1649:24)
+    at Module._compile (node:internal/modules/cjs/loader:1812:5)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1576:12)
+    at require (node:internal/modules/helpers:153:16) {
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v24.15.0
+node:internal/modules/esm/module_job:537
+      throw new ERR_REQUIRE_ASYNC_MODULE(filename, parentFilename);
+      ^
+
+Error [ERR_REQUIRE_ASYNC_MODULE]: require() cannot be used on an ESM graph with top-level await. Use import() instead. To see where the top-level await comes from, use --experimental-print-required-tla.
+  From C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\serve_frontend.cjs 
+  Requiring C:\Users\29abh\AppData\Roaming\npm\node_modules\serve\build\main.js 
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:537:13)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:366:47)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1649:24)
+    at Module._compile (node:internal/modules/cjs/loader:1812:5)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1576:12)
+    at require (node:internal/modules/helpers:153:16) {
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v24.15.0
+node:internal/modules/esm/module_job:537
+      throw new ERR_REQUIRE_ASYNC_MODULE(filename, parentFilename);
+      ^
+
+Error [ERR_REQUIRE_ASYNC_MODULE]: require() cannot be used on an ESM graph with top-level await. Use import() instead. To see where the top-level await comes from, use --experimental-print-required-tla.
+  From C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\serve_frontend.cjs 
+  Requiring C:\Users\29abh\AppData\Roaming\npm\node_modules\serve\build\main.js 
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:537:13)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:366:47)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1649:24)
+    at Module._compile (node:internal/modules/cjs/loader:1812:5)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1576:12)
+    at require (node:internal/modules/helpers:153:16) {
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v24.15.0
+node:internal/modules/esm/module_job:537
+      throw new ERR_REQUIRE_ASYNC_MODULE(filename, parentFilename);
+      ^
+
+Error [ERR_REQUIRE_ASYNC_MODULE]: require() cannot be used on an ESM graph with top-level await. Use import() instead. To see where the top-level await comes from, use --experimental-print-required-tla.
+  From C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\serve_frontend.cjs 
+  Requiring C:\Users\29abh\AppData\Roaming\npm\node_modules\serve\build\main.js 
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:537:13)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:366:47)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1649:24)
+    at Module._compile (node:internal/modules/cjs/loader:1812:5)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1576:12)
+    at require (node:internal/modules/helpers:153:16) {
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v24.15.0
+node:internal/modules/esm/module_job:537
+      throw new ERR_REQUIRE_ASYNC_MODULE(filename, parentFilename);
+      ^
+
+Error [ERR_REQUIRE_ASYNC_MODULE]: require() cannot be used on an ESM graph with top-level await. Use import() instead. To see where the top-level await comes from, use --experimental-print-required-tla.
+  From C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\serve_frontend.cjs 
+  Requiring C:\Users\29abh\AppData\Roaming\npm\node_modules\serve\build\main.js 
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:537:13)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:366:47)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1649:24)
+    at Module._compile (node:internal/modules/cjs/loader:1812:5)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1576:12)
+    at require (node:internal/modules/helpers:153:16) {
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v24.15.0
+node:internal/modules/esm/module_job:537
+      throw new ERR_REQUIRE_ASYNC_MODULE(filename, parentFilename);
+      ^
+
+Error [ERR_REQUIRE_ASYNC_MODULE]: require() cannot be used on an ESM graph with top-level await. Use import() instead. To see where the top-level await comes from, use --experimental-print-required-tla.
+  From C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\frontend\serve_frontend.cjs 
+  Requiring C:\Users\29abh\AppData\Roaming\npm\node_modules\serve\build\main.js 
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:537:13)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:366:47)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1649:24)
+    at Module._compile (node:internal/modules/cjs/loader:1812:5)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)
+    at Module._load (node:internal/modules/cjs/loader:1355:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1576:12)
+    at require (node:internal/modules/helpers:153:16) {
+  code: 'ERR_REQUIRE_ASYNC_MODULE'
+}
+
+Node.js v24.15.0

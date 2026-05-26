@@ -3,7 +3,7 @@
 
 fastapi
 uvicorn[standard]
-supabase
+supabase==2.15.0
 python-dotenv
 kiteconnect
 requests

@@ -5,7 +5,7 @@ Callers handle errors; queries let exceptions propagate so the pipeline
 can log, alert, and decide whether to abort or continue gracefully.
 """
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from database.client import get_client
@@ -45,6 +45,12 @@ def get_all_system_config() -> dict[str, str]:
     return {row["key"]: row["value"] for row in resp.data}
 
 
+def get_dashboard_url() -> str:
+    """Return the dashboard URL from system_config. Fallback ensures notifications always send."""
+    url = get_system_config("dashboard_url")
+    return url or "https://trading.abhishekmittal.in"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # kite_tokens
 # ─────────────────────────────────────────────────────────────────────────────
@@ -76,22 +82,39 @@ def upsert_price_history(rows: list[dict]) -> int:
     """
     if not rows:
         return 0
-    get_client().table("price_history").upsert(rows).execute()
+    get_client().table("price_history").upsert(rows, on_conflict="symbol,date").execute()
     return len(rows)
 
 
 def get_price_history(symbol: str, days: int = 180) -> list[dict]:
-    """Fetch last N calendar days of OHLCV for a symbol, ordered ascending."""
+    """Fetch the most recent N rows of OHLCV for a symbol, ordered ascending."""
     resp = (
         get_client()
         .table("price_history")
         .select("date,open,high,low,close,volume")
         .eq("symbol", symbol)
-        .order("date", desc=False)
+        .order("date", desc=True)
         .limit(days)
         .execute()
     )
-    return resp.data
+    return list(reversed(resp.data))
+
+
+def get_row_count(table: str, filters: dict | None = None, created_after: datetime | None = None) -> int:
+    """
+    Return total row count for a table, filtered by column values and/or creation time.
+    Used for verifying that a scheduled job actually inserted NEW data.
+    """
+    query = get_client().table(table).select("id", count="exact")
+    if filters:
+        for key, val in filters.items():
+            query = query.eq(key, val)
+    if created_after:
+        # Supabase/PostgREST uses ISO strings for timestamp comparisons
+        query = query.gte("created_at", created_after.isoformat())
+    
+    resp = query.limit(1).execute()
+    return resp.count if resp.count is not None else 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -103,7 +126,7 @@ def upsert_fii_dii_flow(data: dict) -> None:
     Upsert a single day's FII/DII flow. Values in Crores — not divided.
     source='LIVE' for fresh data, 'CACHED' when using previous day on fetch failure.
     """
-    get_client().table("fii_dii_flows").upsert(data).execute()
+    get_client().table("fii_dii_flows").upsert(data, on_conflict="date").execute()
 
 
 def get_fii_dii_flows(days: int = 30) -> list[dict]:
@@ -144,7 +167,7 @@ def upsert_lot_sizes(rows: list[dict]) -> None:
     """
     if not rows:
         return
-    get_client().table("lot_sizes").upsert(rows).execute()
+    get_client().table("lot_sizes").upsert(rows, on_conflict="symbol").execute()
 
 
 def get_lot_size(symbol: str) -> int | None:
@@ -165,6 +188,13 @@ def get_all_lot_sizes() -> dict[str, int]:
     return {row["symbol"]: row["lot_size"] for row in resp.data}
 
 
+def upsert_single_lot_size(symbol: str, lot_size: int) -> None:
+    """Cache a single lot size fetched on-demand (e.g. from Kite instruments master)."""
+    get_client().table("lot_sizes").upsert(
+        {"symbol": symbol, "lot_size": lot_size}, on_conflict="symbol"
+    ).execute()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # options_snapshots
 # ─────────────────────────────────────────────────────────────────────────────
@@ -176,7 +206,7 @@ def upsert_options_snapshots(rows: list[dict]) -> int:
     """
     if not rows:
         return 0
-    get_client().table("options_snapshots").upsert(rows).execute()
+    get_client().table("options_snapshots").upsert(rows, on_conflict="symbol,snapshot_date,expiry_date,strike,option_type").execute()
     return len(rows)
 
 
@@ -217,7 +247,7 @@ def get_latest_snapshot_date(symbol: str) -> date | None:
 
 def upsert_continuous_oi(data: dict) -> None:
     """Upsert one row of the continuous OI series (one symbol, one date)."""
-    get_client().table("continuous_oi_series").upsert(data).execute()
+    get_client().table("continuous_oi_series").upsert(data, on_conflict="symbol,date").execute()
 
 
 def get_continuous_oi(symbol: str, days: int = 30) -> list[dict]:
@@ -235,12 +265,59 @@ def get_continuous_oi(symbol: str, days: int = 30) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# options_snapshots (additional queries for oi_series_builder)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_options_by_date(symbol: str, snapshot_date: date) -> list[dict]:
+    """Fetch all option rows for a symbol on a given snapshot date (all expiries)."""
+    resp = (
+        get_client()
+        .table("options_snapshots")
+        .select("*")
+        .eq("symbol", symbol)
+        .eq("snapshot_date", str(snapshot_date))
+        .order("expiry_date", desc=False)
+        .order("strike", desc=False)
+        .execute()
+    )
+    return resp.data
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # futures_continuous_series
 # ─────────────────────────────────────────────────────────────────────────────
 
 def upsert_futures_series(data: dict) -> None:
-    """Upsert one row of the futures continuous series (one symbol, one date)."""
-    get_client().table("futures_continuous_series").upsert(data).execute()
+    """
+    Upsert one row of the futures continuous series (one symbol, one date).
+    New columns futures_open, futures_high, futures_low are included only if
+    present in data (migration 008 must be applied first for them to persist).
+    """
+    get_client().table("futures_continuous_series").upsert(data, on_conflict="symbol,date").execute()
+
+
+def get_futures_row(symbol: str, date_: date) -> dict | None:
+    """Fetch the futures series row for a specific symbol and date."""
+    resp = (
+        get_client()
+        .table("futures_continuous_series")
+        .select("*")
+        .eq("symbol", symbol)
+        .eq("date", str(date_))
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def update_futures_spot(
+    symbol: str, date_: date, spot_price: float, basis: float, basis_pct: float
+) -> None:
+    """Patch spot_price, basis, basis_pct on a futures_continuous_series row."""
+    get_client().table("futures_continuous_series").update({
+        "spot_price": spot_price,
+        "basis":      basis,
+        "basis_pct":  basis_pct,
+    }).eq("symbol", symbol).eq("date", str(date_)).execute()
 
 
 def get_futures_series(symbol: str, days: int = 30) -> list[dict]:
@@ -288,6 +365,20 @@ def get_analysis_session(session_id: str) -> dict | None:
     return resp.data[0] if resp.data else None
 
 
+def get_monthly_claude_spend() -> float:
+    """Return total pipeline Claude spend in USD for the current calendar month."""
+    month_start = date.today().replace(day=1)
+    resp = (
+        get_client()
+        .table("analysis_sessions")
+        .select("claude_cost_usd")
+        .gte("session_date", str(month_start))
+        .not_.is_("claude_cost_usd", "null")
+        .execute()
+    )
+    return sum(float(row["claude_cost_usd"]) for row in resp.data)
+
+
 def get_latest_session() -> dict | None:
     """Return the most recent session row. Used at startup to check for missed runs."""
     resp = (
@@ -327,7 +418,7 @@ def save_claude_turn(
         "input_tokens":  input_tokens,
         "output_tokens": output_tokens,
         "output_text":   output_text,
-    }).execute()
+    }, on_conflict="session_id,turn_number").execute()
 
 
 def get_claude_turns(session_id: str) -> list[dict]:
@@ -400,6 +491,24 @@ def get_open_trade_setups() -> list[dict]:
     return resp.data
 
 
+def get_recent_setups_for_symbol(symbol: str, limit: int = 3) -> list[dict]:
+    """
+    Return the most recent trade setups for a given symbol.
+    Fields: setup_date, direction, conviction_score, stage, paper_outcome, setup_type.
+    Used in build_stock_package to give Claude historical context on this stock.
+    """
+    resp = (
+        get_client()
+        .table("trade_setups")
+        .select("setup_date,direction,conviction_score,stage,paper_outcome,setup_type")
+        .eq("symbol", symbol)
+        .order("setup_date", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return resp.data
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # watchlist_staging
 # ─────────────────────────────────────────────────────────────────────────────
@@ -447,3 +556,38 @@ def get_pending_shadow_tracks() -> list[dict]:
 def update_shadow_track(track_id: str, updates: dict) -> None:
     """Write 5-day outcome back to a shadow track row."""
     get_client().table("level1_shadow_tracks").update(updates).eq("id", track_id).execute()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Context builder helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_recent_outcomes(days: int = 7) -> list[dict]:
+    """Return trade setups with a paper outcome recorded in the last N days."""
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    resp = (
+        get_client()
+        .table("trade_setups")
+        .select("symbol,setup_date,direction,conviction_score,paper_outcome")
+        .not_.is_("paper_outcome", "null")
+        .gte("setup_date", cutoff)
+        .order("setup_date", desc=True)
+        .execute()
+    )
+    return resp.data
+
+
+def get_rollover_context(analysis_date: date) -> dict | None:
+    """
+    Return rollover phase info for analysis_date from one symbol's continuous_oi_series row.
+    All symbols share the same rollover_phase on a given date — any row works.
+    """
+    resp = (
+        get_client()
+        .table("continuous_oi_series")
+        .select("rollover_phase,near_expiry,next_expiry,near_month_oi,next_month_oi,rollover_pct,pcr_near,pcr_total,max_pain")
+        .eq("date", str(analysis_date))
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
