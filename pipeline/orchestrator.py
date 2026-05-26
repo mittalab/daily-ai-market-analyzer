@@ -27,7 +27,9 @@ from integrations.nse_bhavcopy import get_nifty50_symbols
 from integrations.telegram import send_pipeline_complete, send_pipeline_start
 from pipeline.claude_session import run_claude_session
 from pipeline.context_builder import build_context_bundle
+from pipeline.data_ingestion import fetch_kite_token, get_ingestion_symbols, run_kite_data_fetch
 from pipeline.level1_filter import fetch_nse_earnings_window, run_level1_filter
+
 from pipeline.market_regime import run_market_regime
 from pipeline.oi_series_builder import run_oi_series_builder
 
@@ -46,7 +48,8 @@ def run_pipeline(session_date: date) -> dict:
     """
     session_id = f"SESSION_{session_date.strftime('%Y%m%d')}"
     started_at = datetime.now(IST).isoformat()
-    symbols    = sorted(get_nifty50_symbols())
+    # FIX: Dynamic symbols list (Nifty 50 + active watchlist)
+    symbols = get_ingestion_symbols()
 
     logger.info("Pipeline start: %s | %d symbols", session_id, len(symbols))
 

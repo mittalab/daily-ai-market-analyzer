@@ -21,6 +21,7 @@ import pytz
 from database.queries import (
     get_fii_dii_flows,
     get_latest_fii_dii,
+    get_watchlist,
     upsert_fii_dii_flow,
     upsert_futures_series,
     upsert_options_snapshots,
@@ -42,7 +43,18 @@ from integrations.kite_ohlcv import fetch_ohlcv_all, ohlcv_to_price_rows
 logger = logging.getLogger(__name__)
 IST    = pytz.timezone("Asia/Kolkata")
 
-NIFTY50 = sorted(get_nifty50_symbols())
+
+def get_ingestion_symbols() -> list[str]:
+    """Return a sorted list of symbols to ingest: Nifty 50 + active watchlist."""
+    nifty50 = get_nifty50_symbols()
+    try:
+        # Include anyone in WATCH, ON_RADAR, or TRADE_READY stages
+        active_wl = get_watchlist()
+        watchlist = {r["symbol"] for r in active_wl if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY")}
+    except Exception as exc:
+        logger.warning("Failed to fetch watchlist symbols for ingestion: %s", exc)
+        watchlist = set()
+    return sorted(list(set(nifty50) | watchlist))
 
 
 # ── 6:30 PM job ───────────────────────────────────────────────────────────────
@@ -56,16 +68,19 @@ def run_bhavcopy_job(for_date: date | None = None) -> dict:
     On any source failure: logs error, continues with remaining sources.
     """
     summary: dict = {"ok": True, "errors": []}
+    symbols = get_ingestion_symbols()
 
     # ── Equity bhavcopy ────────────────────────────────────────────────────────
     trade_date: date | None = None
     try:
         eq_df, trade_date = fetch_equity_bhavcopy(for_date)
+        # Filter for our target symbols
+        eq_df = eq_df[eq_df["SYMBOL"].isin(symbols)]
         eq_rows           = equity_bhavcopy_to_price_rows(eq_df, trade_date)
         n_upserted        = upsert_price_history(eq_rows)
         summary["trade_date"]   = str(trade_date)
         summary["equity_rows"]  = n_upserted
-        logger.info("Equity bhavcopy: %d rows stored for %s", n_upserted, trade_date)
+        logger.info("Equity bhavcopy: %d rows stored for %d targets on %s", n_upserted, len(symbols), trade_date)
     except Exception as exc:
         logger.error("Equity bhavcopy FAILED: %s", exc)
         summary["errors"].append(f"equity_bhavcopy: {exc}")
@@ -129,19 +144,20 @@ def run_bhavcopy_job(for_date: date | None = None) -> dict:
 
 def run_snapshot_job(snapshot_date: date | None = None) -> dict:
     """
-    Fetch option chain IV snapshot for all 50 Nifty stocks. Store in Supabase.
+    Fetch option chain IV snapshot for all target stocks. Store in Supabase.
     FIX: Tiered fallback to Kite Quotes if NSE scrape is blocked.
     """
     snap_date = snapshot_date or date.today()
     summary: dict = {"ok": False, "rows_stored": 0, "failed_symbols": [], "source": "NSE"}
+    symbols = get_ingestion_symbols()
 
     # Tier 1: Try high-fidelity NSE scrape
     try:
         from integrations.nse_fii_dii import create_nse_session
         nse_session = create_nse_session()
-        all_rows, failed = run_snapshot_batch(nse_session, NIFTY50, snap_date)
+        all_rows, failed = run_snapshot_batch(nse_session, symbols, snap_date)
         
-        if len(all_rows) > 100:  # Heuristic for meaningful success
+        if len(all_rows) > (len(symbols) * 2):  # Heuristic for meaningful success
             n_upserted = upsert_options_snapshots(all_rows)
             summary.update({"ok": True, "rows_stored": n_upserted, "failed_symbols": failed})
             return summary
@@ -150,7 +166,7 @@ def run_snapshot_job(snapshot_date: date | None = None) -> dict:
 
     # Tier 2: Fallback to Kite Quotes
     try:
-        logger.info("Triggering Tier 2 Fallback: Kite Option Quotes")
+        logger.info("Triggering Tier 2 Fallback: Kite Option Quotes for %d symbols", len(symbols))
         from database.queries import get_kite_token
         from integrations.kite_ohlcv import get_kite, get_option_symbols, fetch_option_quotes
         
@@ -161,7 +177,7 @@ def run_snapshot_job(snapshot_date: date | None = None) -> dict:
         kite = get_kite(token_row["access_token"])
         fallback_rows = []
         
-        for symbol in NIFTY50:
+        for symbol in symbols:
             # 1. Get near/next month option symbols
             instruments = get_option_symbols(kite, symbol)
             if instruments.empty:
@@ -196,7 +212,7 @@ def run_snapshot_job(snapshot_date: date | None = None) -> dict:
                 "ok": True, 
                 "rows_stored": n_upserted, 
                 "source": "KITE",
-                "failed_symbols": [s for s in NIFTY50 if s not in [r["symbol"] for r in fallback_rows]]
+                "failed_symbols": [s for s in symbols if s not in [r["symbol"] for r in fallback_rows]]
             })
             logger.info("Kite Fallback successful: Stored %d option rows (IV will be None)", n_upserted)
         
@@ -223,10 +239,11 @@ def run_kite_data_fetch(kite, rollover_phase: str = "NORMAL") -> dict:
     Returns summary dict.
     """
     summary: dict = {"ok": True, "errors": [], "symbols_ohlcv": 0, "symbols_oi": 0}
+    symbols = get_ingestion_symbols()
 
     # ── OHLCV ──────────────────────────────────────────────────────────────────
     try:
-        ohlcv_data = fetch_ohlcv_all(kite, NIFTY50, days=250)
+        ohlcv_data = fetch_ohlcv_all(kite, symbols, days=250)
         price_rows: list[dict] = []
         for symbol, df in ohlcv_data.items():
             if not df.empty:
@@ -240,7 +257,8 @@ def run_kite_data_fetch(kite, rollover_phase: str = "NORMAL") -> dict:
 
     # ── Futures OI ─────────────────────────────────────────────────────────────
     try:
-        oi_data = fetch_futures_oi_all(kite, NIFTY50, days=30)
+        # fetch_futures_oi_all returns {symbol: {near, next, lot_size, ...}}
+        oi_data = fetch_futures_oi_all(kite, symbols, days=30)
         for symbol, entry in oi_data.items():
             near_df      = entry.get("near", None)
             next_df      = entry.get("next", None)
@@ -251,7 +269,7 @@ def run_kite_data_fetch(kite, rollover_phase: str = "NORMAL") -> dict:
             if near_df is None or near_df.empty:
                 continue
 
-            effective_next = next_df if next_df is not None else type(near_df)()
+            effective_next = next_df if next_df is not None else pd.DataFrame()
             rows = futures_oi_to_series_rows(
                 symbol, near_df, effective_next,
                 lot_size, near_expiry, next_expiry, rollover_phase,
