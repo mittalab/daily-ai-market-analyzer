@@ -585,6 +585,11 @@ def run_claude_session(
         save_claude_turn(session_id, turn_num, "deep_analysis", symbol,
                          in_tok, out_tok, json.dumps(analysis))
 
+        # FIX: Send cost notification per turn
+        from integrations.telegram import send_claude_cost
+        turn_cost = round(in_tok / 1_000_000 * 3.00 + out_tok / 1_000_000 * 15.00, 6)
+        send_claude_cost(symbol, in_tok, out_tok, turn_cost)
+
         stage = analysis.get("stage", "SKIP")
         logger.info(
             "Turn %d done: %s stage=%s conviction=%s lots=%s rr=%s in=%d out=%d",

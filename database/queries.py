@@ -366,17 +366,27 @@ def get_analysis_session(session_id: str) -> dict | None:
 
 
 def get_monthly_claude_spend() -> float:
-    """Return total pipeline Claude spend in USD for the current calendar month."""
+    """
+    Return total Claude spend in USD for the current calendar month.
+    Sums from session_claude_turns to include both nightly pipeline and manual runs.
+    """
     month_start = date.today().replace(day=1)
     resp = (
         get_client()
-        .table("analysis_sessions")
-        .select("claude_cost_usd")
-        .gte("session_date", str(month_start))
-        .not_.is_("claude_cost_usd", "null")
+        .table("session_claude_turns")
+        .select("input_tokens,output_tokens")
+        .gte("completed_at", str(month_start))
         .execute()
     )
-    return sum(float(row["claude_cost_usd"]) for row in resp.data)
+    
+    total_cost = 0.0
+    for turn in resp.data:
+        in_t  = turn.get("input_tokens") or 0
+        out_t = turn.get("output_tokens") or 0
+        cost  = (in_t / 1_000_000 * 3.00) + (out_t / 1_000_000 * 15.00)
+        total_cost += cost
+        
+    return round(total_cost, 4)
 
 
 def get_latest_session() -> dict | None:

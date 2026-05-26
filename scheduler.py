@@ -115,9 +115,11 @@ def job_option_snapshot() -> None:
 
     if actual_rows > 0:
         logger.info(
-            "Option snapshot VERIFIED: %d NEW rows in DB (process reported %d)",
-            actual_rows, summary.get("rows_stored", 0)
+            "Option snapshot VERIFIED: %d NEW rows in DB (process reported %d) Source: %s",
+            actual_rows, summary.get("rows_stored", 0), summary.get("source", "NSE")
         )
+        from integrations.telegram import send_snapshot_verified
+        send_snapshot_verified(str(today), actual_rows, summary.get("source", "NSE"))
     else:
         logger.error("Option snapshot VERIFIED FAILURE: 0 NEW rows found in DB for %s", today)
         send_snapshot_failed(str(today))
@@ -150,13 +152,15 @@ def job_bhavcopy() -> None:
 
     if actual_rows >= 50:
         vix  = summary.get("vix") or 0.0
-        fii  = summary.get("fii_ok")
+        fii_ok = summary.get("fii_ok")
         logger.info("Bhavcopy VERIFIED: %d NEW rows in DB. VIX=%.2f, FII OK=%s",
-                    actual_rows, vix, fii)
-        fii_sym = "✅" if fii else "⚠️"
+                    actual_rows, vix, fii_ok)
+        fii_sym = "✅" if fii_ok else "⚠️"
+        fii_msg = "LIVE" if fii_ok else "CACHED"
         send_silent(
             f"📥 <b>Data verified — {today}</b>\n"
-            f"Verified NEW rows: <code>{actual_rows}</code> | VIX: <code>{vix:.2f}</code> | FII {fii_sym}"
+            f"Verified NEW rows: <code>{actual_rows}</code> | VIX: <code>{vix:.2f}</code>\n"
+            f"FII/DII: <b>{fii_msg}</b> {fii_sym}"
         )
     else:
         logger.error("Bhavcopy VERIFIED FAILURE: Only %d NEW rows found in DB (expected >50)", actual_rows)

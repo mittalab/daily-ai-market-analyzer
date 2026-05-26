@@ -1,4 +1,4 @@
-import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus } from './types';
+import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -40,6 +40,10 @@ export function addToWatchlist(symbol: string): Promise<unknown> {
 
 export function fetchToday(): Promise<TodayResponse> {
   return apiFetch<TodayResponse>('/api/today');
+}
+
+export function fetchDeepAnalysis(): Promise<DeepAnalysisResponse> {
+  return apiFetch<DeepAnalysisResponse>('/api/deep-analysis');
 }
 
 export function fetchWatchlist(): Promise<{ watchlist: WatchlistEntry[]; count: number }> {

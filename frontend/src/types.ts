@@ -171,6 +171,19 @@ export interface SystemStatus {
   server_time_ist: string;
 }
 
+export interface DeepAnalysisTurn {
+  turn_number: number;
+  symbol: string;
+  completed_at: string;
+  analysis: AnalysisResult;
+}
+
+export interface DeepAnalysisResponse {
+  turns: DeepAnalysisTurn[];
+  session_id: string | null;
+  session_date: string;
+}
+
 export interface AnalyseResponse {
   symbol: string;
   session_date: string;

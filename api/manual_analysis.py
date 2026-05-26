@@ -29,6 +29,7 @@ from database.queries import (
     get_futures_series,
     get_options_snapshot,
     get_price_history,
+    save_claude_turn,
     upsert_price_history,
     upsert_single_lot_size,
 )
@@ -586,6 +587,21 @@ async def analyse_stock(req: AnalyseRequest) -> AnalyseResponse:
     logger.info("Calling Claude for deep analysis: %s direction=%s", symbol, req.direction)
 
     analysis, input_tok, output_tok = _call_claude_deep(prompt, max_tokens=3000)
+
+    # ── Log Turn ──────────────────────────────────────────────────────────────
+    try:
+        session_id = f"MANUAL_{session_date}_{datetime.now().strftime('%H%M%S')}"
+        save_claude_turn(
+            session_id=session_id,
+            turn_number=1,
+            turn_type="manual_deep",
+            symbol=symbol,
+            input_tokens=input_tok,
+            output_tokens=output_tok,
+            output_text=json.dumps(analysis),
+        )
+    except Exception as exc:
+        logger.warning("Could not log manual turn: %s", exc)
 
     # ── Cost calculation ──────────────────────────────────────────────────────
     cost_usd = round(input_tok / 1_000_000 * 3.00 + output_tok / 1_000_000 * 15.00, 6)

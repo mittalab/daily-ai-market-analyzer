@@ -1,12 +1,13 @@
-export type Screen = 'today' | 'watchlist' | 'analyse' | 'performance';
+export type Screen = 'today' | 'deep' | 'watchlist' | 'analyse' | 'status';
 
 interface Tab { id: Screen; label: string; icon: string; }
 
 const TABS: Tab[] = [
-  { id: 'today',       label: 'Today',       icon: '🏠' },
-  { id: 'watchlist',   label: 'Watchlist',   icon: '👁' },
-  { id: 'analyse',     label: 'Analyse',     icon: '🔍' },
-  { id: 'performance', label: 'Status', icon: '⚙️' },
+  { id: 'today',       label: 'Today',   icon: '🏠' },
+  { id: 'deep',        label: 'Deep',    icon: '🧠' },
+  { id: 'watchlist',   label: 'Watch',   icon: '👁' },
+  { id: 'analyse',     label: 'Analyse', icon: '🔍' },
+  { id: 'status',      label: 'Status',  icon: '⚙️' },
 ];
 
 interface Props { active: Screen; onChange: (s: Screen) => void; }

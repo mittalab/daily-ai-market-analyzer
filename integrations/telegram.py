@@ -114,6 +114,26 @@ def send_pipeline_start(trade_date: str, token_ok: bool, snapshot_ok: bool, bhav
     return send_silent(text)
 
 
+def send_snapshot_verified(trade_date: str, rows: int, source: str) -> int | None:
+    """Verified snapshot success with source info."""
+    text = (
+        f"📥 <b>Option snapshot VERIFIED — {trade_date}</b>\n"
+        f"New rows: <code>{rows}</code> | Source: <b>{source}</b>"
+    )
+    return send_silent(text)
+
+
+def send_claude_cost(symbol: str, input_tok: int, output_tok: int, cost_usd: float) -> int | None:
+    """SILENT — notify cost of an individual deep analysis turn."""
+    cost_inr = round(cost_usd * 84.0) # Heuristic for quick alert
+    text = (
+        f"💰 <b>Claude Deep Analysis — {symbol}</b>\n"
+        f"In: <code>{input_tok}</code> | Out: <code>{output_tok}</code>\n"
+        f"Cost: <code>${cost_usd:.3f}</code> (<code>₹{cost_inr}</code>)"
+    )
+    return send_silent(text)
+
+
 def send_pipeline_complete(
     trade_date: str,
     trade_ready: int,

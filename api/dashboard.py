@@ -96,6 +96,51 @@ async def get_today():
     }
 
 
+@router.get("/deep-analysis")
+async def get_deep_analysis_turns():
+    """
+    Returns every deep analysis turn from today's session, including SKIPPED stocks.
+    Useful for the 'Deep Analysis' tab in the UI.
+    """
+    session = get_latest_session()
+    if not session:
+        return {"turns": [], "session_id": None}
+    
+    session_id = session.get("session_id")
+    try:
+        from database.client import get_client
+        import json
+        res = (
+            get_client()
+            .table("session_claude_turns")
+            .select("turn_number,symbol,output_text,completed_at")
+            .eq("session_id", session_id)
+            .eq("turn_type", "deep_analysis")
+            .order("turn_number")
+            .execute()
+        )
+        
+        turns = []
+        for row in res.data:
+            analysis = {}
+            try:
+                analysis = json.loads(row["output_text"])
+            except:
+                analysis = {"error": "JSON parse failure", "raw": row["output_text"]}
+                
+            turns.append({
+                "turn_number": row["turn_number"],
+                "symbol":      row["symbol"],
+                "completed_at": row["completed_at"],
+                "analysis":    analysis
+            })
+            
+        return {"turns": turns, "session_id": session_id, "session_date": str(session["session_date"])}
+    except Exception as exc:
+        logger.error("Failed to fetch deep analysis turns: %s", exc)
+        return {"turns": [], "error": str(exc)}
+
+
 # ── GET /api/setup/{setup_id} ─────────────────────────────────────────────────
 
 @router.get("/setup/{setup_id}")
