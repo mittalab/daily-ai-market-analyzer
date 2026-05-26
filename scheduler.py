@@ -311,11 +311,25 @@ def job_main_pipeline() -> None:
         logger.error("Failed to schedule morning brief: %s", exc)
 
 
-def job_morning_brief(session_date_str: str) -> None:
-    """07:00 — send morning brief to Telegram (scheduled dynamically by pipeline)."""
+def job_morning_brief(session_date_str: str | None) -> None:
+    """07:00 — send morning brief to Telegram."""
     from datetime import date
     from pipeline.morning_brief import send_morning_brief
-    send_morning_brief(date.fromisoformat(session_date_str))
+    from database.queries import get_latest_session
+
+    if session_date_str:
+        ref_date = date.fromisoformat(session_date_str)
+    else:
+        # Fallback for the recurring 7 AM job: find the latest completed session
+        logger.info("Morning brief (recurring) triggered: finding latest session")
+        latest = get_latest_session()
+        if not latest:
+            logger.warning("No sessions found in DB — morning brief skipped")
+            return
+        ref_date = date.fromisoformat(str(latest["session_date"]))
+
+    logger.info("Sending morning brief for session date: %s", ref_date)
+    send_morning_brief(ref_date)
 
 
 # ── Registration ───────────────────────────────────────────────────────────────
@@ -347,6 +361,17 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         name="Kite token reminder",
         replace_existing=True,
         misfire_grace_time=600,
+    )
+
+    # 07:00 Mon-Fri — morning brief (Morning after pipeline)
+    scheduler.add_job(
+        job_morning_brief,
+        CronTrigger(day_of_week="mon-fri", hour=7, minute=0, **ist_kwargs),
+        id="morning_brief",
+        name="Morning brief (recurring)",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        kwargs={"session_date_str": None}, # job_morning_brief handles None by looking for latest
     )
 
     # 15:20 Mon-Fri — option chain snapshot
