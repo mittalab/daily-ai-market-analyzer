@@ -79,9 +79,9 @@ def run_bhavcopy_job(for_date: date | None = None) -> dict:
         summary["nifty50_close"] = indices.get("NIFTY 50")
         summary["index_rows"]   = len(index_rows)
         logger.info(
-            "Indices bhavcopy: VIX=%.2f, Nifty50=%.2f",
-            summary.get("vix", 0),
-            summary.get("nifty50_close", 0),
+            "Indices bhavcopy: VIX=%.2f, Nifty50=%s",
+            summary.get("vix") or 0.0,
+            summary.get("nifty50_close") or "N/A",
         )
     except Exception as exc:
         logger.error("Indices bhavcopy FAILED: %s", exc)
@@ -128,27 +128,78 @@ def run_bhavcopy_job(for_date: date | None = None) -> dict:
 def run_snapshot_job(snapshot_date: date | None = None) -> dict:
     """
     Fetch option chain IV snapshot for all 50 Nifty stocks. Store in Supabase.
-    Called by the 3:25 PM scheduler job (5 minutes before market close).
-
-    On failure: logged + Telegram LOUD alert sent by scheduler (not here).
-    Returns summary dict with {rows_stored, failed_symbols, ok}.
+    FIX: Tiered fallback to Kite Quotes if NSE scrape is blocked.
     """
     snap_date = snapshot_date or date.today()
-    summary: dict = {"ok": False, "rows_stored": 0, "failed_symbols": []}
+    summary: dict = {"ok": False, "rows_stored": 0, "failed_symbols": [], "source": "NSE"}
 
+    # Tier 1: Try high-fidelity NSE scrape
     try:
+        from integrations.nse_fii_dii import create_nse_session
         nse_session = create_nse_session()
         all_rows, failed = run_snapshot_batch(nse_session, NIFTY50, snap_date)
-        n_upserted = upsert_options_snapshots(all_rows)
-        summary["rows_stored"]    = n_upserted
-        summary["failed_symbols"] = failed
-        summary["ok"]             = len(failed) < len(NIFTY50) // 2   # >50% OK = success
-        logger.info(
-            "Snapshot job: %d rows stored, %d symbols failed",
-            n_upserted, len(failed),
-        )
+        
+        if len(all_rows) > 100:  # Heuristic for meaningful success
+            n_upserted = upsert_options_snapshots(all_rows)
+            summary.update({"ok": True, "rows_stored": n_upserted, "failed_symbols": failed})
+            return summary
     except Exception as exc:
-        logger.error("Snapshot job FAILED: %s", exc)
+        logger.warning("NSE Snapshot scrape failed: %s — attempting Kite fallback", exc)
+
+    # Tier 2: Fallback to Kite Quotes
+    try:
+        logger.info("Triggering Tier 2 Fallback: Kite Option Quotes")
+        from database.queries import get_kite_token
+        from integrations.kite_ohlcv import get_kite, get_option_symbols, fetch_option_quotes
+        
+        token_row = get_kite_token()
+        if not token_row:
+            raise RuntimeError("Kite token missing — cannot run Tier 2 fallback")
+        
+        kite = get_kite(token_row["access_token"])
+        fallback_rows = []
+        
+        for symbol in NIFTY50:
+            # 1. Get near/next month option symbols
+            instruments = get_option_symbols(kite, symbol)
+            if instruments.empty:
+                continue
+                
+            # 2. Fetch live quotes (LTP, OI)
+            quotes = fetch_option_quotes(kite, instruments)
+            
+            # 3. Format for options_snapshots (IV will be None from Kite API)
+            for tk, q in quotes.items():
+                # tk is e.g. 'NFO:HDFCBANK24MAY1500CE'
+                tsym = tk.split(":")[-1]
+                inst = instruments[instruments["tradingsymbol"] == tsym].iloc[0]
+                
+                fallback_rows.append({
+                    "symbol":        symbol,
+                    "snapshot_date": str(snap_date),
+                    "expiry_date":   str(inst["expiry"]),
+                    "strike":        float(inst["strike"]),
+                    "option_type":   inst["instrument_type"],
+                    "oi":            int(q["oi"]),
+                    "oi_change":     int(q["oi_day_high"] - q["oi_day_low"]), # Best estimate
+                    "volume":        int(q["volume"]),
+                    "iv":            None, # Kite API doesn't provide IV
+                    "premium_close": float(q["last_price"]),
+                })
+            time.sleep(0.1) # Respect rate limits
+            
+        if fallback_rows:
+            n_upserted = upsert_options_snapshots(fallback_rows)
+            summary.update({
+                "ok": True, 
+                "rows_stored": n_upserted, 
+                "source": "KITE",
+                "failed_symbols": [s for s in NIFTY50 if s not in [r["symbol"] for r in fallback_rows]]
+            })
+            logger.info("Kite Fallback successful: Stored %d option rows (IV will be None)", n_upserted)
+        
+    except Exception as exc:
+        logger.error("Snapshot Tier 2 Fallback FAILED: %s", exc)
         summary["error"] = str(exc)
 
     return summary

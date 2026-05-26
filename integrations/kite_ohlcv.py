@@ -113,6 +113,42 @@ def fetch_ohlcv_all(
     return results
 
 
+def get_option_symbols(kite: KiteConnect, symbol: str, expiries_count: int = 2) -> pd.DataFrame:
+    """
+    Fetch all NFO option instruments for a symbol, filtered by first N expiries.
+    """
+    df = pd.DataFrame(kite.instruments("NFO"))
+    if df.empty:
+        return pd.DataFrame()
+    
+    # Filter for options of this symbol
+    options = df[(df["name"] == symbol) & (df["segment"] == "NFO-OPT")].copy()
+    if options.empty:
+        return pd.DataFrame()
+    
+    # Identify first two expiries
+    expiries = sorted(options["expiry"].unique())[:expiries_count]
+    return options[options["expiry"].isin(expiries)]
+
+
+def fetch_option_quotes(kite: KiteConnect, instruments: pd.DataFrame) -> dict:
+    """
+    Fetch real-time quotes (LTP, OI) for a list of instrument tokens.
+    Kite allows up to 500 tokens per quote call.
+    """
+    if instruments.empty:
+        return {}
+    
+    tokens = [f"NFO:{s}" for s in instruments["tradingsymbol"].tolist()]
+    # Batch in 500s if needed (but Nifty 50 per stock options < 500)
+    try:
+        quotes = kite.quote(tokens)
+        return quotes
+    except Exception as exc:
+        logger.warning("Kite quote failed: %s", exc)
+        return {}
+
+
 def ohlcv_to_price_rows(symbol: str, df: pd.DataFrame) -> list[dict]:
     """Convert OHLCV DataFrame to price_history upsert rows."""
     rows = []

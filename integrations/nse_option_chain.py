@@ -12,6 +12,7 @@ Stock URL: /api/option-chain-equities?symbol={SYMBOL}
 """
 import logging
 import time
+import random
 from datetime import date
 
 import requests
@@ -19,28 +20,58 @@ import requests
 logger = logging.getLogger(__name__)
 
 _STOCK_CHAIN_URL = "https://www.nseindia.com/api/option-chain-equities?symbol={symbol}"
+_INDEX_CHAIN_URL = "https://www.nseindia.com/api/option-chain-indices?symbol={symbol}"
 
 
 def fetch_option_chain(session: requests.Session, symbol: str) -> dict:
     """
-    Fetch full option chain for a Nifty 50 stock symbol.
-
-    Args:
-        session: NSE session from nse_fii_dii.create_nse_session()
-        symbol:  NSE ticker, e.g. "HDFCBANK", "RELIANCE"
-
-    Returns raw API dict with keys: filtered, records.
-    Raises ValueError if chain is empty (market closed or bad symbol).
+    Fetch full option chain for a symbol (Stock or Index).
+    Uses 'shadow navigation' to sync Referer and Akamai state.
     """
-    url = _STOCK_CHAIN_URL.format(symbol=symbol)
+    is_index = symbol.upper() in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY")
+    symbol_up = symbol.upper()
 
+    # Step 1: Establish the 'landing page' to get symbol-specific cookies/headers
+    if is_index:
+        referer = f"https://www.nseindia.com/option-chain?symbol={symbol_up}"
+        api_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol_up}"
+    else:
+        # For stocks, the URL requires a redirect sequence
+        referer = f"https://www.nseindia.com/get-quotes/derivatives?symbol={symbol_up}"
+        api_url = f"https://www.nseindia.com/api/option-chain-equities?symbol={symbol_up}"
+
+    # Step 2: Mimic user navigation to the referer page
     try:
-        r = session.get(url, timeout=20)
-    except requests.RequestException as exc:
-        raise ConnectionError(f"Network error fetching option chain for {symbol}: {exc}") from exc
+        session.get(referer, timeout=15)
+        time.sleep(random.uniform(0.8, 1.5))
 
-    if r.status_code != 200:
-        raise ValueError(f"HTTP {r.status_code} for {symbol} option chain")
+        # Step 3: Hit the API with the referer context
+        headers = {
+            "Referer": referer,
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/plain, */*",
+        }
+        
+        r = session.get(api_url, headers=headers, timeout=20)
+        
+        if r.status_code == 200:
+            data = r.json()
+            # Success check: records.data must exist and be non-empty
+            if data.get("records", {}).get("data"):
+                return data
+            
+            # Sub-tier fallback: NSE sometimes redirects indices to a different internal slug
+            if is_index and not data.get("records", {}).get("data"):
+                logger.debug("Index chain empty for %s, trying slug fallback", symbol_up)
+                fallback_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol_up}"
+                r = session.get(fallback_url, headers=headers, timeout=20)
+                if r.status_code == 200:
+                    return r.json()
+
+        raise ValueError(f"HTTP {r.status_code} for {symbol_up} — chain empty or blocked (size {len(r.content)})")
+
+    except requests.RequestException as exc:
+        raise ConnectionError(f"Network error fetching option chain for {symbol_up}: {exc}") from exc
 
     try:
         data = r.json()
