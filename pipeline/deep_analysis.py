@@ -248,7 +248,26 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
 
     # Sector context
     sector, sector_index = _sector_info(symbol)
-    sector_rows = get_price_history(sector_index, days=10) if sector_index != "UNKNOWN" else []
+    sector_rows = get_price_history(sector_index, days=30) if sector_index != "UNKNOWN" else []
+    nifty_rows  = get_price_history("NIFTY_50", days=30)
+
+    # Relative performance metrics
+    sector_20d_ret = None
+    nifty_20d_ret  = None
+    sector_vs_nifty = None
+
+    if len(sector_rows) >= 20:
+        s_now = float(sector_rows[-1]["close"])
+        s_old = float(sector_rows[-20]["close"])
+        sector_20d_ret = round((s_now - s_old) / s_old * 100, 2)
+    
+    if len(nifty_rows) >= 20:
+        n_now = float(nifty_rows[-1]["close"])
+        n_old = float(nifty_rows[-20]["close"])
+        nifty_20d_ret = round((n_now - n_old) / n_old * 100, 2)
+        
+    if sector_20d_ret is not None and nifty_20d_ret is not None:
+        sector_vs_nifty = round(sector_20d_ret - nifty_20d_ret, 2)
 
     return {
         "symbol":         symbol,
@@ -266,6 +285,11 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
         "macd":           _last(macd_l),
         "macd_signal":    _last(macd_sig),
         "macd_hist":      _last(macd_hist),
+        # Sector metrics
+        "sector_20d_return":  sector_20d_ret,
+        "nifty_20d_return":   nifty_20d_ret,
+        "sector_vs_nifty":    sector_vs_nifty,
+        "sector_status":      "TAILWIND" if (sector_vs_nifty or 0) > 0 else "HEADWIND",
         # OI / options
         "rollover_phase": rollover_phase,
         "near_expiry":    near_expiry_str,
@@ -305,8 +329,8 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
              "oi": r.get("oi"), "iv": r.get("implied_volatility")}
             for r in options
         ],
-        "sector_index_5d":     [
-            {"date": r["date"], "close": r["close"]} for r in sector_rows[-5:]
+        "sector_index_20d":     [
+            {"date": r["date"], "close": r["close"]} for r in sector_rows[-20:]
         ],
         "previous_setups":     [
             {

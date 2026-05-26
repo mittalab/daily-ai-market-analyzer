@@ -23,6 +23,24 @@ _STOCK_CHAIN_URL = "https://www.nseindia.com/api/option-chain-equities?symbol={s
 _INDEX_CHAIN_URL = "https://www.nseindia.com/api/option-chain-indices?symbol={symbol}"
 
 
+_STOCK_CHAIN_URL = "https://www.nseindia.com/api/option-chain-equities?symbol={symbol}"
+_INDEX_CHAIN_URL = "https://www.nseindia.com/api/option-chain-indices?symbol={symbol}"
+
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Referer": "https://www.nseindia.com/option-chain",
+    "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin"
+}
+
 def fetch_option_chain(session: requests.Session, symbol: str) -> dict:
     """
     Fetch full option chain for a symbol (Stock or Index).
@@ -31,42 +49,27 @@ def fetch_option_chain(session: requests.Session, symbol: str) -> dict:
     is_index = symbol.upper() in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY")
     symbol_up = symbol.upper()
 
-    # Step 1: Establish the 'landing page' to get symbol-specific cookies/headers
     if is_index:
         referer = f"https://www.nseindia.com/option-chain?symbol={symbol_up}"
         api_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol_up}"
     else:
-        # For stocks, the URL requires a redirect sequence
         referer = f"https://www.nseindia.com/get-quotes/derivatives?symbol={symbol_up}"
         api_url = f"https://www.nseindia.com/api/option-chain-equities?symbol={symbol_up}"
 
-    # Step 2: Mimic user navigation to the referer page
     try:
-        session.get(referer, timeout=15)
-        time.sleep(random.uniform(0.8, 1.5))
-
-        # Step 3: Hit the API with the referer context
-        headers = {
-            "Referer": referer,
-            "X-Requested-With": "XMLHttpRequest",
-            "Accept": "application/json, text/plain, */*",
-        }
+        # FIX 3: Wait longer and ensure session headers are browser-like
+        session.headers.update(_BROWSER_HEADERS)
         
-        r = session.get(api_url, headers=headers, timeout=20)
+        # Hit referer
+        session.get(referer, timeout=15)
+        time.sleep(random.uniform(2.0, 3.5))
+
+        r = session.get(api_url, timeout=20)
         
         if r.status_code == 200:
             data = r.json()
-            # Success check: records.data must exist and be non-empty
             if data.get("records", {}).get("data"):
                 return data
-            
-            # Sub-tier fallback: NSE sometimes redirects indices to a different internal slug
-            if is_index and not data.get("records", {}).get("data"):
-                logger.debug("Index chain empty for %s, trying slug fallback", symbol_up)
-                fallback_url = f"https://www.nseindia.com/api/option-chain-indices?symbol={symbol_up}"
-                r = session.get(fallback_url, headers=headers, timeout=20)
-                if r.status_code == 200:
-                    return r.json()
 
         raise ValueError(f"HTTP {r.status_code} for {symbol_up} — chain empty or blocked (size {len(r.content)})")
 

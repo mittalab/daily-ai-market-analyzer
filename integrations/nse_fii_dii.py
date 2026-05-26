@@ -64,8 +64,8 @@ def create_nse_session() -> requests.Session:
     headers = {
         "User-Agent": ua,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
         "Cache-Control": "max-age=0",
         "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
@@ -80,13 +80,13 @@ def create_nse_session() -> requests.Session:
     session.headers.update(headers)
 
     try:
-        # 1. Main entry (Expect 403 or 200)
+        # 1. Main entry (Wait 5 seconds)
         session.get("https://www.nseindia.com", timeout=15)
-        time.sleep(random.uniform(3, 5))
+        time.sleep(5)
 
         # 2. Specific landing page to trigger JS/Challenge cookies
         session.get("https://www.nseindia.com/market-data/option-chain", timeout=15)
-        time.sleep(random.uniform(2, 3))
+        time.sleep(3)
         
         logger.debug("NSE session baked. Cookies: %s", list(session.cookies.keys()))
     except requests.RequestException as exc:

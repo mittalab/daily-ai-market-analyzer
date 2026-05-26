@@ -1,0 +1,126 @@
+{
+  "session_id": "SESSION_20260526",
+  "session_date": "2026-05-26",
+  "model": "claude-sonnet-4-6",
+  "regime": "SIDEWAYS_WIDE",
+  "turns": [
+    {
+      "turn_number": 1,
+      "turn_type": "market_context",
+      "symbol": null,
+      "input_tokens": 2630,
+      "output_tokens": 479,
+      "input_cost_usd": 0.00789,
+      "output_cost_usd": 0.007185,
+      "total_cost_usd": 0.015075
+    },
+    {
+      "turn_number": 2,
+      "turn_type": "prescan",
+      "symbol": null,
+      "input_tokens": 18266,
+      "output_tokens": 6847,
+      "input_cost_usd": 0.054798,
+      "output_cost_usd": 0.102705,
+      "total_cost_usd": 0.157503
+    },
+    {
+      "turn_number": 3,
+      "turn_type": "deep_analysis",
+      "symbol": "EICHERMOT",
+      "input_tokens": 14160,
+      "output_tokens": 2044,
+      "input_cost_usd": 0.04248,
+      "output_cost_usd": 0.03066,
+      "total_cost_usd": 0.07314
+    },
+    {
+      "turn_number": 4,
+      "turn_type": "deep_analysis",
+      "symbol": "HINDALCO",
+      "input_tokens": 13503,
+      "output_tokens": 2298,
+      "input_cost_usd": 0.040509,
+      "output_cost_usd": 0.03447,
+      "total_cost_usd": 0.074979
+    },
+    {
+      "turn_number": 5,
+      "turn_type": "deep_analysis",
+      "symbol": "ITC",
+      "input_tokens": 13253,
+      "output_tokens": 1953,
+      "input_cost_usd": 0.039759,
+      "output_cost_usd": 0.029295,
+      "total_cost_usd": 0.069054
+    },
+    {
+      "turn_number": 6,
+      "turn_type": "deep_analysis",
+      "symbol": "MAXHEALTH",
+      "input_tokens": 13809,
+      "output_tokens": 2320,
+      "input_cost_usd": 0.041427,
+      "output_cost_usd": 0.0348,
+      "total_cost_usd": 0.076227
+    },
+    {
+      "turn_number": 7,
+      "turn_type": "deep_analysis",
+      "symbol": "TMPV",
+      "input_tokens": 12678,
+      "output_tokens": 1830,
+      "input_cost_usd": 0.038034,
+      "output_cost_usd": 0.02745,
+      "total_cost_usd": 0.065484
+    },
+    {
+      "turn_number": 8,
+      "turn_type": "deep_analysis",
+      "symbol": "WIPRO",
+      "input_tokens": 12720,
+      "output_tokens": 1980,
+      "input_cost_usd": 0.03816,
+      "output_cost_usd": 0.0297,
+      "total_cost_usd": 0.06786
+    },
+    {
+      "turn_number": 9,
+      "turn_type": "deep_analysis",
+      "symbol": "APOLLOHOSP",
+      "input_tokens": 14504,
+      "output_tokens": 2220,
+      "input_cost_usd": 0.043512,
+      "output_cost_usd": 0.0333,
+      "total_cost_usd": 0.076812
+    },
+    {
+      "turn_number": 10,
+      "turn_type": "deep_analysis",
+      "symbol": "INDIGO",
+      "input_tokens": 13626,
+      "output_tokens": 1827,
+      "input_cost_usd": 0.040878,
+      "output_cost_usd": 0.027405,
+      "total_cost_usd": 0.068283
+    }
+  ],
+  "totals": {
+    "total_input_tokens": 129149,
+    "total_output_tokens": 23798,
+    "total_cost_usd": 0.7444,
+    "total_cost_inr": 62.53,
+    "monthly_budget_usd": 60.0,
+    "monthly_spent_usd": 0.8949,
+    "monthly_remaining_usd": 59.1051,
+    "sessions_remaining_estimate": 79
+  },
+  "context_quality": {
+    "prescan_data_complete": true,
+    "deep_data_complete": true,
+    "oi_data_available": true,
+    "iv_data_available": true,
+    "fii_data_source": "LIVE",
+    "missing_data_flags": []
+  }
+}
