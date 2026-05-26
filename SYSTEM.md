@@ -3,5 +3,5 @@
 
 
 ### UI
-1. Run npm run build in the frontend folder
+1. Run `npm run build` in the frontend folder
 2. & "C:\nssm\nssm.exe" restart SwingTradingFrontend
