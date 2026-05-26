@@ -14,7 +14,13 @@ import pytz
 from pandas import bdate_range
 
 from database.client import get_client
-from database.queries import get_dashboard_url, get_trade_setups_by_date, get_latest_fii_dii
+from database.queries import (
+    get_dashboard_url, 
+    get_trade_setups_by_date, 
+    get_latest_fii_dii,
+    get_watchlist,
+    get_recent_setups_for_symbol
+)
 from integrations.telegram import send_loud, send_silent
 
 logger = logging.getLogger(__name__)
@@ -182,16 +188,40 @@ def _build_message1(
 def _build_message2(watch: list[dict]) -> str:
     lines: list[str] = []
 
+    # Fetch metadata for re-analysis indicators
+    try:
+        from database.queries import get_watchlist, get_recent_setups_for_symbol
+        wl_meta = {r["symbol"]: r for r in get_watchlist()}
+    except Exception:
+        wl_meta = {}
+
     if watch:
         lines.append(f"<b>🟡 WATCHING ({len(watch)})</b>")
         shown = watch[:5]
         for s in shown:
             symbol    = s.get("symbol", "?")
             direction = s.get("direction", "")
-            score     = s.get("conviction_score", "?")
+            score     = s.get("conviction_score", 0)
             setup_type = s.get("setup_type") or s.get("setup_maturity") or "Setup developing"
-            lines.append(f"• {symbol} | {direction} | Conv: <code>{score}</code>")
-            lines.append(f"  {setup_type}")
+            
+            # Determine days in watch and trend
+            meta = wl_meta.get(symbol, {})
+            days_in = meta.get("days_in_stage", 0)
+            
+            trend = "→"
+            try:
+                prev = get_recent_setups_for_symbol(symbol, limit=2)
+                if len(prev) >= 2:
+                    old_c = prev[1].get("conviction_score", 0)
+                    if score > old_c: trend = "↑"
+                    elif score < old_c: trend = "↓"
+            except Exception:
+                pass
+
+            day_str = f" | D{days_in} {trend}" if days_in > 0 else ""
+            
+            lines.append(f"• {symbol} | {direction} | Conv: <code>{score}</code>{day_str}")
+            lines.append(f"  <i>{setup_type}</i>")
         if len(watch) > 5:
             lines.append(f"...and <code>{len(watch) - 5}</code> more on dashboard")
     else:

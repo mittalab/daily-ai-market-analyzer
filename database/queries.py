@@ -528,6 +528,11 @@ def upsert_watchlist_staging(data: dict) -> None:
     get_client().table("watchlist_staging").upsert(data, on_conflict="symbol").execute()
 
 
+def update_watchlist_staging(symbol: str, updates: dict) -> None:
+    """Patch a watchlist entry (e.g., update stage or days_in_stage)."""
+    get_client().table("watchlist_staging").update(updates).eq("symbol", symbol).execute()
+
+
 def get_watchlist() -> list[dict]:
     """Return all watchlist entries ordered by days_in_stage descending."""
     resp = (

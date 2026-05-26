@@ -19,7 +19,9 @@ import pytz
 from database.queries import (
     create_analysis_session,
     get_analysis_session,
+    get_watchlist,
     update_analysis_session,
+    update_watchlist_staging,
 )
 from integrations.nse_bhavcopy import get_nifty50_symbols
 from integrations.telegram import send_pipeline_complete, send_pipeline_start
@@ -143,9 +145,32 @@ def run_pipeline(session_date: date) -> dict:
     logger.info("Stage 4: Building context bundle...")
     context_bundle = build_context_bundle(session_date, session_id, regime_result=regime_result)
 
+    # ── Stage 4.5: Watchlist Priority ─────────────────────────────────────────
+    # Fetch active watchlist stocks and prioritize for deep analysis
+    watchlist_stocks = []
+    try:
+        active_wl = get_watchlist()
+        # Filter for active ones (WATCH/ON_RADAR) within 10 days
+        watchlist_stocks = [
+            {
+                "symbol": r["symbol"], 
+                "direction": r.get("direction_bias", "AUTO"),
+                "priority": "HIGH",
+                "forward_to_deep": True,
+                "is_watchlist_reanalysis": True,
+                "days_in_stage": r.get("days_in_stage", 0)
+            } 
+            for r in active_wl 
+            if r.get("current_stage") in ("WATCH", "ON_RADAR") and r.get("days_in_stage", 0) <= 10
+        ]
+        if watchlist_stocks:
+            logger.info("Watchlist re-analysis: %d stocks prioritized", len(watchlist_stocks))
+    except Exception as exc:
+        logger.warning("Failed to fetch watchlist for re-analysis: %s", exc)
+
     # ── Stage 5: Claude Session ───────────────────────────────────────────────
     logger.info("Stage 5: Claude multi-turn session (%d stocks)...", len(level1_passed))
-    claude_result = run_claude_session(context_bundle, level1_passed, session_id)
+    claude_result = run_claude_session(context_bundle, level1_passed, session_id, watchlist_priority=watchlist_stocks)
 
     # ── Pipeline complete ─────────────────────────────────────────────────────
     # FIX: Ground-truth DB validation before final notification

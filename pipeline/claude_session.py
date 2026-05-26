@@ -372,6 +372,7 @@ def run_claude_session(
     context_bundle: dict,
     level1_passed:  list[str],
     session_id:     str,
+    watchlist_priority: list[dict] | None = None,
 ) -> dict:
     """
     Execute the full multi-turn Claude session:
@@ -383,6 +384,8 @@ def run_claude_session(
     Raises BudgetExhaustedException if monthly Claude spend >= budget.
     Raises RuntimeError on API key missing or token ceiling exceeded.
     """
+    from database.queries import update_watchlist_staging
+    from integrations.telegram import send_loud, send_silent
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError(
@@ -520,7 +523,23 @@ def run_claude_session(
                 len(forwarded_stocks),
                 sum(1 for s in forwarded_stocks if s.get("priority") == "HIGH"))
 
-    # ── Turns 3+: deep analysis (FIX 1) ──────────────────────────────────────
+    # ── Turns 3+: deep analysis ──────────────────────────────────────
+    # Combine forwarded pre-scan stocks with watchlist priority stocks
+    priority_map = {s["symbol"]: s for s in (watchlist_priority or [])}
+    
+    # Final deep analysis queue: Priority Watchlist (if not already in forwarded) + forwarded pre-scan
+    final_queue = forwarded_stocks[:]
+    for wl_stock in (watchlist_priority or []):
+        # If not already forwarded, add to top
+        if not any(fs["symbol"] == wl_stock["symbol"] for fs in forwarded_stocks):
+            final_queue.insert(0, wl_stock)
+        else:
+            # If already there, mark it as a re-analysis
+            for fs in final_queue:
+                if fs["symbol"] == wl_stock["symbol"]:
+                    fs["is_watchlist_reanalysis"] = True
+                    fs["days_in_stage"] = wl_stock.get("days_in_stage", 0)
+
     deep_results: list[dict] = []
 
     # Build index context once for all deep turns
@@ -533,15 +552,17 @@ def run_claude_session(
         "ret20d_pct":  regime_result.get("ret20d")       if regime_result else None,
     }
 
-    for i, prescan_stock in enumerate(forwarded_stocks):
+    for i, prescan_stock in enumerate(final_queue):
         symbol    = prescan_stock.get("symbol", "")
         direction = prescan_stock.get("direction", "AUTO")
+        is_re     = prescan_stock.get("is_watchlist_reanalysis", False)
+        days_in   = prescan_stock.get("days_in_stage", 0)
         turn_num  = 3 + i
 
         if not symbol:
             continue
 
-        logger.info("Turn %d: deep analysis for %s (direction=%s)...", turn_num, symbol, direction)
+        logger.info("Turn %d: deep analysis for %s (direction=%s, re-analysis=%s)...", turn_num, symbol, direction, is_re)
         quality_notes: list[str] = []
 
         try:
@@ -560,7 +581,21 @@ def run_claude_session(
             })
             continue
 
+        # Add watchlist re-analysis context to prompt
+        custom_instructions = ""
+        if is_re:
+            prev_setups = stock_pkg.get("previous_setups", [])
+            prev_score = prev_setups[0].get("conviction_score", "??") if prev_setups else "??"
+            prev_type  = prev_setups[0].get("setup_type", "??") if prev_setups else "??"
+            custom_instructions = (
+                f"\n\nCONTEXT: This stock has been on Watch for {days_in} days. "
+                f"Previous conviction: {prev_score}. Previous setup: {prev_type}. "
+                "Re-evaluate with today's data. Has the setup confirmed or broken down?"
+            )
+
         prompt = build_deep_prompt(stock_pkg, index_ctx, direction)
+        if custom_instructions:
+            prompt += custom_instructions
 
         try:
             analysis, in_tok, out_tok = call_claude_deep(client, prompt)
@@ -591,6 +626,42 @@ def run_claude_session(
         send_claude_cost(symbol, in_tok, out_tok, turn_cost)
 
         stage = analysis.get("stage", "SKIP")
+        conviction = analysis.get("conviction_score", 0)
+
+        # ── Watchlist Lifecycle Management ───────────────────────────────────
+        if is_re:
+            if stage == "TRADE_READY" or (conviction >= 75 and stage != "SKIP"):
+                update_watchlist_staging(symbol, {"current_stage": "TRADE_READY", "updated_at": datetime.now(IST).isoformat()})
+                send_loud(f"🚀 <b>{symbol} graduated</b>\nWatch → <b>Trade Ready</b> (Conviction: {conviction})")
+                logger.info("Watchlist graduation: %s", symbol)
+            elif conviction >= 55:
+                # Maintain in watch, increment days
+                new_days = days_in + 1
+                if new_days > 10:
+                    update_watchlist_staging(symbol, {"current_stage": "EXPIRED", "updated_at": datetime.now(IST).isoformat()})
+                    send_silent(f"⏰ <b>{symbol} Watch expired</b>\nNo trigger in 10 days. Moved out of Watch.")
+                else:
+                    update_watchlist_staging(symbol, {"days_in_stage": new_days, "updated_at": datetime.now(IST).isoformat()})
+                    logger.info("Watchlist maintenance: %s (Day %d)", symbol, new_days)
+            else:
+                # Conviction dropped
+                update_watchlist_staging(symbol, {"current_stage": "DEGRADED", "updated_at": datetime.now(IST).isoformat()})
+                send_silent(f"📉 <b>{symbol} removed from Watch</b>\nSetup broke (Conviction dropped to {conviction}).")
+                logger.info("Watchlist degradation: %s", symbol)
+        else:
+            # New discovery — if it's WATCH or TRADE_READY, add to staging
+            if stage in ("WATCH", "TRADE_READY", "ON_RADAR"):
+                from database.queries import upsert_watchlist_staging
+                upsert_watchlist_staging({
+                    "symbol":            symbol,
+                    "current_stage":     stage,
+                    "direction_bias":    analysis.get("direction"),
+                    "days_in_stage":     0,
+                    "first_flagged_date": str(session_date),
+                    "updated_at":        datetime.now(IST).isoformat(),
+                })
+                logger.info("New watchlist discovery synced: %s stage=%s", symbol, stage)
+
         logger.info(
             "Turn %d done: %s stage=%s conviction=%s lots=%s rr=%s in=%d out=%d",
             turn_num, symbol, stage,
