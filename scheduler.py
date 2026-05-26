@@ -223,14 +223,31 @@ def job_preflight_check() -> None:
     except Exception as exc:
         failures.append(f"Database check error: {exc}")
 
-    # Check 3: Bhavcopy downloaded for today
+    # Check 3: Data Freshness (Bhavcopy + Snapshots)
     try:
+        from database.queries import get_row_count
+        # Bhavcopy (Expected after 18:30)
+        bhav_start = _datetime.combine(today, _datetime.min.time()).replace(hour=18, minute=30).astimezone(_pytz.utc)
+        count_eq = get_row_count("price_history", {"date": today}, created_after=bhav_start)
+        
+        # Option Snapshot (Expected after 15:20)
+        snap_start = _datetime.combine(today, _datetime.min.time()).replace(hour=15, minute=20).astimezone(_pytz.utc)
+        count_opt = get_row_count("options_snapshots", {"snapshot_date": today}, created_after=snap_start)
+        
+        # FII/DII (Check date column)
         from database.queries import get_latest_fii_dii
-        latest = get_latest_fii_dii()
-        if not latest or str(latest.get("date", "")) != str(today):
-            failures.append(f"Bhavcopy not downloaded for today ({today})")
+        fii = get_latest_fii_dii()
+        fii_date = str(fii.get("date", "")) if fii else ""
+
+        if count_eq < 50:
+            failures.append(f"Bhavcopy incomplete (Verified NEW rows: {count_eq})")
+        if count_opt == 0:
+            failures.append("Option snapshot missing for today")
+        if fii_date != str(today):
+            failures.append(f"FII/DII data stale (Latest: {fii_date})")
+            
     except Exception as exc:
-        failures.append(f"Bhavcopy check error: {exc}")
+        failures.append(f"Data freshness check error: {exc}")
 
     if failures:
         from integrations.telegram import send_preflight_check_failed

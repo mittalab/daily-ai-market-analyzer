@@ -1109,3 +1109,53 @@ INFO:     Waiting for application startup.
 2026-05-26 21:06:10 INFO main — APScheduler started with 9 jobs
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-26 21:22:01 INFO main — APScheduler stopped
+2026-05-26 21:22:01 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [30732]
+INFO:     Started server process [25032]
+INFO:     Waiting for application startup.
+2026-05-26 21:22:04 INFO main — Starting Swing Trading API...
+2026-05-26 21:22:05 INFO database.client — Supabase client initialised (service key)
+2026-05-26 21:22:05 INFO main — Database connection verified
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Scheduler started
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-26 21:22:05 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-26 21:22:05 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-26 21:22:05 INFO main — APScheduler started with 9 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-26 21:24:13 INFO main — APScheduler stopped
+2026-05-26 21:24:13 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25032]
+INFO:     Started server process [29436]
+INFO:     Waiting for application startup.
+2026-05-26 21:24:16 INFO main — Starting Swing Trading API...
+2026-05-26 21:24:16 INFO database.client — Supabase client initialised (service key)
+2026-05-26 21:24:16 INFO main — Database connection verified
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Scheduler started
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-26 21:24:16 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-26 21:24:16 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-26 21:24:16 INFO main — APScheduler started with 9 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
