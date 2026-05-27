@@ -78,7 +78,7 @@ def run_bhavcopy_job(for_date: date | None = None) -> dict:
     On any source failure: logs error, continues with remaining sources.
     """
     summary: dict = {"ok": True, "errors": []}
-    symbols = get_ingestion_symbols()
+    symbols = get_ingestion_symbols(all_stages=True)
 
     # ── Equity bhavcopy ────────────────────────────────────────────────────────
     trade_date: date | None = None
