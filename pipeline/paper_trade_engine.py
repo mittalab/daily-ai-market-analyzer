@@ -303,7 +303,7 @@ def _check_exits(setup: dict, today: date) -> None:
             "t1_exit_price":       t1_premium if t1_hit else None,
             "t1_pnl_inr":         round(t1_partial_pnl, 2) if t1_hit else None,
         })
-        if outcome in ("TARGET_HIT", "SL_HIT"):
+        if outcome in ("TARGET_HIT", "SL_HIT", "EXPIRED", "CLOSED_BREAKEVEN"):
             send_paper_trade_outcome(
                 outcome=outcome,
                 symbol=symbol,

@@ -3589,3 +3589,474 @@ INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 2026-05-27 08:42:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
 2026-05-27 08:42:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
 2026-05-27 08:42:58 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 15:20:00 INFO apscheduler.executors.default — Running job "Option chain IV snapshot (trigger: cron[day_of_week='mon-fri', hour='15', minute='20'], next run at: 2026-05-27 15:20:00 IST)" (scheduled at 2026-05-27 15:20:00+05:30)
+2026-05-27 15:20:00 INFO scheduler — Option snapshot job starting for 2026-05-27
+2026-05-27 15:20:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 15:20:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 15:20:14 WARNING integrations.nse_option_chain — Option chain failed for ADANIENT: HTTP 200 for ADANIENT — chain empty or blocked (size 2)
+2026-05-27 15:20:18 WARNING integrations.nse_option_chain — Option chain failed for ADANIPORTS: HTTP 200 for ADANIPORTS — chain empty or blocked (size 2)
+2026-05-27 15:20:21 WARNING integrations.nse_option_chain — Option chain failed for APOLLOHOSP: HTTP 200 for APOLLOHOSP — chain empty or blocked (size 2)
+2026-05-27 15:20:25 WARNING integrations.nse_option_chain — Option chain failed for ASIANPAINT: HTTP 200 for ASIANPAINT — chain empty or blocked (size 2)
+2026-05-27 15:20:28 WARNING integrations.nse_option_chain — Option chain failed for AXISBANK: HTTP 200 for AXISBANK — chain empty or blocked (size 2)
+2026-05-27 15:20:34 WARNING integrations.nse_option_chain — Option chain failed for BAJAJ-AUTO: HTTP 200 for BAJAJ-AUTO — chain empty or blocked (size 2)
+2026-05-27 15:20:39 WARNING integrations.nse_option_chain — Option chain failed for BAJAJFINSV: HTTP 200 for BAJAJFINSV — chain empty or blocked (size 2)
+2026-05-27 15:20:46 WARNING integrations.nse_option_chain — Option chain failed for BAJFINANCE: HTTP 200 for BAJFINANCE — chain empty or blocked (size 2)
+2026-05-27 15:20:49 WARNING integrations.nse_option_chain — Option chain failed for BEL: HTTP 200 for BEL — chain empty or blocked (size 2)
+2026-05-27 15:20:53 WARNING integrations.nse_option_chain — Option chain failed for BHARTIARTL: HTTP 200 for BHARTIARTL — chain empty or blocked (size 2)
+2026-05-27 15:20:57 WARNING integrations.nse_option_chain — Option chain failed for CIPLA: HTTP 200 for CIPLA — chain empty or blocked (size 2)
+2026-05-27 15:21:01 WARNING integrations.nse_option_chain — Option chain failed for COALINDIA: HTTP 200 for COALINDIA — chain empty or blocked (size 2)
+2026-05-27 15:21:05 WARNING integrations.nse_option_chain — Option chain failed for DRREDDY: HTTP 200 for DRREDDY — chain empty or blocked (size 2)
+2026-05-27 15:21:09 WARNING integrations.nse_option_chain — Option chain failed for EICHERMOT: HTTP 200 for EICHERMOT — chain empty or blocked (size 2)
+2026-05-27 15:21:13 WARNING integrations.nse_option_chain — Option chain failed for ETERNAL: HTTP 200 for ETERNAL — chain empty or blocked (size 2)
+2026-05-27 15:21:17 WARNING integrations.nse_option_chain — Option chain failed for GRASIM: HTTP 200 for GRASIM — chain empty or blocked (size 2)
+2026-05-27 15:21:21 WARNING integrations.nse_option_chain — Option chain failed for HCLTECH: HTTP 200 for HCLTECH — chain empty or blocked (size 2)
+2026-05-27 15:21:25 WARNING integrations.nse_option_chain — Option chain failed for HDFCBANK: HTTP 200 for HDFCBANK — chain empty or blocked (size 2)
+2026-05-27 15:21:29 WARNING integrations.nse_option_chain — Option chain failed for HDFCLIFE: HTTP 200 for HDFCLIFE — chain empty or blocked (size 2)
+2026-05-27 15:21:33 WARNING integrations.nse_option_chain — Option chain failed for HINDALCO: HTTP 200 for HINDALCO — chain empty or blocked (size 2)
+2026-05-27 15:21:36 WARNING integrations.nse_option_chain — Option chain failed for HINDUNILVR: HTTP 200 for HINDUNILVR — chain empty or blocked (size 2)
+2026-05-27 15:21:40 WARNING integrations.nse_option_chain — Option chain failed for ICICIBANK: HTTP 200 for ICICIBANK — chain empty or blocked (size 2)
+2026-05-27 15:21:43 WARNING integrations.nse_option_chain — Option chain failed for INDIGO: HTTP 200 for INDIGO — chain empty or blocked (size 2)
+2026-05-27 15:21:46 WARNING integrations.nse_option_chain — Option chain failed for INFY: HTTP 200 for INFY — chain empty or blocked (size 2)
+2026-05-27 15:21:51 WARNING integrations.nse_option_chain — Option chain failed for ITC: HTTP 200 for ITC — chain empty or blocked (size 2)
+2026-05-27 15:21:55 WARNING integrations.nse_option_chain — Option chain failed for JIOFIN: HTTP 200 for JIOFIN — chain empty or blocked (size 2)
+2026-05-27 15:21:59 WARNING integrations.nse_option_chain — Option chain failed for JSWSTEEL: HTTP 200 for JSWSTEEL — chain empty or blocked (size 2)
+2026-05-27 15:22:02 WARNING integrations.nse_option_chain — Option chain failed for KOTAKBANK: HTTP 200 for KOTAKBANK — chain empty or blocked (size 2)
+2026-05-27 15:22:06 WARNING integrations.nse_option_chain — Option chain failed for LT: HTTP 200 for LT — chain empty or blocked (size 2)
+2026-05-27 15:22:22 WARNING integrations.nse_option_chain — Option chain failed for M&M: Network error fetching option chain for M&M: HTTPSConnectionPool(host='www.nseindia.com', port=443): Read timed out. (read timeout=15)
+2026-05-27 15:22:26 WARNING integrations.nse_option_chain — Option chain failed for MARUTI: HTTP 200 for MARUTI — chain empty or blocked (size 2)
+2026-05-27 15:22:30 WARNING integrations.nse_option_chain — Option chain failed for MAXHEALTH: HTTP 200 for MAXHEALTH — chain empty or blocked (size 2)
+2026-05-27 15:22:34 WARNING integrations.nse_option_chain — Option chain failed for NESTLEIND: HTTP 200 for NESTLEIND — chain empty or blocked (size 2)
+2026-05-27 15:22:38 WARNING integrations.nse_option_chain — Option chain failed for NTPC: HTTP 200 for NTPC — chain empty or blocked (size 2)
+2026-05-27 15:22:41 WARNING integrations.nse_option_chain — Option chain failed for ONGC: HTTP 200 for ONGC — chain empty or blocked (size 2)
+2026-05-27 15:22:44 WARNING integrations.nse_option_chain — Option chain failed for POWERGRID: HTTP 200 for POWERGRID — chain empty or blocked (size 2)
+2026-05-27 15:22:48 WARNING integrations.nse_option_chain — Option chain failed for RELIANCE: HTTP 200 for RELIANCE — chain empty or blocked (size 2)
+2026-05-27 15:22:52 WARNING integrations.nse_option_chain — Option chain failed for SBILIFE: HTTP 200 for SBILIFE — chain empty or blocked (size 2)
+2026-05-27 15:22:55 WARNING integrations.nse_option_chain — Option chain failed for SBIN: HTTP 200 for SBIN — chain empty or blocked (size 2)
+2026-05-27 15:22:59 WARNING integrations.nse_option_chain — Option chain failed for SHRIRAMFIN: HTTP 200 for SHRIRAMFIN — chain empty or blocked (size 2)
+2026-05-27 15:23:02 WARNING integrations.nse_option_chain — Option chain failed for SUNPHARMA: HTTP 200 for SUNPHARMA — chain empty or blocked (size 2)
+2026-05-27 15:23:06 WARNING integrations.nse_option_chain — Option chain failed for TATACONSUM: HTTP 200 for TATACONSUM — chain empty or blocked (size 2)
+2026-05-27 15:23:10 WARNING integrations.nse_option_chain — Option chain failed for TATASTEEL: HTTP 200 for TATASTEEL — chain empty or blocked (size 2)
+2026-05-27 15:23:13 WARNING integrations.nse_option_chain — Option chain failed for TCS: HTTP 200 for TCS — chain empty or blocked (size 2)
+2026-05-27 15:23:17 WARNING integrations.nse_option_chain — Option chain failed for TECHM: HTTP 200 for TECHM — chain empty or blocked (size 2)
+2026-05-27 15:23:21 WARNING integrations.nse_option_chain — Option chain failed for TITAN: HTTP 200 for TITAN — chain empty or blocked (size 2)
+2026-05-27 15:23:24 WARNING integrations.nse_option_chain — Option chain failed for TMPV: HTTP 200 for TMPV — chain empty or blocked (size 2)
+2026-05-27 15:23:28 WARNING integrations.nse_option_chain — Option chain failed for TRENT: HTTP 200 for TRENT — chain empty or blocked (size 2)
+2026-05-27 15:23:31 WARNING integrations.nse_option_chain — Option chain failed for ULTRACEMCO: HTTP 200 for ULTRACEMCO — chain empty or blocked (size 2)
+2026-05-27 15:23:34 WARNING integrations.nse_option_chain — Option chain failed for WIPRO: HTTP 200 for WIPRO — chain empty or blocked (size 2)
+2026-05-27 15:23:35 INFO integrations.nse_option_chain — Snapshot batch complete: 0 rows from 0/50 symbols
+2026-05-27 15:23:35 INFO pipeline.data_ingestion — Triggering Tier 2 Fallback: Kite Option Quotes for 50 symbols
+2026-05-27 15:23:35 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 15:23:38 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:40 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:42 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:44 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:46 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:48 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:50 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:52 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:54 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:56 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:23:58 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:00 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:02 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:04 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:06 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:08 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:10 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:13 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:15 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:17 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:19 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:21 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:23 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:25 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:27 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:29 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:31 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:33 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:35 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:37 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:39 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:42 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:44 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:46 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:48 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:50 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:52 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:54 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:56 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:24:58 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:00 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:03 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:05 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:07 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:09 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:11 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:13 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:15 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:17 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:19 WARNING integrations.kite_ohlcv — Kite quote failed: Incorrect `api_key` or `access_token`.
+2026-05-27 15:25:19 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/options_snapshots?select=id&snapshot_date=eq.2026-05-27&created_at=gte.2026-05-27T09%3A50%3A00.578255%2B00%3A00&limit=1 "HTTP/2 200 OK"
+2026-05-27 15:25:19 ERROR scheduler — Option snapshot VERIFIED FAILURE: 0 NEW rows found in DB for 2026-05-27
+2026-05-27 15:25:21 INFO integrations.telegram — Telegram message sent (id=28, silent=False)
+2026-05-27 15:25:21 INFO apscheduler.executors.default — Job "Option chain IV snapshot (trigger: cron[day_of_week='mon-fri', hour='15', minute='20'], next run at: 2026-05-28 15:20:00 IST)" executed successfully
+2026-05-27 18:30:00 INFO apscheduler.executors.default — Running job "NSE bhavcopy + FII/DII (trigger: cron[day_of_week='mon-fri', hour='18', minute='30'], next run at: 2026-05-28 18:30:00 IST)" (scheduled at 2026-05-27 18:30:00+05:30)
+2026-05-27 18:30:00 INFO scheduler — Bhavcopy job starting
+2026-05-27 18:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 18:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 18:30:01 INFO integrations.nse_bhavcopy — Equity bhavcopy fetched: 50 Nifty 50 rows for 2026-05-27
+2026-05-27 18:30:02 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 201 Created"
+2026-05-27 18:30:02 INFO pipeline.data_ingestion — Equity bhavcopy: 50 rows stored for 50 targets on 2026-05-27
+2026-05-27 18:30:02 INFO integrations.nse_bhavcopy — Indices bhavcopy fetched for 2026-05-27 — VIX: 14.98, Nifty50: 23907.15
+2026-05-27 18:30:02 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 201 Created"
+2026-05-27 18:30:02 INFO pipeline.data_ingestion — Indices bhavcopy: VIX=14.98, Nifty50=N/A
+2026-05-27 18:30:12 ERROR pipeline.data_ingestion — FII/DII FAILED — will use cached value: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+2026-05-27 18:30:12 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 18:30:12 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?on_conflict=date "HTTP/2 409 Conflict"
+2026-05-27 18:30:12 ERROR apscheduler.executors.default — Job "NSE bhavcopy + FII/DII (trigger: cron[day_of_week='mon-fri', hour='18', minute='30'], next run at: 2026-05-28 18:30:00 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1116, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 121, in fetch_fii_dii
+    data = r.json()
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1120, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 113, in run_bhavcopy_job
+    fii_dii     = fetch_fii_dii(nse_session)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 123, in fetch_fii_dii
+    raise ValueError(f"FII/DII response not JSON. First 200 chars: {r.text[:200]}")
+ValueError: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\scheduler.py", line 143, in job_bhavcopy
+    summary = run_bhavcopy_job()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 136, in run_bhavcopy_job
+    upsert_fii_dii_flow(cached_row)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\database\queries.py", line 129, in upsert_fii_dii_flow
+    get_client().table("fii_dii_flows").upsert(data, on_conflict="date").execute()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\postgrest\_sync\request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': 'duplicate key value violates unique constraint "fii_dii_flows_pkey"', 'code': '23505', 'hint': None, 'details': 'Key (id)=(4f403fe8-11ea-4cf4-a666-b70bbd235361) already exists.'}
+2026-05-27 19:00:00 INFO apscheduler.executors.default — Running job "Bhavcopy retry 19:00 (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-28 19:00:00 IST)" (scheduled at 2026-05-27 19:00:00+05:30)
+2026-05-27 19:00:00 INFO apscheduler.executors.default — Running job "Kite token reminder (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-28 19:00:00 IST)" (scheduled at 2026-05-27 19:00:00+05:30)
+2026-05-27 19:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 19:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 19:00:01 INFO scheduler — Token expires_at=2026-05-27 18:30:00+00:00 | valid_for_tonight=True
+2026-05-27 19:00:01 INFO scheduler — Bhavcopy retry starting for 2026-05-27
+2026-05-27 19:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 19:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 19:00:02 INFO integrations.nse_bhavcopy — Equity bhavcopy fetched: 50 Nifty 50 rows for 2026-05-27
+2026-05-27 19:00:02 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 200 OK"
+2026-05-27 19:00:02 INFO pipeline.data_ingestion — Equity bhavcopy: 50 rows stored for 50 targets on 2026-05-27
+2026-05-27 19:00:03 INFO integrations.telegram — Telegram message sent (id=29, silent=True)
+2026-05-27 19:00:03 INFO scheduler — Token valid — silent confirmation sent (message_id=29)
+2026-05-27 19:00:03 INFO apscheduler.executors.default — Job "Kite token reminder (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-28 19:00:00 IST)" executed successfully
+2026-05-27 19:00:03 INFO integrations.nse_bhavcopy — Indices bhavcopy fetched for 2026-05-27 — VIX: 14.98, Nifty50: 23907.15
+2026-05-27 19:00:03 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 200 OK"
+2026-05-27 19:00:03 INFO pipeline.data_ingestion — Indices bhavcopy: VIX=14.98, Nifty50=N/A
+2026-05-27 19:00:12 ERROR pipeline.data_ingestion — FII/DII FAILED — will use cached value: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+2026-05-27 19:00:12 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 19:00:12 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?on_conflict=date "HTTP/2 409 Conflict"
+2026-05-27 19:00:12 ERROR apscheduler.executors.default — Job "Bhavcopy retry 19:00 (trigger: cron[day_of_week='mon-fri', hour='19', minute='0'], next run at: 2026-05-28 19:00:00 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1116, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 121, in fetch_fii_dii
+    data = r.json()
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1120, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 113, in run_bhavcopy_job
+    fii_dii     = fetch_fii_dii(nse_session)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 123, in fetch_fii_dii
+    raise ValueError(f"FII/DII response not JSON. First 200 chars: {r.text[:200]}")
+ValueError: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\scheduler.py", line 186, in job_bhavcopy_retry
+    summary = run_bhavcopy_job()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 136, in run_bhavcopy_job
+    upsert_fii_dii_flow(cached_row)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\database\queries.py", line 129, in upsert_fii_dii_flow
+    get_client().table("fii_dii_flows").upsert(data, on_conflict="date").execute()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\postgrest\_sync\request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': 'duplicate key value violates unique constraint "fii_dii_flows_pkey"', 'code': '23505', 'hint': None, 'details': 'Key (id)=(4f403fe8-11ea-4cf4-a666-b70bbd235361) already exists.'}
+2026-05-27 19:30:00 INFO apscheduler.executors.default — Running job "Bhavcopy retry 19:30 (trigger: cron[day_of_week='mon-fri', hour='19', minute='30'], next run at: 2026-05-28 19:30:00 IST)" (scheduled at 2026-05-27 19:30:00+05:30)
+2026-05-27 19:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 19:30:01 INFO scheduler — Bhavcopy retry starting for 2026-05-27
+2026-05-27 19:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 19:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 19:30:01 INFO integrations.nse_bhavcopy — Equity bhavcopy fetched: 50 Nifty 50 rows for 2026-05-27
+2026-05-27 19:30:01 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 200 OK"
+2026-05-27 19:30:01 INFO pipeline.data_ingestion — Equity bhavcopy: 50 rows stored for 50 targets on 2026-05-27
+2026-05-27 19:30:02 INFO integrations.nse_bhavcopy — Indices bhavcopy fetched for 2026-05-27 — VIX: 14.98, Nifty50: 23907.15
+2026-05-27 19:30:02 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 200 OK"
+2026-05-27 19:30:02 INFO pipeline.data_ingestion — Indices bhavcopy: VIX=14.98, Nifty50=N/A
+2026-05-27 19:30:16 ERROR pipeline.data_ingestion — FII/DII FAILED — will use cached value: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+2026-05-27 19:30:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 19:30:16 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?on_conflict=date "HTTP/2 409 Conflict"
+2026-05-27 19:30:16 ERROR apscheduler.executors.default — Job "Bhavcopy retry 19:30 (trigger: cron[day_of_week='mon-fri', hour='19', minute='30'], next run at: 2026-05-28 19:30:00 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1116, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 121, in fetch_fii_dii
+    data = r.json()
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1120, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 113, in run_bhavcopy_job
+    fii_dii     = fetch_fii_dii(nse_session)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 123, in fetch_fii_dii
+    raise ValueError(f"FII/DII response not JSON. First 200 chars: {r.text[:200]}")
+ValueError: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\scheduler.py", line 186, in job_bhavcopy_retry
+    summary = run_bhavcopy_job()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 136, in run_bhavcopy_job
+    upsert_fii_dii_flow(cached_row)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\database\queries.py", line 129, in upsert_fii_dii_flow
+    get_client().table("fii_dii_flows").upsert(data, on_conflict="date").execute()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\postgrest\_sync\request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': 'duplicate key value violates unique constraint "fii_dii_flows_pkey"', 'code': '23505', 'hint': None, 'details': 'Key (id)=(4f403fe8-11ea-4cf4-a666-b70bbd235361) already exists.'}
+2026-05-27 20:00:00 INFO apscheduler.executors.default — Running job "Bhavcopy retry 20:00 (trigger: cron[day_of_week='mon-fri', hour='20', minute='0'], next run at: 2026-05-28 20:00:00 IST)" (scheduled at 2026-05-27 20:00:00+05:30)
+2026-05-27 20:00:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 20:00:00 INFO scheduler — Bhavcopy retry starting for 2026-05-27
+2026-05-27 20:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 20:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 20:00:01 INFO integrations.nse_bhavcopy — Equity bhavcopy fetched: 50 Nifty 50 rows for 2026-05-27
+2026-05-27 20:00:01 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 200 OK"
+2026-05-27 20:00:01 INFO pipeline.data_ingestion — Equity bhavcopy: 50 rows stored for 50 targets on 2026-05-27
+2026-05-27 20:00:02 INFO integrations.nse_bhavcopy — Indices bhavcopy fetched for 2026-05-27 — VIX: 14.98, Nifty50: 23907.15
+2026-05-27 20:00:02 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?on_conflict=symbol%2Cdate&columns=%22high%22%2C%22symbol%22%2C%22open%22%2C%22date%22%2C%22low%22%2C%22volume%22%2C%22close%22 "HTTP/2 200 OK"
+2026-05-27 20:00:02 INFO pipeline.data_ingestion — Indices bhavcopy: VIX=14.98, Nifty50=N/A
+2026-05-27 20:00:12 ERROR pipeline.data_ingestion — FII/DII FAILED — will use cached value: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+2026-05-27 20:00:12 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 20:00:13 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?on_conflict=date "HTTP/2 409 Conflict"
+2026-05-27 20:00:13 ERROR apscheduler.executors.default — Job "Bhavcopy retry 20:00 (trigger: cron[day_of_week='mon-fri', hour='20', minute='0'], next run at: 2026-05-28 20:00:00 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1116, in json
+    return complexjson.loads(self.text, **kwargs)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\json\decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 121, in fetch_fii_dii
+    data = r.json()
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\requests\models.py", line 1120, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 113, in run_bhavcopy_job
+    fii_dii     = fetch_fii_dii(nse_session)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\integrations\nse_fii_dii.py", line 123, in fetch_fii_dii
+    raise ValueError(f"FII/DII response not JSON. First 200 chars: {r.text[:200]}")
+ValueError: FII/DII response not JSON. First 200 chars: \ufffd \ufffd\ufffd8\ufffd\ufffd\u04d4@o\ufffd	\ufffdNN\ufffdg=|\ufffd<\ufffd\U00012950C)\ufffd-\ufffd\ufffd\ufffd\ufffd:P\ufffd\ufffd\ufffd\ufffd\ufffdAUQP\ufffd\ufffd \ufffd\ufffd \ufffd\u02f7\ufffd\ufffd\ufffdp\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffdg\ufffd\ufffd6\ufffdjY4\u06b21j
+\ufffdT\ufffd\ufffd\ufffd\ufffdS\ufffd:
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\scheduler.py", line 186, in job_bhavcopy_retry
+    summary = run_bhavcopy_job()
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py", line 136, in run_bhavcopy_job
+    upsert_fii_dii_flow(cached_row)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\database\queries.py", line 129, in upsert_fii_dii_flow
+    get_client().table("fii_dii_flows").upsert(data, on_conflict="date").execute()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\postgrest\_sync\request_builder.py", line 78, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': 'duplicate key value violates unique constraint "fii_dii_flows_pkey"', 'code': '23505', 'hint': None, 'details': 'Key (id)=(4f403fe8-11ea-4cf4-a666-b70bbd235361) already exists.'}
+2026-05-27 21:30:00 INFO apscheduler.executors.default — Running job "Pre-flight system check (trigger: cron[day_of_week='mon-fri', hour='21', minute='30'], next run at: 2026-05-28 21:30:00 IST)" (scheduled at 2026-05-27 21:30:00+05:30)
+2026-05-27 21:30:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 21:30:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/price_history?select=id&date=eq.2026-05-27&created_at=gte.2026-05-27T13%3A00%3A00%2B00%3A00&limit=1 "HTTP/2 206 Partial Content"
+2026-05-27 21:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/options_snapshots?select=id&snapshot_date=eq.2026-05-27&created_at=gte.2026-05-27T09%3A50%3A00%2B00%3A00&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:30:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:30:02 INFO integrations.telegram — Telegram message sent (id=30, silent=False)
+2026-05-27 21:30:02 WARNING scheduler — Pre-flight FAILED: ['Option snapshot missing for today', 'FII/DII data stale (Latest: 2026-05-26)']
+2026-05-27 21:30:02 INFO apscheduler.executors.default — Job "Pre-flight system check (trigger: cron[day_of_week='mon-fri', hour='21', minute='30'], next run at: 2026-05-28 21:30:00 IST)" executed successfully
+2026-05-27 21:58:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 21:58:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 21:58:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 21:58:10 INFO integrations.kite_oauth — Kite login URL generated
+2026-05-27 21:58:10 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-05-27 21:58:22 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens "HTTP/2 200 OK"
+2026-05-27 21:58:22 INFO integrations.kite_oauth — Kite token exchanged and stored. User: NOK061. Expires: 2026-05-28 00:00 IST
+2026-05-27 21:58:22 INFO main — Kite OAuth: token stored successfully
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 21:58:26 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 21:58:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 22:00:00 INFO apscheduler.executors.default — Running job "Main analysis pipeline (trigger: cron[day_of_week='mon-fri', hour='22', minute='0'], next run at: 2026-05-28 22:00:00 IST)" (scheduled at 2026-05-27 22:00:00+05:30)
+2026-05-27 22:00:00 ERROR scheduler — Main pipeline failed: cannot import name 'fetch_kite_token' from 'pipeline.data_ingestion' (C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\pipeline\data_ingestion.py)
+2026-05-27 22:00:01 INFO integrations.telegram — Telegram message sent (id=31, silent=False)
+2026-05-27 22:00:01 INFO apscheduler.executors.default — Job "Main analysis pipeline (trigger: cron[day_of_week='mon-fri', hour='22', minute='0'], next run at: 2026-05-28 22:00:00 IST)" executed successfully
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 22:03:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:02 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 22:03:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 22:03:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 22:03:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 22:03:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 22:03:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 22:03:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 22:03:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:04 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 22:03:06 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 22:03:59 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:04:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 22:06:16 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"

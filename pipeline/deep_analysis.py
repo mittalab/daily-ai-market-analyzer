@@ -566,6 +566,12 @@ def validate_position_sizing(analysis: dict, config: dict) -> dict:
     actual_risk = risk_per_lot * lots
     actual_rr   = (float(target_2) - entry_mid) / (entry_mid - float(stop_loss))
 
+    if actual_rr < 2.0:
+        analysis["rr_gate_passed"] = False
+        analysis["stage"] = "SKIP"
+        analysis["skip_reason"] = f"RR {actual_rr:.2f} below 2.0 minimum"
+        return analysis
+
     analysis["lots"]         = lots
     analysis["max_risk_inr"] = round(actual_risk, 0)
     analysis["risk_reward"]  = round(actual_rr, 2)

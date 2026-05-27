@@ -44,13 +44,23 @@ logger = logging.getLogger(__name__)
 IST    = pytz.timezone("Asia/Kolkata")
 
 
-def get_ingestion_symbols() -> list[str]:
-    """Return a sorted list of symbols to ingest: Nifty 50 + active watchlist."""
+def get_ingestion_symbols(all_stages: bool = False) -> list[str]:
+    """
+    Return a sorted list of symbols to ingest: Nifty 50 + watchlist.
+
+    all_stages=False (default): only WATCH / ON_RADAR / TRADE_READY watchlist entries.
+    all_stages=True: every symbol in watchlist_staging regardless of stage.
+                     Use for data-fetch jobs (snapshot, OHLCV, futures OI) so that
+                     symbols like IOC that are in ENTRY_TRIGGERED / FLAGGED / DEGRADED
+                     are not silently dropped.
+    """
     nifty50 = get_nifty50_symbols()
     try:
-        # Include anyone in WATCH, ON_RADAR, or TRADE_READY stages
         active_wl = get_watchlist()
-        watchlist = {r["symbol"] for r in active_wl if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY")}
+        if all_stages:
+            watchlist = {r["symbol"] for r in active_wl if r.get("symbol")}
+        else:
+            watchlist = {r["symbol"] for r in active_wl if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY")}
     except Exception as exc:
         logger.warning("Failed to fetch watchlist symbols for ingestion: %s", exc)
         watchlist = set()
@@ -130,6 +140,9 @@ def run_bhavcopy_job(for_date: date | None = None) -> dict:
         cached = get_latest_fii_dii()
         if cached:
             cached_row = dict(cached)
+            # Remove PK/Audit fields to avoid unique constraint violations on retry/new day
+            cached_row.pop("id", None)
+            cached_row.pop("created_at", None)
             cached_row["source"] = "CACHED"
             ref_date = trade_date or last_trading_day(for_date)
             cached_row["date"] = str(ref_date)
@@ -144,81 +157,80 @@ def run_bhavcopy_job(for_date: date | None = None) -> dict:
 
 def run_snapshot_job(snapshot_date: date | None = None) -> dict:
     """
-    Fetch option chain IV snapshot for all target stocks. Store in Supabase.
-    FIX: Tiered fallback to Kite Quotes if NSE scrape is blocked.
+    Fetch option chain snapshot for all target stocks.
+    Priority: 
+      1. Kite Quotes (Reliable primary for OI/Price)
+      2. NSE Scrape (Enrich with IV where available)
     """
     snap_date = snapshot_date or date.today()
-    summary: dict = {"ok": False, "rows_stored": 0, "failed_symbols": [], "source": "NSE"}
-    symbols = get_ingestion_symbols()
+    summary: dict = {"ok": False, "rows_stored": 0, "failed_symbols": [], "source": "NONE"}
+    symbols = get_ingestion_symbols(all_stages=True)
 
-    # Tier 1: Try high-fidelity NSE scrape
+    # --- Step 1: Kite Quotes (Primary / Reliable) ---
+    kite_rows = []
     try:
-        from integrations.nse_fii_dii import create_nse_session
-        nse_session = create_nse_session()
-        all_rows, failed = run_snapshot_batch(nse_session, symbols, snap_date)
-        
-        if len(all_rows) > (len(symbols) * 2):  # Heuristic for meaningful success
-            n_upserted = upsert_options_snapshots(all_rows)
-            summary.update({"ok": True, "rows_stored": n_upserted, "failed_symbols": failed})
-            return summary
-    except Exception as exc:
-        logger.warning("NSE Snapshot scrape failed: %s — attempting Kite fallback", exc)
-
-    # Tier 2: Fallback to Kite Quotes
-    try:
-        logger.info("Triggering Tier 2 Fallback: Kite Option Quotes for %d symbols", len(symbols))
         from database.queries import get_kite_token
         from integrations.kite_ohlcv import get_kite, get_option_symbols, fetch_option_quotes
         
         token_row = get_kite_token()
-        if not token_row:
-            raise RuntimeError("Kite token missing — cannot run Tier 2 fallback")
-        
-        kite = get_kite(token_row["access_token"])
-        fallback_rows = []
-        
-        for symbol in symbols:
-            # 1. Get near/next month option symbols
-            instruments = get_option_symbols(kite, symbol)
-            if instruments.empty:
-                continue
-                
-            # 2. Fetch live quotes (LTP, OI)
-            quotes = fetch_option_quotes(kite, instruments)
+        if token_row:
+            kite = get_kite(token_row["access_token"])
+            for symbol in symbols:
+                try:
+                    instruments = get_option_symbols(kite, symbol)
+                    if instruments.empty: continue
+                    quotes = fetch_option_quotes(kite, instruments)
+                    for tk, q in quotes.items():
+                        try:
+                            tsym = tk.split(":")[-1]
+                            matches = instruments[instruments["tradingsymbol"] == tsym]
+                            if matches.empty: continue
+                            inst = matches.iloc[0]
+                            expiry = inst["expiry"]
+                            if hasattr(expiry, "date"): expiry = expiry.date()
+                            oi_high = q.get("oi_day_high") or 0
+                            oi_low  = q.get("oi_day_low")  or 0
+                            kite_rows.append({
+                                "symbol":        symbol,
+                                "snapshot_date": str(snap_date),
+                                "expiry_date":   str(expiry),
+                                "strike":        float(inst["strike"]),
+                                "option_type":   inst["instrument_type"],
+                                "oi":            int(q.get("oi") or 0),
+                                "oi_change":     int(oi_high - oi_low),
+                                "volume":        int(q.get("volume") or 0),
+                                "iv":            None,
+                                "premium_close": float(q.get("last_price") or 0),
+                            })
+                        except Exception: continue
+                    time.sleep(0.1)
+                except Exception as sym_exc:
+                    logger.warning("Kite skip %s: %s", symbol, sym_exc)
             
-            # 3. Format for options_snapshots (IV will be None from Kite API)
-            for tk, q in quotes.items():
-                # tk is e.g. 'NFO:HDFCBANK24MAY1500CE'
-                tsym = tk.split(":")[-1]
-                inst = instruments[instruments["tradingsymbol"] == tsym].iloc[0]
-                
-                fallback_rows.append({
-                    "symbol":        symbol,
-                    "snapshot_date": str(snap_date),
-                    "expiry_date":   str(inst["expiry"]),
-                    "strike":        float(inst["strike"]),
-                    "option_type":   inst["instrument_type"],
-                    "oi":            int(q["oi"]),
-                    "oi_change":     int(q["oi_day_high"] - q["oi_day_low"]), # Best estimate
-                    "volume":        int(q["volume"]),
-                    "iv":            None, # Kite API doesn't provide IV
-                    "premium_close": float(q["last_price"]),
-                })
-            time.sleep(0.1) # Respect rate limits
-            
-        if fallback_rows:
-            n_upserted = upsert_options_snapshots(fallback_rows)
-            summary.update({
-                "ok": True, 
-                "rows_stored": n_upserted, 
-                "source": "KITE",
-                "failed_symbols": [s for s in symbols if s not in [r["symbol"] for r in fallback_rows]]
-            })
-            logger.info("Kite Fallback successful: Stored %d option rows (IV will be None)", n_upserted)
-        
+            if kite_rows:
+                n = upsert_options_snapshots(kite_rows)
+                summary.update({"ok": True, "rows_stored": n, "source": "KITE"})
+                logger.info("Kite snapshot stored: %d rows", n)
     except Exception as exc:
-        logger.error("Snapshot Tier 2 Fallback FAILED: %s", exc)
-        summary["error"] = str(exc)
+        logger.error("Kite snapshot failed: %s", exc)
+
+    # --- Step 2: NSE Scrape (Enrichment / IVs) ---
+    try:
+        from integrations.nse_fii_dii import create_nse_session
+        from integrations.nse_option_chain import run_snapshot_batch
+        
+        nse_session = create_nse_session()
+        nse_rows, failed = run_snapshot_batch(nse_session, symbols, snap_date)
+        
+        if nse_rows:
+            n = upsert_options_snapshots(nse_rows)
+            summary["ok"] = True
+            summary["rows_stored"] = max(summary["rows_stored"], n)
+            summary["source"] = "KITE+NSE" if kite_rows else "NSE"
+            summary["failed_symbols"] = failed
+            logger.info("NSE snapshot enriched: %d rows (source: %s)", n, summary["source"])
+    except Exception as exc:
+        logger.warning("NSE enrichment failed (using Kite data): %s", exc)
 
     return summary
 
@@ -239,7 +251,7 @@ def run_kite_data_fetch(kite, rollover_phase: str = "NORMAL") -> dict:
     Returns summary dict.
     """
     summary: dict = {"ok": True, "errors": [], "symbols_ohlcv": 0, "symbols_oi": 0}
-    symbols = get_ingestion_symbols()
+    symbols = get_ingestion_symbols(all_stages=True)
 
     # ── OHLCV ──────────────────────────────────────────────────────────────────
     try:

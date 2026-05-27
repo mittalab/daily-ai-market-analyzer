@@ -217,19 +217,24 @@ def send_paper_trade_outcome(
     holding_days: int,
 ) -> int | None:
     """
-    Send Telegram for TARGET_HIT (LOUD) and SL_HIT (SILENT).
-    All other outcomes (EXPIRED, CLOSED_BREAKEVEN, ENTRY_MISSED) are silent — no notification.
+    Send SILENT Telegram for all closed paper trade outcomes.
+    All paper outcomes are silent — paper trades never trigger loud alerts.
+    ENTRY_MISSED produces no notification.
     """
-    if outcome not in ("TARGET_HIT", "SL_HIT"):
+    if outcome not in ("TARGET_HIT", "SL_HIT", "EXPIRED", "CLOSED_BREAKEVEN"):
         return None
     positions_url = f"{_get_dashboard_url()}/positions"
     pnl_sign      = "+" if pnl_inr >= 0 else ""
     strike_str    = f" {strike}" if strike else ""
 
     if outcome == "TARGET_HIT":
-        icon, label, send_fn = "🎯", "Target Hit", send_loud
+        icon, label = "🎯", "Target Hit"
+    elif outcome == "SL_HIT":
+        icon, label = "🛑", "Stop Loss Hit"
+    elif outcome == "EXPIRED":
+        icon, label = "⏰", "Trade Expired"
     else:
-        icon, label, send_fn = "🛑", "Stop Loss Hit", send_silent
+        icon, label = "↔️", "Breakeven Exit"
 
     text = (
         f"{icon} <b>Paper {label} — {symbol}{strike_str} {option_type}</b>\n"
@@ -237,7 +242,7 @@ def send_paper_trade_outcome(
         f"Exit: <code>₹{exit_price:.0f}</code> | P&amp;L: <code>{pnl_sign}₹{abs(pnl_inr):,.0f}</code>\n"
         f'📱 <a href="{positions_url}">View Positions</a>'
     )
-    return send_fn(text)
+    return send_silent(text)
 
 
 def send_budget_exhausted(spent_usd: float, budget_usd: float, trade_date: str) -> int | None:

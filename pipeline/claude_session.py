@@ -37,6 +37,7 @@ from indicators.technical import (
 )
 from pipeline.deep_analysis import (
     DEEP_SYSTEM,
+    _sector_info,
     build_deep_prompt,
     build_stock_package,
     call_claude_deep,
@@ -567,6 +568,7 @@ def run_claude_session(
                     fs["days_in_stage"] = wl_stock.get("days_in_stage", 0)
 
     deep_results: list[dict] = []
+    trade_ready_list: list[dict] = []  # sector correlation tracking
 
     # Build index context once for all deep turns
     index_ctx = {
@@ -653,6 +655,35 @@ def run_claude_session(
 
         stage = analysis.get("stage", "SKIP")
         conviction = analysis.get("conviction_score", 0)
+
+        # ── Sector correlation enforcement ────────────────────────────────────
+        if stage == "TRADE_READY":
+            sym_sector, _ = _sector_info(symbol)
+            sym_direction = analysis.get("direction", "")
+            conflict = next(
+                (r for r in trade_ready_list
+                 if r["sector"] == sym_sector
+                 and r["direction"] == sym_direction
+                 and sym_sector != "UNKNOWN"),
+                None,
+            )
+            if conflict:
+                logger.info(
+                    "Sector correlation: %s downgraded — %s already has %s %s setup",
+                    symbol, sym_sector, sym_direction, conflict["symbol"],
+                )
+                stage = "WATCH"
+                analysis["stage"] = "WATCH"
+                analysis["skip_reason"] = (
+                    f"Sector correlation: {sym_sector} already has "
+                    f"{sym_direction} setup ({conflict['symbol']})"
+                )
+            else:
+                trade_ready_list.append({
+                    "symbol":    symbol,
+                    "sector":    sym_sector,
+                    "direction": sym_direction,
+                })
 
         # ── Watchlist Lifecycle Management ───────────────────────────────────
         if is_re:

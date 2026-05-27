@@ -117,7 +117,7 @@ def get_option_symbols(kite: KiteConnect, symbol: str, expiries_count: int = 2) 
     """
     Fetch all NFO option instruments for a symbol, filtered by first N expiries.
     """
-    df = pd.DataFrame(kite.instruments("NFO"))
+    df = get_instruments(kite, "NFO")
     if df.empty:
         return pd.DataFrame()
     

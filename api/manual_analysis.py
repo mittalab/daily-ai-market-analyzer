@@ -546,6 +546,17 @@ async def analyse_stock(req: AnalyseRequest) -> AnalyseResponse:
     t_start = time.monotonic()
     symbol  = req.symbol
 
+    # ── Market hours guard ────────────────────────────────────────────────────
+    now_ist = datetime.now(IST)
+    if now_ist.weekday() < 5 and 9 <= now_ist.hour < 16:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Manual analysis blocked during market hours (09:00–16:00 IST). "
+                f"Current IST: {now_ist.strftime('%H:%M')}. Try after 4:00 PM."
+            ),
+        )
+
     # ── Feature gate ──────────────────────────────────────────────────────────
     config = get_all_system_config()
     if config.get("manual_analysis_enabled", "true").lower() != "true":
