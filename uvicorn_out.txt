@@ -696,3 +696,15 @@ INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
