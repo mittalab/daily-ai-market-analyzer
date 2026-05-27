@@ -173,14 +173,15 @@ export interface SystemStatus {
 
 export interface DeepAnalysisTurn {
   turn_number: number;
-  symbol: string;
+  turn_type: 'market_context' | 'deep_analysis';
+  symbol: string | null;
   completed_at: string;
-  analysis: AnalysisResult;
+  analysis: any; // Flexible for market_context or deep_analysis JSON
 }
 
 export interface DeepAnalysisResponse {
   turns: DeepAnalysisTurn[];
-  session_id: string | null;
+  session_id: string;
   session_date: string;
 }
 

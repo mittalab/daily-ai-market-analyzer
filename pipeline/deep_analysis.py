@@ -7,6 +7,7 @@ Exports:
   build_deep_prompt      — formats Claude deep analysis prompt
   validate_position_sizing — Python-authoritative position sizing (FIX 2)
   call_claude_deep       — single deep analysis API call
+  oi_walls               — calculates top CE/PE OI walls
   DEEP_SYSTEM            — system prompt constant
 """
 import json
@@ -97,7 +98,7 @@ def _atm_iv(options: list[dict], spot: float | None) -> float | None:
     return round(float(iv), 2) if iv else None
 
 
-def _oi_walls(options: list[dict], near_expiry_str: str, top_n: int = 5) -> dict:
+def oi_walls(options: list[dict], near_expiry_str: str, top_n: int = 5) -> dict:
     near = [r for r in options if str(r.get("expiry_date", "")) == near_expiry_str]
     ce   = sorted([r for r in near if r["option_type"] == "CE"],
                   key=lambda r: int(r.get("oi") or 0), reverse=True)[:top_n]
@@ -215,11 +216,25 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
     # Options snapshot
     options  = []
     atm_iv   = None
-    oi_walls = {}
+    oi_walls_data = {}
+    next_options = []
+    next_oi_walls = {}
+
     if near_expiry_str:
         try:
             near_exp_date = date.fromisoformat(near_expiry_str)
             options = get_options_snapshot(symbol, session_date, near_exp_date)
+            
+            # ── FIX: Next month OI if near expiry is < 5 days away ────────────
+            dte = (near_exp_date - session_date).days
+            if dte < 5 and next_expiry_str:
+                try:
+                    next_exp_date = date.fromisoformat(next_expiry_str)
+                    next_options = get_options_snapshot(symbol, session_date, next_exp_date)
+                    if next_options:
+                        next_oi_walls = oi_walls(next_options, next_expiry_str)
+                except Exception as exc:
+                    logger.warning("Failed to fetch next-expiry OI for %s: %s", symbol, exc)
         except Exception:
             pass
     if not options and near_expiry_str:
@@ -235,7 +250,7 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
         quality_notes.append(f"No options snapshot for {symbol} — IV unavailable")
     else:
         atm_iv   = _atm_iv(options, spot)
-        oi_walls = _oi_walls(options, near_expiry_str or "")
+        oi_walls_data = oi_walls(options, near_expiry_str or "")
 
     # Futures series: 30 days
     fut_rows   = get_futures_series(symbol, days=30)
@@ -296,7 +311,8 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
         "next_expiry":    next_expiry_str,
         "atm_iv_pct":     atm_iv,
         "iv_assessment":  _iv_assessment(atm_iv),
-        "oi_walls":       oi_walls,
+        "oi_walls":       oi_walls_data,
+        "next_oi_walls":  next_oi_walls,
         "near_month_oi":  latest_oi.get("near_month_oi"),
         "pcr_near":       latest_oi.get("pcr_near"),
         "max_pain":       latest_oi.get("max_pain"),
@@ -328,6 +344,11 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
             {"strike": r["strike"], "type": r["option_type"],
              "oi": r.get("oi"), "iv": r.get("implied_volatility")}
             for r in options
+        ],
+        "next_options_chain":  [
+            {"strike": r["strike"], "type": r["option_type"],
+             "oi": r.get("oi"), "iv": r.get("implied_volatility")}
+            for r in next_options
         ],
         "sector_index_20d":     [
             {"date": r["date"], "close": r["close"]} for r in sector_rows[-20:]

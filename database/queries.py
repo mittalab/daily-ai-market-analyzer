@@ -413,6 +413,7 @@ def save_claude_turn(
     symbol: str | None,
     input_tokens: int,
     output_tokens: int,
+    input_text: str,
     output_text: str,
 ) -> None:
     """
@@ -427,6 +428,7 @@ def save_claude_turn(
         "symbol":        symbol,
         "input_tokens":  input_tokens,
         "output_tokens": output_tokens,
+        "input_text":    input_text,
         "output_text":   output_text,
     }, on_conflict="session_id,turn_number").execute()
 

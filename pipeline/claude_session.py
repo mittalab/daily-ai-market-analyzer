@@ -40,9 +40,14 @@ from pipeline.deep_analysis import (
     build_deep_prompt,
     build_stock_package,
     call_claude_deep,
+    oi_walls,
     validate_position_sizing,
 )
 from pipeline.system_prompt_builder import build_system_prompt
+
+from database.queries import (
+    get_options_snapshot,
+)
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -140,6 +145,24 @@ def _build_turn1_message(session_date: date, regime_result: dict | None) -> str:
         for r in fii_rows[-30:]
     ]
 
+    # ── Nifty OI Walls ────────────────────────────────────────────────────────
+    nifty_oi_walls = {}
+    if nifty_rows:
+        try:
+            # Latest available snapshot for NIFTY_50
+            # Indices usually have weekly expiries, but we focus on the nearest
+            n_snap = get_options_snapshot("NIFTY_50", session_date)
+            if not n_snap:
+                n_snap = get_options_snapshot("NIFTY_50", session_date - timedelta(days=1))
+            
+            if n_snap:
+                # Get the earliest expiry in the snapshot
+                expiries = sorted(list(set(r["expiry_date"] for r in n_snap)))
+                if expiries:
+                    nifty_oi_walls = oi_walls(n_snap, expiries[0])
+        except Exception as exc:
+            logger.warning("Failed to calculate Nifty OI walls: %s", exc)
+
     payload = {
         "turn":         "market_context",
         "session_date": str(session_date),
@@ -152,10 +175,13 @@ def _build_turn1_message(session_date: date, regime_result: dict | None) -> str:
         "nifty_30d":    nifty_30,
         "vix_30d":      vix_30,
         "fii_dii_30d":  fii_30,
+        "nifty_oi_walls": nifty_oi_walls,
     }
 
     instructions = (
         "Analyse the market context above. "
+        "Factor in the Nifty 50 OI walls (Support=PE walls, Resistance=CE walls) "
+        "when defining key levels and narrative. "
         "Respond with ONLY a JSON object — no commentary outside the JSON:\n"
         "{\n"
         '  "session_narrative": "3-4 sentences on market condition and tone tonight",\n'
@@ -442,7 +468,7 @@ def run_claude_session(
                 getattr(u1, "cache_read_input_tokens", "-"))
 
     save_claude_turn(session_id, 1, "market_context", None,
-                     u1.input_tokens, u1.output_tokens, t1_out_text)
+                     u1.input_tokens, u1.output_tokens, t1_text_user, t1_out_text)
     messages.append({"role": "assistant", "content": t1_out_text})
 
     try:
@@ -481,7 +507,7 @@ def run_claude_session(
                 getattr(u2, "cache_read_input_tokens", "-"))
 
     save_claude_turn(session_id, 2, "prescan", None,
-                     u2.input_tokens, u2.output_tokens, t2_out_text)
+                     u2.input_tokens, u2.output_tokens, t2_text_user, t2_out_text)
     messages.append({"role": "assistant", "content": t2_out_text})
 
     try:
@@ -618,7 +644,7 @@ def run_claude_session(
         analysis = validate_position_sizing(analysis, config)
 
         save_claude_turn(session_id, turn_num, "deep_analysis", symbol,
-                         in_tok, out_tok, json.dumps(analysis))
+                         in_tok, out_tok, prompt, json.dumps(analysis))
 
         # FIX: Send cost notification per turn
         from integrations.telegram import send_claude_cost

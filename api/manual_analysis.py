@@ -598,6 +598,7 @@ async def analyse_stock(req: AnalyseRequest) -> AnalyseResponse:
             symbol=symbol,
             input_tokens=input_tok,
             output_tokens=output_tok,
+            input_text=prompt,
             output_text=json.dumps(analysis),
         )
     except Exception as exc:

@@ -67,6 +67,10 @@ async def get_today():
     if session:
         session_date = date.fromisoformat(str(session["session_date"]))
         setups       = get_trade_setups_by_date(session_date)
+        
+        # Sort by conviction score DESC
+        setups.sort(key=lambda s: s.get("conviction_score") or 0, reverse=True)
+        
         trade_ready  = [s for s in setups if s.get("stage") == "TRADE_READY"]
         watch        = [s for s in setups if s.get("stage") == "WATCH"]
 
@@ -113,26 +117,42 @@ async def get_deep_analysis_turns():
         res = (
             get_client()
             .table("session_claude_turns")
-            .select("turn_number,symbol,output_text,completed_at")
+            .select("turn_number,turn_type,symbol,output_text,completed_at")
             .eq("session_id", session_id)
-            .eq("turn_type", "deep_analysis")
+            .in_("turn_type", ["market_context", "deep_analysis"])
             .order("turn_number")
             .execute()
         )
         
         turns = []
         for row in res.data:
+            text = row["output_text"].strip()
             analysis = {}
             try:
-                analysis = json.loads(row["output_text"])
-            except:
-                analysis = {"error": "JSON parse failure", "raw": row["output_text"]}
+                # Robust parsing for Markdown JSON blocks
+                clean_text = text
+                if clean_text.startswith("```"):
+                    # Remove opening ```json or ```
+                    first_newline = clean_text.find("\n")
+                    if first_newline != -1:
+                        clean_text = clean_text[first_newline+1:]
+                    else:
+                        clean_text = clean_text[3:]
+                        
+                if clean_text.endswith("```"):
+                    clean_text = clean_text[:-3]
+                    
+                analysis = json.loads(clean_text.strip())
+            except Exception as e:
+                logger.warning("JSON parse failure for turn %s: %s", row["turn_number"], e)
+                analysis = {"error": "JSON parse failure", "raw": text}
                 
             turns.append({
-                "turn_number": row["turn_number"],
-                "symbol":      row["symbol"],
+                "turn_number":  row["turn_number"],
+                "turn_type":    row["turn_type"],
+                "symbol":       row["symbol"],
                 "completed_at": row["completed_at"],
-                "analysis":    analysis
+                "analysis":     analysis
             })
             
         return {"turns": turns, "session_id": session_id, "session_date": str(session["session_date"])}
