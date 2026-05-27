@@ -67,6 +67,7 @@ export default function WatchlistScreen() {
                 }`}
               >
                 <div className="flex-1 min-w-0">
+                  {/* Line 1: Symbol and Stage */}
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-gray-900">{e.symbol}</span>
                     {e.current_stage && (
@@ -74,11 +75,20 @@ export default function WatchlistScreen() {
                         {e.current_stage.replace('_', ' ')}
                       </span>
                     )}
+                  </div>
+                  
+                  {/* Line 2: Bias and Lot Size */}
+                  <div className="flex items-center gap-2 mb-1">
                     {e.direction_bias && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                         e.direction_bias === 'LONG' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                       }`}>
                         {e.direction_bias}
+                      </span>
+                    )}
+                    {e.lot_size && (
+                      <span className="text-[10px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded font-mono">
+                        LOT: {e.lot_size}
                       </span>
                     )}
                   </div>

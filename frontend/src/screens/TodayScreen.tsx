@@ -51,7 +51,14 @@ function SetupCard({ s }: { s: TradeSetup }) {
               {s.direction === 'LONG' ? '↑ LONG' : '↓ SHORT'}
             </span>
           </div>
-          <span className="text-lg font-bold text-gray-900">{s.symbol}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-gray-900">{s.symbol}</span>
+            {s.lot_size && (
+              <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">
+                LOT: {s.lot_size}
+              </span>
+            )}
+          </div>
         </div>
         <ConvictionBar score={s.conviction_score} />
         <div className="flex items-center gap-2 flex-wrap mt-2">
@@ -112,10 +119,15 @@ function SetupCard({ s }: { s: TradeSetup }) {
       </div>
 
       {/* Expanders */}
-      {(s.claude_full_rationale || s.mentor_explanation || s.why_could_be_wrong) && (
-        <div className="px-4">
+      {(s.claude_full_rationale || s.rr_reasoning || s.mentor_explanation || s.why_could_be_wrong) && (
+        <div className="px-4 pb-2">
           {s.claude_full_rationale && (
             <Expander title="Claude's Analysis">{s.claude_full_rationale}</Expander>
+          )}
+          {s.rr_reasoning && (
+            <Expander title="R:R & Target Reasoning">
+              <p className="text-sm text-blue-700 leading-relaxed italic">{s.rr_reasoning}</p>
+            </Expander>
           )}
           {s.mentor_explanation && (
             <Expander title="Learning">{s.mentor_explanation}</Expander>
@@ -133,17 +145,29 @@ function WatchRow({ s }: { s: TradeSetup }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
       <div>
-        <span className="font-semibold text-gray-900 text-sm">{s.symbol}</span>
-        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${
-          s.direction === 'LONG' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-        }`}>{s.direction}</span>
+        {/* Line 1: Symbol */}
+        <div className="flex items-center gap-2 mb-1">
+            <span className="font-semibold text-gray-900 text-sm">{s.symbol}</span>
+        </div>
+        
+        {/* Line 2: Bias and Lot Size */}
+        <div className="flex items-center gap-2">
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              s.direction === 'LONG' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>{s.direction}</span>
+            {s.lot_size && (
+                <span className="text-[9px] bg-gray-50 text-gray-400 px-1 py-0.5 rounded font-mono">
+                    LOT: {s.lot_size}
+                </span>
+            )}
+        </div>
         {s.setup_type && (
-          <p className="text-xs text-gray-400 mt-0.5">{s.setup_type}</p>
+          <p className="text-[10px] text-gray-400 mt-1">{s.setup_type}</p>
         )}
       </div>
       <div className="text-right">
         <span className="text-sm font-semibold text-gray-700">{s.conviction_score}</span>
-        <p className="text-xs text-gray-400">conviction</p>
+        <p className="text-[10px] text-gray-400">conviction</p>
       </div>
     </div>
   );

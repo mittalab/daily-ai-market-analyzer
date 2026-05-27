@@ -23,6 +23,7 @@ from database.queries import (
     get_all_lot_sizes,
     get_continuous_oi,
     get_futures_series,
+    get_option_history_window,
     get_options_snapshot,
     get_price_history,
     get_recent_setups_for_symbol,
@@ -191,6 +192,9 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
     volr_s   = volume_ratio(df["volume"], short=3, long=20)
     macd_l, macd_sig, macd_hist = calculate_macd(closes)
 
+    # Attach RSI to dataframe for inclusion in time series
+    df["rsi"] = rsi_s
+
     def _last(s: pd.Series) -> float | None:
         v = s.iloc[-1]
         return round(float(v), 4) if not pd.isna(v) else None
@@ -237,17 +241,10 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
                     logger.warning("Failed to fetch next-expiry OI for %s: %s", symbol, exc)
         except Exception:
             pass
-    if not options and near_expiry_str:
-        yesterday = session_date - timedelta(days=1)
-        try:
-            near_exp_date = date.fromisoformat(near_expiry_str)
-            options = get_options_snapshot(symbol, yesterday, near_exp_date)
-            if options:
-                quality_notes.append(f"IV data from {yesterday} (yesterday's snapshot)")
-        except Exception:
-            pass
-    if not options:
-        quality_notes.append(f"No options snapshot for {symbol} — IV unavailable")
+
+    iv_available = len(options) > 0
+    if not iv_available:
+        quality_notes.append(f"IV data unavailable — NSE blocked or snapshot missing")
     else:
         atm_iv   = _atm_iv(options, spot)
         oi_walls_data = oi_walls(options, near_expiry_str or "")
@@ -284,12 +281,42 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
     if sector_20d_ret is not None and nifty_20d_ret is not None:
         sector_vs_nifty = round(sector_20d_ret - nifty_20d_ret, 2)
 
+    # ── Centered Option Window (+/- 25 strikes, 10 days) ──────────────────────
+    centered_history = []
+    if options and near_exp_date:
+        try:
+            # Detect strike interval (e.g. 50 for Nifty, 5 for some stocks)
+            strikes = sorted(list(set(float(r["strike"]) for r in options)))
+            interval = 5.0
+            if len(strikes) > 1:
+                interval = strikes[1] - strikes[0]
+            
+            min_s = spot - (interval * 25)
+            max_s = spot + (interval * 25)
+            
+            raw_h = get_option_history_window(symbol, near_exp_date, min_s, max_s, days=10)
+            
+            # Format by date for Claude
+            h_map = {}
+            for r in raw_h:
+                dt = r["snapshot_date"]
+                if dt not in h_map: h_map[dt] = []
+                h_map[dt].append({
+                    "s": r["strike"], "t": r["option_type"], 
+                    "p": r["premium_close"], "oi": r["oi"]
+                })
+            centered_history = [{"date": d, "chain": rows} for d, rows in sorted(h_map.items())]
+        except Exception as exc:
+            logger.warning("Failed to build centered option history for %s: %s", symbol, exc)
+
     return {
         "symbol":         symbol,
         "sector":         sector,
         "sector_index":   sector_index,
         "spot_price":     spot,
         "lot_size":       lot_size,
+        "iv_data_available": iv_available,
+        "centered_option_history_10d": centered_history,
         # indicators
         "ema20":          round(float(ema20_s.iloc[-1]), 2),
         "ema50":          round(float(ema50_s.iloc[-1]), 2),
@@ -324,8 +351,9 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
         # time series
         "ohlcv_120d":          [
             {"date": r["date"], "open": r["open"], "high": r["high"],
-             "low": r["low"], "close": r["close"], "volume": r["volume"]}
-            for r in price_rows[-120:]
+             "low": r["low"], "close": r["close"], "volume": r["volume"],
+             "rsi": round(float(r["rsi"]), 2) if pd.notnull(r.get("rsi")) else None}
+            for _, r in df.tail(120).iterrows()
         ],
         "oi_series_30d":       [
             {"date": r["date"], "near_oi": r.get("near_month_oi"),
@@ -336,6 +364,8 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
         ],
         "futures_series_30d":  [
             {"date": r["date"], "futures_price": r.get("futures_price"),
+             "open": r.get("futures_open"), "high": r.get("futures_high"),
+             "low": r.get("futures_low"), "volume": r.get("futures_volume"),
              "near_oi": r.get("near_month_oi"), "basis": r.get("basis"),
              "basis_pct": r.get("basis_pct"), "rollover_pct": r.get("rollover_pct")}
             for r in fut_rows
@@ -383,10 +413,20 @@ def build_deep_prompt(stock_pkg: dict, index_ctx: dict, direction: str) -> str:
         if stock_pkg.get("lot_size") is None
         else ""
     )
+    iv_instruction = ""
+    if not stock_pkg.get("iv_data_available"):
+        iv_instruction = (
+            "\n\nIMPORTANT: IV data unavailable — NSE blocked. "
+            "Do NOT guess or use stale IV. Use VIX as market-wide vol context. "
+            "Assess option premium relative to its own 10-day history instead. "
+            "Flag expensive/cheap qualitatively in your rationale."
+        )
+
     payload = {"task": "deep_analysis", "index_context": index_ctx, "stock": stock_pkg}
     instructions = (
         "Perform a full deep analysis of this stock using the Section 9 "
-        "conviction scoring framework.\n"
+        "conviction scoring framework. Factor in the daily Spot RSI series and "
+        "Futures OHLCV data for momentum and liquidity context.\n"
         "Respond with ONLY a JSON object:\n"
         "{\n"
         '  "stage": "TRADE_READY | WATCH | ON_RADAR | SKIP",\n'
@@ -407,6 +447,7 @@ def build_deep_prompt(stock_pkg: dict, index_ctx: dict, direction: str) -> str:
         '  "stop_loss_premium": number,\n'
         '  "target_1_premium": number,\n'
         '  "target_2_premium": number,\n'
+        '  "rr_reasoning": "Justify your stop loss, targets, and R:R ratio based on price structure and option premiums",\n'
         '  "lots": integer,\n'
         '  "lot_size": integer,\n'
         '  "max_risk_inr": number,\n'
@@ -428,7 +469,7 @@ def build_deep_prompt(stock_pkg: dict, index_ctx: dict, direction: str) -> str:
     )
     return (
         json.dumps(payload, ensure_ascii=False) + "\n\n"
-        + instructions + direction_instruction + lot_size_instruction
+        + instructions + direction_instruction + lot_size_instruction + iv_instruction
     )
 
 

@@ -164,10 +164,11 @@ def futures_oi_to_series_rows(
         total_oi     = near_oi + next_oi
         rollover_pct = (next_oi / total_oi * 100) if total_oi > 0 else None
 
-        futures_close = float(row["close"])   # futures close used as proxy until bhavcopy loaded
-        futures_open  = float(row["open"])  if "open"  in row and row["open"]  is not None else None
-        futures_high  = float(row["high"])  if "high"  in row and row["high"]  is not None else None
-        futures_low   = float(row["low"])   if "low"   in row and row["low"]   is not None else None
+        futures_close  = float(row["close"])   # futures close used as proxy until bhavcopy loaded
+        futures_open   = float(row["open"])   if "open"   in row and row["open"]   is not None else None
+        futures_high   = float(row["high"])   if "high"   in row and row["high"]   is not None else None
+        futures_low    = float(row["low"])    if "low"    in row and row["low"]    is not None else None
+        futures_volume = int(row["volume"])   if "volume" in row and row["volume"] is not None else None
 
         rows.append({
             "symbol":         symbol,
@@ -179,6 +180,7 @@ def futures_oi_to_series_rows(
             "futures_open":   futures_open,
             "futures_high":   futures_high,
             "futures_low":    futures_low,
+            "futures_volume": futures_volume,
             "spot_price":     None,   # set later from bhavcopy CLOSE
             "basis":          None,
             "basis_pct":      None,

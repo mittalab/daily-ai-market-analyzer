@@ -334,6 +334,33 @@ def get_futures_series(symbol: str, days: int = 30) -> list[dict]:
     return list(reversed(resp.data))
 
 
+def get_option_history_window(
+    symbol: str, 
+    expiry_date: date, 
+    min_strike: float, 
+    max_strike: float, 
+    days: int = 10
+) -> list[dict]:
+    """
+    Fetch historical daily snapshots (3:25 PM) for a specific strike range.
+    Useful for 'Centered Window' analysis of premiums and OI shifts.
+    """
+    resp = (
+        get_client()
+        .table("options_snapshots")
+        .select("snapshot_date,strike,option_type,premium_close,oi,iv")
+        .eq("symbol", symbol)
+        .eq("expiry_date", str(expiry_date))
+        .gte("strike", min_strike)
+        .lte("strike", max_strike)
+        .order("snapshot_date", desc=True)
+        .limit(1000) # Safety limit for large windows
+        .execute()
+    )
+    # Group by date for easier AI consumption
+    return resp.data
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # analysis_sessions
 # ─────────────────────────────────────────────────────────────────────────────
@@ -536,7 +563,7 @@ def update_watchlist_staging(symbol: str, updates: dict) -> None:
 
 
 def get_watchlist() -> list[dict]:
-    """Return all watchlist entries ordered by days_in_stage descending."""
+    """Return all watchlist entries ordered by days_in_stage descending, including lot_size."""
     resp = (
         get_client()
         .table("watchlist_staging")
@@ -544,7 +571,14 @@ def get_watchlist() -> list[dict]:
         .order("days_in_stage", desc=True)
         .execute()
     )
-    return resp.data
+    entries = resp.data
+    
+    # Merge lot sizes
+    lot_sizes = get_all_lot_sizes()
+    for e in entries:
+        e["lot_size"] = lot_sizes.get(e["symbol"])
+        
+    return entries
 
 
 # ─────────────────────────────────────────────────────────────────────────────

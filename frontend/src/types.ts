@@ -41,6 +41,7 @@ export interface AnalysisResult {
   mentor_explanation: string;
   why_could_be_wrong: string;
   skip_reason: string | null;
+  rr_reasoning: string | null;
 }
 
 // ── Dashboard API types (from trade_setups DB records) ─────────────────────
@@ -77,6 +78,7 @@ export interface TradeSetup {
   entry_triggered: boolean;
   paper_outcome: string | null;
   paper_pnl_inr: number | null;
+  rr_reasoning: string | null;
 }
 
 export interface MarketContext {
@@ -111,6 +113,7 @@ export interface WatchlistEntry {
   days_in_stage: number | null;
   direction_bias: string | null;
   last_analysis_notes: string | null;
+  lot_size: number | null;
 }
 
 export interface SessionTurn {

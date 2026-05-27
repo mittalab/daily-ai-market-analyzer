@@ -3311,3 +3311,233 @@ INFO:     Waiting for application startup.
 2026-05-27 05:42:52 INFO main — APScheduler started with 10 jobs
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 05:57:15 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 06:00:00 INFO apscheduler.executors.default — Running job "Supabase keepalive (trigger: cron[hour='6', minute='0'], next run at: 2026-05-27 06:00:00 IST)" (scheduled at 2026-05-27 06:00:00+05:30)
+2026-05-27 06:00:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 06:00:00 INFO scheduler — Keepalive: Supabase connection alive
+2026-05-27 06:00:00 INFO apscheduler.executors.default — Job "Supabase keepalive (trigger: cron[hour='6', minute='0'], next run at: 2026-05-28 06:00:00 IST)" executed successfully
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 06:10:52 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 07:00:00 INFO apscheduler.executors.default — Running job "Morning brief (recurring) (trigger: cron[day_of_week='mon-fri', hour='7', minute='0'], next run at: 2026-05-28 07:00:00 IST)" (scheduled at 2026-05-27 07:00:00+05:30)
+2026-05-27 07:00:00 INFO scheduler — Morning brief (recurring) triggered: finding latest session
+2026-05-27 07:00:00 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 07:00:00 INFO scheduler — Sending morning brief for session date: 2026-05-26
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=market_regime%2Cnifty_close%2Cvix_close%2Cfii_net_flow_cr%2Csession_date%2Cstatus&session_date=lte.2026-05-26&order=session_date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/fii_dii_flows?select=%2A&order=date.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=value&key=eq.dashboard_url "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=setup_date%2Cdirection%2Cconviction_score%2Cstage%2Cpaper_outcome%2Csetup_type&symbol=eq.HINDALCO&order=setup_date.desc&limit=2 "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=setup_date%2Cdirection%2Cconviction_score%2Cstage%2Cpaper_outcome%2Csetup_type&symbol=eq.EICHERMOT&order=setup_date.desc&limit=2 "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=setup_date%2Cdirection%2Cconviction_score%2Cstage%2Cpaper_outcome%2Csetup_type&symbol=eq.APOLLOHOSP&order=setup_date.desc&limit=2 "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=setup_date%2Cdirection%2Cconviction_score%2Cstage%2Cpaper_outcome%2Csetup_type&symbol=eq.TMPV&order=setup_date.desc&limit=2 "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=setup_date%2Cdirection%2Cconviction_score%2Cstage%2Cpaper_outcome%2Csetup_type&symbol=eq.WIPRO&order=setup_date.desc&limit=2 "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=value&key=eq.dashboard_url "HTTP/2 200 OK"
+2026-05-27 07:00:01 INFO pipeline.morning_brief — Morning brief built: 0 TRADE_READY, 7 WATCH | msg1=388 chars, msg2=655 chars
+2026-05-27 07:00:02 INFO integrations.telegram — Telegram message sent (id=26, silent=False)
+2026-05-27 07:00:04 INFO integrations.telegram — Telegram message sent (id=27, silent=True)
+2026-05-27 07:00:04 INFO apscheduler.executors.default — Job "Morning brief (recurring) (trigger: cron[day_of_week='mon-fri', hour='7', minute='0'], next run at: 2026-05-28 07:00:00 IST)" executed successfully
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 07:53:43 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 07:53:44 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-27 08:12:47 INFO main — APScheduler stopped
+2026-05-27 08:12:47 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17060]
+INFO:     Started server process [24400]
+INFO:     Waiting for application startup.
+2026-05-27 08:12:49 INFO main — Starting Swing Trading API...
+2026-05-27 08:12:50 INFO database.client — Supabase client initialised (service key)
+2026-05-27 08:12:50 INFO main — Database connection verified
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Scheduler started
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Morning brief (recurring)" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-27 08:12:50 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-27 08:12:50 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-27 08:12:50 INFO main — APScheduler started with 10 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:12:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:12:55 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:12:55 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:12:55 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:14:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:14:33 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:14:33 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:14:45 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:14:54 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:14 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:15:31 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:15:32 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-27 08:17:30 INFO main — APScheduler stopped
+2026-05-27 08:17:30 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24400]
+INFO:     Started server process [31940]
+INFO:     Waiting for application startup.
+2026-05-27 08:17:32 INFO main — Starting Swing Trading API...
+2026-05-27 08:17:32 INFO database.client — Supabase client initialised (service key)
+2026-05-27 08:17:32 INFO main — Database connection verified
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Scheduler started
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Morning brief (recurring)" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-27 08:17:32 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-27 08:17:32 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-27 08:17:32 INFO main — APScheduler started with 10 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:17:46 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:17:47 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-05-27 08:18:58 INFO main — APScheduler stopped
+2026-05-27 08:18:58 INFO apscheduler.scheduler — Scheduler has been shut down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [31940]
+INFO:     Started server process [15540]
+INFO:     Waiting for application startup.
+2026-05-27 08:19:00 INFO main — Starting Swing Trading API...
+2026-05-27 08:19:00 INFO database.client — Supabase client initialised (service key)
+2026-05-27 08:19:00 INFO main — Database connection verified
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Scheduler started
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Supabase keepalive" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Kite token reminder" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Morning brief (recurring)" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Option chain IV snapshot" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "NSE bhavcopy + FII/DII" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:00" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Bhavcopy retry 19:30" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Bhavcopy retry 20:00" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Pre-flight system check" to job store "default"
+2026-05-27 08:19:00 INFO apscheduler.scheduler — Added job "Main analysis pipeline" to job store "default"
+2026-05-27 08:19:00 INFO scheduler — Scheduler: 10 jobs registered (keepalive, token_reminder, option_snapshot, bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)
+2026-05-27 08:19:00 INFO main — APScheduler started with 10 jobs
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-05-26&order=conviction_score.desc "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260526&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-05-27 08:19:03 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-05-01 "HTTP/2 200 OK"

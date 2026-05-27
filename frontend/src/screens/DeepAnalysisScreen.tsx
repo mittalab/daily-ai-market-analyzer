@@ -22,30 +22,32 @@ function IndexAnalysisCard({ turn }: { turn: DeepAnalysisTurn }) {
   return (
     <div className="bg-blue-50 rounded-xl shadow-sm border border-blue-100 overflow-hidden mb-4">
       <div 
-        className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-blue-100/50 transition-colors"
+        className="px-4 py-3 flex flex-col gap-2 cursor-pointer hover:bg-blue-100/50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-3">
-          <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-            Market Context
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+              Market Context
+            </div>
+            <span className="text-sm font-bold text-blue-900">Step 1: Index Analysis</span>
           </div>
-          <span className="text-sm font-bold text-blue-900">Step 1: Index Analysis</span>
-          
-          {/* Quick Stats - Visible in header */}
-          <div className="flex items-center gap-3 ml-2 border-l border-blue-200 pl-3">
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              a.favourable_setups === 'LONG' ? 'bg-green-100 text-green-700' :
-              a.favourable_setups === 'SHORT' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-            }`}>
-              {a.favourable_setups}
-            </span>
-            <span className="text-[10px] font-mono font-bold text-blue-600 bg-blue-100/50 px-1.5 py-0.5 rounded-full">
-              S:{a.index_key_levels?.support} / R:{a.index_key_levels?.resistance}
-            </span>
+          <div className="text-blue-400">
+              {isExpanded ? '−' : '+'}
           </div>
         </div>
-        <div className="text-blue-400">
-            {isExpanded ? '−' : '+'}
+
+        {/* Line 2: Quick Stats - Always visible in header */}
+        <div className="flex items-center gap-3 pl-0.5">
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-medium border ${
+            a.favourable_setups === 'LONG' ? 'bg-green-50 text-green-700 border-green-100' :
+            a.favourable_setups === 'SHORT' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-blue-700 border-blue-100'
+          }`}>
+            Bias: {a.favourable_setups}
+          </span>
+          <span className="text-[10px] font-mono font-bold text-blue-600 bg-white/60 border border-blue-100/50 px-1.5 py-0.5 rounded shadow-sm">
+            Nifty: {a.index_key_levels?.support || '—'} ↔ {a.index_key_levels?.resistance || '—'}
+          </span>
         </div>
       </div>
 
@@ -128,7 +130,14 @@ function AnalysisTurnCard({ turn }: { turn: DeepAnalysisTurn }) {
           </div>
         </div>
         <div className="flex items-center justify-between mt-2">
-            <span className="text-xs text-gray-400">Turn #{turn.turn_number}</span>
+            <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Turn #{turn.turn_number}</span>
+                {s.lot_size && (
+                  <span className="text-[10px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded font-mono border border-gray-100">
+                    LOT: {s.lot_size}
+                  </span>
+                )}
+            </div>
             <ConvictionBar score={s.conviction_score} />
         </div>
       </div>
@@ -147,6 +156,11 @@ function AnalysisTurnCard({ turn }: { turn: DeepAnalysisTurn }) {
               {s.claude_full_rationale && (
                   <Expander title="Deep Rationale" defaultOpen={s.stage !== 'SKIP'}>
                       <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{s.claude_full_rationale}</p>
+                  </Expander>
+              )}
+              {s.rr_reasoning && (
+                  <Expander title="R:R & Target Reasoning">
+                      <p className="text-sm text-blue-700 leading-relaxed italic">{s.rr_reasoning}</p>
                   </Expander>
               )}
               {s.mentor_explanation && (
@@ -169,7 +183,7 @@ function AnalysisTurnCard({ turn }: { turn: DeepAnalysisTurn }) {
 
           {/* Technical Snapshot (Mini) */}
           {s.stage !== 'SKIP' && (
-              <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-2 text-center">
+              <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-4 gap-2 text-center">
                   <div className="bg-gray-50 rounded-lg p-2">
                       <p className="text-[10px] text-gray-400 uppercase tracking-tighter">RR</p>
                       <p className="text-xs font-bold text-gray-900">1:{s.risk_reward?.toFixed(1) || '—'}</p>
@@ -177,6 +191,10 @@ function AnalysisTurnCard({ turn }: { turn: DeepAnalysisTurn }) {
                   <div className="bg-gray-50 rounded-lg p-2">
                       <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Strike</p>
                       <p className="text-xs font-bold text-gray-900">{s.strike || '—'} {s.option_type}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-2">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Lot Size</p>
+                      <p className="text-xs font-bold text-gray-900">{s.lot_size || '—'}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-2">
                       <p className="text-[10px] text-gray-400 uppercase tracking-tighter">IV</p>
