@@ -1,0 +1,158 @@
+{
+  "session_id": "SESSION_20260604",
+  "session_date": "2026-06-04",
+  "model": "claude-sonnet-4-6",
+  "regime": "BEAR_TRENDING",
+  "turns": [
+    {
+      "turn_number": 1,
+      "turn_type": "market_context",
+      "symbol": null,
+      "input_tokens": 3123,
+      "output_tokens": 426,
+      "input_cost_usd": 0.009369,
+      "output_cost_usd": 0.00639,
+      "total_cost_usd": 0.015759
+    },
+    {
+      "turn_number": 2,
+      "turn_type": "prescan",
+      "symbol": null,
+      "input_tokens": 17822,
+      "output_tokens": 6144,
+      "input_cost_usd": 0.053466,
+      "output_cost_usd": 0.09216,
+      "total_cost_usd": 0.145626
+    },
+    {
+      "turn_number": 3,
+      "turn_type": "deep_analysis",
+      "symbol": "GRASIM",
+      "input_tokens": 13618,
+      "output_tokens": 2548,
+      "input_cost_usd": 0.040854,
+      "output_cost_usd": 0.03822,
+      "total_cost_usd": 0.079074
+    },
+    {
+      "turn_number": 4,
+      "turn_type": "deep_analysis",
+      "symbol": "INFY",
+      "input_tokens": 13812,
+      "output_tokens": 2419,
+      "input_cost_usd": 0.041436,
+      "output_cost_usd": 0.036285,
+      "total_cost_usd": 0.077721
+    },
+    {
+      "turn_number": 5,
+      "turn_type": "deep_analysis",
+      "symbol": "AXISBANK",
+      "input_tokens": 13675,
+      "output_tokens": 2640,
+      "input_cost_usd": 0.041025,
+      "output_cost_usd": 0.0396,
+      "total_cost_usd": 0.080625
+    },
+    {
+      "turn_number": 7,
+      "turn_type": "deep_analysis",
+      "symbol": "HCLTECH",
+      "input_tokens": 13723,
+      "output_tokens": 2855,
+      "input_cost_usd": 0.041169,
+      "output_cost_usd": 0.042825,
+      "total_cost_usd": 0.083994
+    },
+    {
+      "turn_number": 9,
+      "turn_type": "deep_analysis",
+      "symbol": "M&M",
+      "input_tokens": 13522,
+      "output_tokens": 2466,
+      "input_cost_usd": 0.040566,
+      "output_cost_usd": 0.03699,
+      "total_cost_usd": 0.077556
+    },
+    {
+      "turn_number": 10,
+      "turn_type": "deep_analysis",
+      "symbol": "RELIANCE",
+      "input_tokens": 13548,
+      "output_tokens": 2661,
+      "input_cost_usd": 0.040644,
+      "output_cost_usd": 0.039915,
+      "total_cost_usd": 0.080559
+    },
+    {
+      "turn_number": 11,
+      "turn_type": "deep_analysis",
+      "symbol": "TCS",
+      "input_tokens": 13711,
+      "output_tokens": 2861,
+      "input_cost_usd": 0.041133,
+      "output_cost_usd": 0.042915,
+      "total_cost_usd": 0.084048
+    },
+    {
+      "turn_number": 12,
+      "turn_type": "deep_analysis",
+      "symbol": "APOLLOHOSP",
+      "input_tokens": 13574,
+      "output_tokens": 2523,
+      "input_cost_usd": 0.040722,
+      "output_cost_usd": 0.037845,
+      "total_cost_usd": 0.078567
+    },
+    {
+      "turn_number": 13,
+      "turn_type": "deep_analysis",
+      "symbol": "BAJAJ-AUTO",
+      "input_tokens": 13519,
+      "output_tokens": 2359,
+      "input_cost_usd": 0.040557,
+      "output_cost_usd": 0.035385,
+      "total_cost_usd": 0.075942
+    },
+    {
+      "turn_number": 15,
+      "turn_type": "deep_analysis",
+      "symbol": "EICHERMOT",
+      "input_tokens": 13517,
+      "output_tokens": 2622,
+      "input_cost_usd": 0.040551,
+      "output_cost_usd": 0.03933,
+      "total_cost_usd": 0.079881
+    },
+    {
+      "turn_number": 16,
+      "turn_type": "deep_analysis",
+      "symbol": "LT",
+      "input_tokens": 13768,
+      "output_tokens": 2366,
+      "input_cost_usd": 0.041304,
+      "output_cost_usd": 0.03549,
+      "total_cost_usd": 0.076794
+    }
+  ],
+  "totals": {
+    "total_input_tokens": 170932,
+    "total_output_tokens": 34890,
+    "total_cost_usd": 1.0361,
+    "total_cost_inr": 87.03,
+    "monthly_budget_usd": 60.0,
+    "monthly_spent_usd": 4.7493,
+    "monthly_remaining_usd": 55.2507,
+    "sessions_remaining_estimate": 53
+  },
+  "context_quality": {
+    "prescan_data_complete": true,
+    "deep_data_complete": true,
+    "oi_data_available": true,
+    "iv_data_available": true,
+    "fii_data_source": "LIVE",
+    "missing_data_flags": [
+      "IV data unavailable \u2014 NSE blocked or snapshot missing"
+    ]
+  }
+}

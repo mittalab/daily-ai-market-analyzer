@@ -1,0 +1,156 @@
+{
+  "session_id": "SESSION_20260527",
+  "session_date": "2026-05-27",
+  "model": "claude-sonnet-4-6",
+  "regime": "SIDEWAYS_WIDE",
+  "turns": [
+    {
+      "turn_number": 1,
+      "turn_type": "market_context",
+      "symbol": null,
+      "input_tokens": 3,
+      "output_tokens": 492,
+      "input_cost_usd": 9e-06,
+      "output_cost_usd": 0.00738,
+      "total_cost_usd": 0.007389
+    },
+    {
+      "turn_number": 2,
+      "turn_type": "prescan",
+      "symbol": null,
+      "input_tokens": 17473,
+      "output_tokens": 7527,
+      "input_cost_usd": 0.052419,
+      "output_cost_usd": 0.112905,
+      "total_cost_usd": 0.165324
+    },
+    {
+      "turn_number": 3,
+      "turn_type": "deep_analysis",
+      "symbol": "INDIGO",
+      "input_tokens": 3,
+      "output_tokens": 2696,
+      "input_cost_usd": 9e-06,
+      "output_cost_usd": 0.04044,
+      "total_cost_usd": 0.040449
+    },
+    {
+      "turn_number": 4,
+      "turn_type": "deep_analysis",
+      "symbol": "WIPRO",
+      "input_tokens": 18625,
+      "output_tokens": 2315,
+      "input_cost_usd": 0.055875,
+      "output_cost_usd": 0.034725,
+      "total_cost_usd": 0.0906
+    },
+    {
+      "turn_number": 5,
+      "turn_type": "deep_analysis",
+      "symbol": "COALINDIA",
+      "input_tokens": 18409,
+      "output_tokens": 2427,
+      "input_cost_usd": 0.055227,
+      "output_cost_usd": 0.036405,
+      "total_cost_usd": 0.091632
+    },
+    {
+      "turn_number": 6,
+      "turn_type": "deep_analysis",
+      "symbol": "EICHERMOT",
+      "input_tokens": 22393,
+      "output_tokens": 2377,
+      "input_cost_usd": 0.067179,
+      "output_cost_usd": 0.035655,
+      "total_cost_usd": 0.102834
+    },
+    {
+      "turn_number": 7,
+      "turn_type": "deep_analysis",
+      "symbol": "HINDALCO",
+      "input_tokens": 19319,
+      "output_tokens": 2315,
+      "input_cost_usd": 0.057957,
+      "output_cost_usd": 0.034725,
+      "total_cost_usd": 0.092682
+    },
+    {
+      "turn_number": 8,
+      "turn_type": "deep_analysis",
+      "symbol": "MAXHEALTH",
+      "input_tokens": 21263,
+      "output_tokens": 2676,
+      "input_cost_usd": 0.063789,
+      "output_cost_usd": 0.04014,
+      "total_cost_usd": 0.103929
+    },
+    {
+      "turn_number": 9,
+      "turn_type": "deep_analysis",
+      "symbol": "TMPV",
+      "input_tokens": 17963,
+      "output_tokens": 2436,
+      "input_cost_usd": 0.053889,
+      "output_cost_usd": 0.03654,
+      "total_cost_usd": 0.090429
+    },
+    {
+      "turn_number": 10,
+      "turn_type": "deep_analysis",
+      "symbol": "APOLLOHOSP",
+      "input_tokens": 22702,
+      "output_tokens": 2512,
+      "input_cost_usd": 0.068106,
+      "output_cost_usd": 0.03768,
+      "total_cost_usd": 0.105786
+    },
+    {
+      "turn_number": 11,
+      "turn_type": "deep_analysis",
+      "symbol": "BAJAJ-AUTO",
+      "input_tokens": 19980,
+      "output_tokens": 2173,
+      "input_cost_usd": 0.05994,
+      "output_cost_usd": 0.032595,
+      "total_cost_usd": 0.092535
+    },
+    {
+      "turn_number": 12,
+      "turn_type": "deep_analysis",
+      "symbol": "HDFCBANK",
+      "input_tokens": 21478,
+      "output_tokens": 2659,
+      "input_cost_usd": 0.064434,
+      "output_cost_usd": 0.039885,
+      "total_cost_usd": 0.104319
+    },
+    {
+      "turn_number": 13,
+      "turn_type": "deep_analysis",
+      "symbol": "LT",
+      "input_tokens": 22837,
+      "output_tokens": 2435,
+      "input_cost_usd": 0.068511,
+      "output_cost_usd": 0.036525,
+      "total_cost_usd": 0.105036
+    }
+  ],
+  "totals": {
+    "total_input_tokens": 222448,
+    "total_output_tokens": 35040,
+    "total_cost_usd": 1.1929,
+    "total_cost_inr": 100.2,
+    "monthly_budget_usd": 60.0,
+    "monthly_spent_usd": 2.3676,
+    "monthly_remaining_usd": 57.6324,
+    "sessions_remaining_estimate": 48
+  },
+  "context_quality": {
+    "prescan_data_complete": true,
+    "deep_data_complete": true,
+    "oi_data_available": true,
+    "iv_data_available": true,
+    "fii_data_source": "LIVE",
+    "missing_data_flags": []
+  }
+}

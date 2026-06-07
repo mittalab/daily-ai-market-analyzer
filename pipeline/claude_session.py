@@ -12,10 +12,11 @@ import json
 import logging
 import os
 import time
-from datetime import date
+from datetime import date, datetime
 
 import anthropic
 import pandas as pd
+import pytz
 from dotenv import load_dotenv
 
 from database.queries import (
@@ -52,6 +53,7 @@ from database.queries import (
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+IST = pytz.timezone("Asia/Kolkata")
 
 _MODEL           = "claude-sonnet-4-6"
 _TOKEN_CEILING   = 250_000

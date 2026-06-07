@@ -1,0 +1,156 @@
+{
+  "session_id": "SESSION_20260602",
+  "session_date": "2026-06-02",
+  "model": "claude-sonnet-4-6",
+  "regime": "BEAR_TRENDING",
+  "turns": [
+    {
+      "turn_number": 1,
+      "turn_type": "market_context",
+      "symbol": null,
+      "input_tokens": 3061,
+      "output_tokens": 442,
+      "input_cost_usd": 0.009183,
+      "output_cost_usd": 0.00663,
+      "total_cost_usd": 0.015813
+    },
+    {
+      "turn_number": 2,
+      "turn_type": "prescan",
+      "symbol": null,
+      "input_tokens": 17830,
+      "output_tokens": 7039,
+      "input_cost_usd": 0.05349,
+      "output_cost_usd": 0.105585,
+      "total_cost_usd": 0.159075
+    },
+    {
+      "turn_number": 3,
+      "turn_type": "deep_analysis",
+      "symbol": "LT",
+      "input_tokens": 31996,
+      "output_tokens": 2473,
+      "input_cost_usd": 0.095988,
+      "output_cost_usd": 0.037095,
+      "total_cost_usd": 0.133083
+    },
+    {
+      "turn_number": 4,
+      "turn_type": "deep_analysis",
+      "symbol": "GRASIM",
+      "input_tokens": 30692,
+      "output_tokens": 2550,
+      "input_cost_usd": 0.092076,
+      "output_cost_usd": 0.03825,
+      "total_cost_usd": 0.130326
+    },
+    {
+      "turn_number": 5,
+      "turn_type": "deep_analysis",
+      "symbol": "WIPRO",
+      "input_tokens": 24174,
+      "output_tokens": 2528,
+      "input_cost_usd": 0.072522,
+      "output_cost_usd": 0.03792,
+      "total_cost_usd": 0.110442
+    },
+    {
+      "turn_number": 6,
+      "turn_type": "deep_analysis",
+      "symbol": "AXISBANK",
+      "input_tokens": 27299,
+      "output_tokens": 2809,
+      "input_cost_usd": 0.081897,
+      "output_cost_usd": 0.042135,
+      "total_cost_usd": 0.124032
+    },
+    {
+      "turn_number": 7,
+      "turn_type": "deep_analysis",
+      "symbol": "BAJFINANCE",
+      "input_tokens": 24646,
+      "output_tokens": 2548,
+      "input_cost_usd": 0.073938,
+      "output_cost_usd": 0.03822,
+      "total_cost_usd": 0.112158
+    },
+    {
+      "turn_number": 8,
+      "turn_type": "deep_analysis",
+      "symbol": "BHARTIARTL",
+      "input_tokens": 25880,
+      "output_tokens": 2545,
+      "input_cost_usd": 0.07764,
+      "output_cost_usd": 0.038175,
+      "total_cost_usd": 0.115815
+    },
+    {
+      "turn_number": 9,
+      "turn_type": "deep_analysis",
+      "symbol": "HCLTECH",
+      "input_tokens": 28428,
+      "output_tokens": 2298,
+      "input_cost_usd": 0.085284,
+      "output_cost_usd": 0.03447,
+      "total_cost_usd": 0.119754
+    },
+    {
+      "turn_number": 10,
+      "turn_type": "deep_analysis",
+      "symbol": "HDFCBANK",
+      "input_tokens": 30644,
+      "output_tokens": 2774,
+      "input_cost_usd": 0.091932,
+      "output_cost_usd": 0.04161,
+      "total_cost_usd": 0.133542
+    },
+    {
+      "turn_number": 11,
+      "turn_type": "deep_analysis",
+      "symbol": "INFY",
+      "input_tokens": 34970,
+      "output_tokens": 2728,
+      "input_cost_usd": 0.10491,
+      "output_cost_usd": 0.04092,
+      "total_cost_usd": 0.14583
+    },
+    {
+      "turn_number": 12,
+      "turn_type": "deep_analysis",
+      "symbol": "MAXHEALTH",
+      "input_tokens": 27681,
+      "output_tokens": 2898,
+      "input_cost_usd": 0.083043,
+      "output_cost_usd": 0.04347,
+      "total_cost_usd": 0.126513
+    },
+    {
+      "turn_number": 13,
+      "turn_type": "deep_analysis",
+      "symbol": "TCS",
+      "input_tokens": 35167,
+      "output_tokens": 2520,
+      "input_cost_usd": 0.105501,
+      "output_cost_usd": 0.0378,
+      "total_cost_usd": 0.143301
+    }
+  ],
+  "totals": {
+    "total_input_tokens": 342468,
+    "total_output_tokens": 36152,
+    "total_cost_usd": 1.5697,
+    "total_cost_inr": 131.85,
+    "monthly_budget_usd": 60.0,
+    "monthly_spent_usd": 3.7132,
+    "monthly_remaining_usd": 56.2868,
+    "sessions_remaining_estimate": 35
+  },
+  "context_quality": {
+    "prescan_data_complete": true,
+    "deep_data_complete": true,
+    "oi_data_available": true,
+    "iv_data_available": true,
+    "fii_data_source": "LIVE",
+    "missing_data_flags": []
+  }
+}

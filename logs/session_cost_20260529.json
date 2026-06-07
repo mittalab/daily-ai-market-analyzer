@@ -1,0 +1,176 @@
+{
+  "session_id": "SESSION_20260529",
+  "session_date": "2026-05-29",
+  "model": "claude-sonnet-4-6",
+  "regime": "SIDEWAYS_TIGHT",
+  "turns": [
+    {
+      "turn_number": 1,
+      "turn_type": "market_context",
+      "symbol": null,
+      "input_tokens": 2864,
+      "output_tokens": 491,
+      "input_cost_usd": 0.008592,
+      "output_cost_usd": 0.007365,
+      "total_cost_usd": 0.015957
+    },
+    {
+      "turn_number": 2,
+      "turn_type": "prescan",
+      "symbol": null,
+      "input_tokens": 17836,
+      "output_tokens": 7008,
+      "input_cost_usd": 0.053508,
+      "output_cost_usd": 0.10512,
+      "total_cost_usd": 0.158628
+    },
+    {
+      "turn_number": 3,
+      "turn_type": "deep_analysis",
+      "symbol": "APOLLOHOSP",
+      "input_tokens": 24550,
+      "output_tokens": 2480,
+      "input_cost_usd": 0.07365,
+      "output_cost_usd": 0.0372,
+      "total_cost_usd": 0.11085
+    },
+    {
+      "turn_number": 4,
+      "turn_type": "deep_analysis",
+      "symbol": "CIPLA",
+      "input_tokens": 24776,
+      "output_tokens": 2677,
+      "input_cost_usd": 0.074328,
+      "output_cost_usd": 0.040155,
+      "total_cost_usd": 0.114483
+    },
+    {
+      "turn_number": 5,
+      "turn_type": "deep_analysis",
+      "symbol": "HDFCBANK",
+      "input_tokens": 24441,
+      "output_tokens": 2634,
+      "input_cost_usd": 0.073323,
+      "output_cost_usd": 0.03951,
+      "total_cost_usd": 0.112833
+    },
+    {
+      "turn_number": 6,
+      "turn_type": "deep_analysis",
+      "symbol": "HINDALCO",
+      "input_tokens": 21788,
+      "output_tokens": 2555,
+      "input_cost_usd": 0.065364,
+      "output_cost_usd": 0.038325,
+      "total_cost_usd": 0.103689
+    },
+    {
+      "turn_number": 7,
+      "turn_type": "deep_analysis",
+      "symbol": "HINDUNILVR",
+      "input_tokens": 23162,
+      "output_tokens": 2988,
+      "input_cost_usd": 0.069486,
+      "output_cost_usd": 0.04482,
+      "total_cost_usd": 0.114306
+    },
+    {
+      "turn_number": 8,
+      "turn_type": "deep_analysis",
+      "symbol": "INFY",
+      "input_tokens": 24027,
+      "output_tokens": 2890,
+      "input_cost_usd": 0.072081,
+      "output_cost_usd": 0.04335,
+      "total_cost_usd": 0.115431
+    },
+    {
+      "turn_number": 9,
+      "turn_type": "deep_analysis",
+      "symbol": "LT",
+      "input_tokens": 25792,
+      "output_tokens": 2259,
+      "input_cost_usd": 0.077376,
+      "output_cost_usd": 0.033885,
+      "total_cost_usd": 0.111261
+    },
+    {
+      "turn_number": 10,
+      "turn_type": "deep_analysis",
+      "symbol": "MAXHEALTH",
+      "input_tokens": 22990,
+      "output_tokens": 2807,
+      "input_cost_usd": 0.06897,
+      "output_cost_usd": 0.042105,
+      "total_cost_usd": 0.111075
+    },
+    {
+      "turn_number": 11,
+      "turn_type": "deep_analysis",
+      "symbol": "WIPRO",
+      "input_tokens": 20334,
+      "output_tokens": 2773,
+      "input_cost_usd": 0.061002,
+      "output_cost_usd": 0.041595,
+      "total_cost_usd": 0.102597
+    },
+    {
+      "turn_number": 12,
+      "turn_type": "deep_analysis",
+      "symbol": "BAJAJ-AUTO",
+      "input_tokens": 22355,
+      "output_tokens": 2460,
+      "input_cost_usd": 0.067065,
+      "output_cost_usd": 0.0369,
+      "total_cost_usd": 0.103965
+    },
+    {
+      "turn_number": 13,
+      "turn_type": "deep_analysis",
+      "symbol": "COALINDIA",
+      "input_tokens": 20655,
+      "output_tokens": 2390,
+      "input_cost_usd": 0.061965,
+      "output_cost_usd": 0.03585,
+      "total_cost_usd": 0.097815
+    },
+    {
+      "turn_number": 14,
+      "turn_type": "deep_analysis",
+      "symbol": "EICHERMOT",
+      "input_tokens": 24364,
+      "output_tokens": 2632,
+      "input_cost_usd": 0.073092,
+      "output_cost_usd": 0.03948,
+      "total_cost_usd": 0.112572
+    },
+    {
+      "turn_number": 15,
+      "turn_type": "deep_analysis",
+      "symbol": "TMPV",
+      "input_tokens": 19785,
+      "output_tokens": 2531,
+      "input_cost_usd": 0.059355,
+      "output_cost_usd": 0.037965,
+      "total_cost_usd": 0.09732
+    }
+  ],
+  "totals": {
+    "total_input_tokens": 319719,
+    "total_output_tokens": 41575,
+    "total_cost_usd": 1.5828,
+    "total_cost_inr": 132.96,
+    "monthly_budget_usd": 60.0,
+    "monthly_spent_usd": 4.7052,
+    "monthly_remaining_usd": 55.2948,
+    "sessions_remaining_estimate": 34
+  },
+  "context_quality": {
+    "prescan_data_complete": true,
+    "deep_data_complete": true,
+    "oi_data_available": true,
+    "iv_data_available": true,
+    "fii_data_source": "LIVE",
+    "missing_data_flags": []
+  }
+}

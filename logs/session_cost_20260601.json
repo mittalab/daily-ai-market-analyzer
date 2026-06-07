@@ -1,0 +1,216 @@
+{
+  "session_id": "SESSION_20260601",
+  "session_date": "2026-06-01",
+  "model": "claude-sonnet-4-6",
+  "regime": "SIDEWAYS_TIGHT",
+  "turns": [
+    {
+      "turn_number": 1,
+      "turn_type": "market_context",
+      "symbol": null,
+      "input_tokens": 2936,
+      "output_tokens": 507,
+      "input_cost_usd": 0.008808,
+      "output_cost_usd": 0.007605,
+      "total_cost_usd": 0.016413
+    },
+    {
+      "turn_number": 2,
+      "turn_type": "prescan",
+      "symbol": null,
+      "input_tokens": 17833,
+      "output_tokens": 7027,
+      "input_cost_usd": 0.053499,
+      "output_cost_usd": 0.105405,
+      "total_cost_usd": 0.158904
+    },
+    {
+      "turn_number": 3,
+      "turn_type": "deep_analysis",
+      "symbol": "WIPRO",
+      "input_tokens": 22242,
+      "output_tokens": 2572,
+      "input_cost_usd": 0.066726,
+      "output_cost_usd": 0.03858,
+      "total_cost_usd": 0.105306
+    },
+    {
+      "turn_number": 4,
+      "turn_type": "deep_analysis",
+      "symbol": "BAJFINANCE",
+      "input_tokens": 22517,
+      "output_tokens": 2581,
+      "input_cost_usd": 0.067551,
+      "output_cost_usd": 0.038715,
+      "total_cost_usd": 0.106266
+    },
+    {
+      "turn_number": 5,
+      "turn_type": "deep_analysis",
+      "symbol": "BHARTIARTL",
+      "input_tokens": 23682,
+      "output_tokens": 2693,
+      "input_cost_usd": 0.071046,
+      "output_cost_usd": 0.040395,
+      "total_cost_usd": 0.111441
+    },
+    {
+      "turn_number": 6,
+      "turn_type": "deep_analysis",
+      "symbol": "CIPLA",
+      "input_tokens": 27666,
+      "output_tokens": 2656,
+      "input_cost_usd": 0.082998,
+      "output_cost_usd": 0.03984,
+      "total_cost_usd": 0.122838
+    },
+    {
+      "turn_number": 7,
+      "turn_type": "deep_analysis",
+      "symbol": "COALINDIA",
+      "input_tokens": 22818,
+      "output_tokens": 2522,
+      "input_cost_usd": 0.068454,
+      "output_cost_usd": 0.03783,
+      "total_cost_usd": 0.106284
+    },
+    {
+      "turn_number": 8,
+      "turn_type": "deep_analysis",
+      "symbol": "HDFCBANK",
+      "input_tokens": 27644,
+      "output_tokens": 2696,
+      "input_cost_usd": 0.082932,
+      "output_cost_usd": 0.04044,
+      "total_cost_usd": 0.123372
+    },
+    {
+      "turn_number": 9,
+      "turn_type": "deep_analysis",
+      "symbol": "HINDALCO",
+      "input_tokens": 24032,
+      "output_tokens": 2911,
+      "input_cost_usd": 0.072096,
+      "output_cost_usd": 0.043665,
+      "total_cost_usd": 0.115761
+    },
+    {
+      "turn_number": 10,
+      "turn_type": "deep_analysis",
+      "symbol": "INFY",
+      "input_tokens": 26806,
+      "output_tokens": 2362,
+      "input_cost_usd": 0.080418,
+      "output_cost_usd": 0.03543,
+      "total_cost_usd": 0.115848
+    },
+    {
+      "turn_number": 12,
+      "turn_type": "deep_analysis",
+      "symbol": "TECHM",
+      "input_tokens": 24786,
+      "output_tokens": 2665,
+      "input_cost_usd": 0.074358,
+      "output_cost_usd": 0.039975,
+      "total_cost_usd": 0.114333
+    },
+    {
+      "turn_number": 13,
+      "turn_type": "deep_analysis",
+      "symbol": "TMPV",
+      "input_tokens": 21704,
+      "output_tokens": 2475,
+      "input_cost_usd": 0.065112,
+      "output_cost_usd": 0.037125,
+      "total_cost_usd": 0.102237
+    },
+    {
+      "turn_number": 14,
+      "turn_type": "deep_analysis",
+      "symbol": "APOLLOHOSP",
+      "input_tokens": 27162,
+      "output_tokens": 2465,
+      "input_cost_usd": 0.081486,
+      "output_cost_usd": 0.036975,
+      "total_cost_usd": 0.118461
+    },
+    {
+      "turn_number": 15,
+      "turn_type": "deep_analysis",
+      "symbol": "AXISBANK",
+      "input_tokens": 24934,
+      "output_tokens": 2773,
+      "input_cost_usd": 0.074802,
+      "output_cost_usd": 0.041595,
+      "total_cost_usd": 0.116397
+    },
+    {
+      "turn_number": 17,
+      "turn_type": "deep_analysis",
+      "symbol": "GRASIM",
+      "input_tokens": 27914,
+      "output_tokens": 2578,
+      "input_cost_usd": 0.083742,
+      "output_cost_usd": 0.03867,
+      "total_cost_usd": 0.122412
+    },
+    {
+      "turn_number": 18,
+      "turn_type": "deep_analysis",
+      "symbol": "HCLTECH",
+      "input_tokens": 25882,
+      "output_tokens": 2854,
+      "input_cost_usd": 0.077646,
+      "output_cost_usd": 0.04281,
+      "total_cost_usd": 0.120456
+    },
+    {
+      "turn_number": 19,
+      "turn_type": "deep_analysis",
+      "symbol": "HINDUNILVR",
+      "input_tokens": 25838,
+      "output_tokens": 2928,
+      "input_cost_usd": 0.077514,
+      "output_cost_usd": 0.04392,
+      "total_cost_usd": 0.121434
+    },
+    {
+      "turn_number": 20,
+      "turn_type": "deep_analysis",
+      "symbol": "LT",
+      "input_tokens": 28812,
+      "output_tokens": 2252,
+      "input_cost_usd": 0.086436,
+      "output_cost_usd": 0.03378,
+      "total_cost_usd": 0.120216
+    },
+    {
+      "turn_number": 21,
+      "turn_type": "deep_analysis",
+      "symbol": "TCS",
+      "input_tokens": 27086,
+      "output_tokens": 2927,
+      "input_cost_usd": 0.081258,
+      "output_cost_usd": 0.043905,
+      "total_cost_usd": 0.125163
+    }
+  ],
+  "totals": {
+    "total_input_tokens": 452294,
+    "total_output_tokens": 52444,
+    "total_cost_usd": 2.1435,
+    "total_cost_inr": 180.05,
+    "monthly_budget_usd": 60.0,
+    "monthly_spent_usd": 2.1597,
+    "monthly_remaining_usd": 57.8403,
+    "sessions_remaining_estimate": 26
+  },
+  "context_quality": {
+    "prescan_data_complete": true,
+    "deep_data_complete": true,
+    "oi_data_available": true,
+    "iv_data_available": true,
+    "fii_data_source": "LIVE",
+    "missing_data_flags": []
+  }
+}

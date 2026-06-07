@@ -415,18 +415,18 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         misfire_grace_time=300,
     )
 
-    # 22:00 Mon-Fri — main pipeline
-    scheduler.add_job(
-        job_main_pipeline,
-        CronTrigger(day_of_week="mon-fri", hour=22, minute=0, **ist_kwargs),
-        id="main_pipeline",
-        name="Main analysis pipeline",
-        replace_existing=True,
-        misfire_grace_time=1800,
-    )
+    # 22:00 Mon-Fri — main pipeline (DISABLED)
+    # scheduler.add_job(
+    #     job_main_pipeline,
+    #     CronTrigger(day_of_week="mon-fri", hour=22, minute=0, **ist_kwargs),
+    #     id="main_pipeline",
+    #     name="Main analysis pipeline",
+    #     replace_existing=True,
+    #     misfire_grace_time=1800,
+    # )
 
     logger.info(
         "Scheduler: %d jobs registered (keepalive, token_reminder, option_snapshot, "
-        "bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)",
-        10,
+        "bhavcopy, 3x bhavcopy_retry, preflight_check)",
+        9,
     )
