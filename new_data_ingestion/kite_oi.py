@@ -21,6 +21,22 @@ def get_nfo_instruments(kite: KiteConnect) -> pd.DataFrame:
     return get_instruments(kite, "NFO")
 
 
+# DB symbol name → Kite NFO `name` field used in the instruments master.
+# For equity stocks the two names match; indices differ significantly.
+_DB_TO_KITE_FUT_NAME: dict[str, str] = {
+    "NIFTY_50":   "NIFTY",
+    "NIFTY_BANK": "BANKNIFTY",
+    "FINNIFTY":   "FINNIFTY",
+    "MIDCPNIFTY": "MIDCPNIFTY",
+    "NIFTYNXT50": "NIFTYNXT50",
+}
+
+
+def db_to_kite_fut_name(db_symbol: str) -> str:
+    """Return the Kite NFO `name` field for a DB symbol (e.g. NIFTY_50 → NIFTY)."""
+    return _DB_TO_KITE_FUT_NAME.get(db_symbol, db_symbol)
+
+
 def get_futures_contracts(
     kite: KiteConnect,
     symbol: str,
@@ -80,19 +96,27 @@ def fetch_futures_oi_all(
     kite: KiteConnect,
     symbols: list[str],
     days: int = 30,
+    target_date: date | None = None,
 ) -> dict[str, dict]:
+    """Fetch near + next month futures OI for all target symbols.
+
+    If target_date is given, fetches only that single date (no lookback).
+    Otherwise fetches the last `days` calendar days up to today.
     """
-    Fetch near + next month futures OI for all target symbols.
-    """
-    to_date   = date.today()
-    from_date = to_date - timedelta(days=days)
+    if target_date is not None:
+        from_date = target_date
+        to_date   = target_date
+    else:
+        to_date   = date.today()
+        from_date = to_date - timedelta(days=days)
     results: dict[str, dict] = {}
 
-    for symbol in symbols:
+    for db_symbol in symbols:
+        kite_name = db_to_kite_fut_name(db_symbol)
         try:
-            contracts = get_futures_contracts(kite, symbol, max_expiries=2)
+            contracts = get_futures_contracts(kite, kite_name, max_expiries=2)
         except ValueError as exc:
-            logger.warning("No futures for %s: %s", symbol, exc)
+            logger.warning("No futures for %s (kite name: %s): %s", db_symbol, kite_name, exc)
             continue
 
         entry: dict = {"lot_size": contracts[0][1]}
@@ -103,13 +127,14 @@ def fetch_futures_oi_all(
             try:
                 df = fetch_futures_oi_series(kite, token, lot_size, from_date, to_date)
                 entry[label] = df
-                logger.debug("%s %s expiry %s: %d rows", symbol, label, expiry, len(df))
+                logger.debug("%s %s expiry %s: %d rows", db_symbol, label, expiry, len(df))
             except Exception as exc:
-                logger.warning("OI fetch failed %s %s: %s", symbol, label, exc)
+                logger.warning("OI fetch failed %s %s: %s", db_symbol, label, exc)
                 entry[label] = pd.DataFrame()
             time.sleep(0.35)
 
-        results[symbol] = entry
+        # Key by DB symbol so callers always use the canonical name (e.g. NIFTY_50 not NIFTY)
+        results[db_symbol] = entry
 
     ok = sum(1 for v in results.values() if not v.get("near", pd.DataFrame()).empty)
     logger.info("Futures OI batch complete: %d/%d symbols", ok, len(symbols))

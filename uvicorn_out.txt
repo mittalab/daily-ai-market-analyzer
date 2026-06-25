@@ -1245,3 +1245,16 @@ INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
 INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/callback?type=login&status=success&request_token=3nVsVQDlfs9i2OBv339IWtxbCXjeTDls&action=login HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found

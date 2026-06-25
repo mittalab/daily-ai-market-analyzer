@@ -12738,3 +12738,21 @@ httpx.ConnectError: [Errno 11001] getaddrinfo failed
 2026-06-25 21:30:04 INFO integrations.telegram — Telegram message sent (id=201, silent=False)
 2026-06-25 21:30:04 WARNING scheduler — Pre-flight FAILED: ['Bhavcopy incomplete (Verified NEW rows: 0)']
 2026-06-25 21:30:04 INFO apscheduler.executors.default — Job "Pre-flight system check (trigger: cron[day_of_week='mon-fri', hour='21', minute='30'], next run at: 2026-06-26 21:30:00 IST)" executed successfully
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-06-01 "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260625&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-06-26 03:52:27 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-06-25&order=conviction_score.desc "HTTP/2 200 OK"
+2026-06-26 03:52:29 INFO integrations.kite_oauth — Kite login URL generated
+2026-06-26 03:52:29 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-06-26 03:52:43 INFO integrations.kite_oauth — Kite login URL generated
+2026-06-26 03:52:43 INFO main — Kite OAuth: redirecting to Zerodha login
+2026-06-26 03:52:52 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens "HTTP/2 200 OK"
+2026-06-26 03:52:52 INFO integrations.kite_oauth — Kite token exchanged and stored. User: NOK061. Expires: 2026-06-27 00:00 IST
+2026-06-26 03:52:52 INFO main — Kite OAuth: token stored successfully

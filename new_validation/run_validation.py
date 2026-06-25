@@ -32,7 +32,6 @@ from database.queries import (
 )
 from new_data_ingestion.nse_bhavcopy import get_holiday_dates, last_trading_day
 from new_data_ingestion.ingestion_utils import (
-    ingest_today_bhavcopy,
     ingest_today_options,
     ingest_today_kite_data,
     backfill_historical_date,
@@ -291,12 +290,11 @@ def heal_and_recheck(
 
     # ── Heal ──────────────────────────────────────────────────────────────────
     if is_today:
+        # Today: Kite API only — no bhavcopy under any circumstance.
+        # kite_ohlcv.get_nse_token handles both equity (EQ) and index (INDEX) symbols.
+        # kite_oi.fetch_futures_oi_all maps DB symbol names to Kite NFO names internally.
         if symbol == "INDIA_VIX" and needs_ohlcv:
             _safe(lambda: run_vix_backfill(check_date, check_date), "VIX live backfill")
-
-        elif symbol in other_indices and needs_ohlcv:
-            _safe(lambda: ingest_today_bhavcopy(check_date), "index bhavcopy")
-
         else:
             if needs_ohlcv or needs_futures:
                 _safe(lambda: ingest_today_kite_data(check_date, [symbol]), "Kite live OHLCV+futures")

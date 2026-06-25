@@ -172,20 +172,29 @@ def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] |
     return summary
 
 
+def _is_index(symbol: str) -> bool:
+    """Return True for known NSE index symbols — these need OHLCV but not stock-style futures."""
+    return symbol.startswith("NIFTY") or symbol == "INDIA_VIX"
+
+
 def ingest_today_kite_data(for_date: date | None = None, symbols: list[str] | None = None) -> dict:
     """
-    Ingest Kite OHLCV history (250 days) and raw futuressnapshots for today's trading.
-    Stores OHLCV in `price_history` and raw futures snapshots in `futures_snapshots`.
+    Ingest Kite OHLCV and futures snapshots for a specific date via the Kite API.
+
+    - OHLCV is fetched for ALL symbols (stocks + indices).
+    - Futures are fetched for STOCK symbols only (indices are excluded).
+    - Fetches only the target_date — no historical lookback.
     """
     summary: dict = {"ok": True, "errors": [], "symbols_ohlcv": 0, "symbols_oi": 0}
-    target_symbols = symbols or get_stock_list_for_analysis()
-    target_date = for_date or date.today()
+    target_date    = for_date or date.today()
+    target_symbols = symbols
+    stock_symbols  = [s for s in target_symbols if not _is_index(s)]
 
     try:
         kite = get_authenticated_kite()
-        
-        # 1. OHLCV Ingestion
-        ohlcv_data = fetch_ohlcv_all(kite, target_symbols, days=250)
+
+        # 1. OHLCV — all symbols (stocks + indices), single date only
+        ohlcv_data = fetch_ohlcv_all(kite, target_symbols, target_date=target_date)
         price_rows = []
         for symbol, df in ohlcv_data.items():
             if not df.empty:
@@ -193,31 +202,35 @@ def ingest_today_kite_data(for_date: date | None = None, symbols: list[str] | No
                 summary["symbols_ohlcv"] += 1
         if price_rows:
             upsert_price_history(price_rows)
-            logger.info("Kite OHLCV ingested: %d symbols, %d rows", summary["symbols_ohlcv"], len(price_rows))
+            logger.info("Kite OHLCV ingested: %d symbols, %d rows for %s",
+                        summary["symbols_ohlcv"], len(price_rows), target_date)
 
-        # 2. Futures Snaps Ingestion (Raw snapshots)
-        oi_data = fetch_futures_oi_all(kite, target_symbols, days=30)
-        snapshot_rows = []
-        for symbol, entry in oi_data.items():
-            near_df     = entry.get("near")
-            next_df     = entry.get("next")
-            near_expiry = entry.get("near_expiry")
-            next_expiry = entry.get("next_expiry")
+        # 2. Futures — stock symbols only, single date only
+        if len(stock_symbols) > 0:
+            oi_data = fetch_futures_oi_all(kite, stock_symbols, target_date=target_date)
+            snapshot_rows = []
 
-            if near_df is None or near_df.empty:
-                continue
+            for symbol, entry in oi_data.items():
+                near_df     = entry.get("near")
+                next_df     = entry.get("next")
+                near_expiry = entry.get("near_expiry")
+                next_expiry = entry.get("next_expiry")
 
-            rows = futures_oi_to_snapshots_rows(
-                symbol, near_df, next_df if next_df is not None else pd.DataFrame(),
-                near_expiry, next_expiry
-            )
-            snapshot_rows.extend(rows)
-            summary["symbols_oi"] += 1
+                if near_df is None or near_df.empty:
+                    continue
 
-        if snapshot_rows:
-            n = upsert_futures_snapshots(snapshot_rows)
-            logger.info("Kite futures snapshots stored: %d rows for %d symbols", n, summary["symbols_oi"])
-        
+                rows = futures_oi_to_snapshots_rows(
+                    symbol, near_df, next_df if next_df is not None else pd.DataFrame(),
+                    near_expiry, next_expiry,
+                )
+                snapshot_rows.extend(rows)
+                summary["symbols_oi"] += 1
+
+            if snapshot_rows:
+                n = upsert_futures_snapshots(snapshot_rows)
+                logger.info("Kite futures snapshots stored: %d rows for %d symbols on %s",
+                            n, summary["symbols_oi"], target_date)
+
     except Exception as exc:
         logger.error("Kite data fetch FAILED: %s", exc)
         summary["errors"].append(f"kite_data_fetch: {exc}")

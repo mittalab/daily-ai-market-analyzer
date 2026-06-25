@@ -53,6 +53,42 @@ def get_equity_token(kite: KiteConnect, symbol: str) -> int:
     return int(match.iloc[0]["instrument_token"])
 
 
+# DB symbol → Kite NSE tradingsymbol overrides.
+# Kite lists ALL instruments (equity + indices) as instrument_type="EQ" in NSE.
+# The underscore→space fallback covers most indices automatically;
+# only add overrides here when the name doesn't follow that pattern.
+_DB_TO_KITE_INDEX: dict[str, str] = {
+    "INDIA_VIX": "INDIA VIX",
+}
+
+
+def get_nse_token(kite: KiteConnect, db_symbol: str) -> int:
+    """
+    Look up instrument_token for a DB symbol in NSE.
+    Tries exact tradingsymbol first (equity stocks), then applies the
+    underscore→space conversion (indices) — all as instrument_type=EQ,
+    since Kite lists both equity stocks and NSE indices under that type.
+    """
+    df = get_instruments(kite, "NSE")
+    eq = df[df["instrument_type"] == "EQ"]
+
+    # Equity stocks: exact tradingsymbol match (e.g. "RELIANCE")
+    match = eq[eq["tradingsymbol"] == db_symbol]
+    if not match.empty:
+        return int(match.iloc[0]["instrument_token"])
+
+    # Indices: explicit override or underscore→space fallback (e.g. "NIFTY_50" → "NIFTY 50")
+    kite_sym = _DB_TO_KITE_INDEX.get(db_symbol, db_symbol.replace("_", " "))
+    match = eq[eq["tradingsymbol"] == kite_sym]
+    if not match.empty:
+        return int(match.iloc[0]["instrument_token"])
+
+    raise ValueError(
+        f"Symbol '{db_symbol}' not found in NSE instruments "
+        f"(tried EQ '{db_symbol}' and EQ '{kite_sym}')"
+    )
+
+
 def fetch_ohlcv(
     kite: KiteConnect,
     instrument_token: int,
@@ -76,15 +112,24 @@ def fetch_ohlcv_all(
     kite: KiteConnect,
     symbols: list[str],
     days: int = 180,
+    target_date: date | None = None,
 ) -> dict[str, pd.DataFrame]:
-    """Fetch daily OHLCV for all target symbols."""
-    to_date   = date.today()
-    from_date = to_date - timedelta(days=days)
+    """Fetch daily OHLCV for all target symbols.
+
+    If target_date is given, fetches only that single date (no lookback).
+    Otherwise fetches the last `days` calendar days up to today.
+    """
+    if target_date is not None:
+        from_date = target_date
+        to_date   = target_date
+    else:
+        to_date   = date.today()
+        from_date = to_date - timedelta(days=days)
     results: dict[str, pd.DataFrame] = {}
 
     for symbol in symbols:
         try:
-            token = get_equity_token(kite, symbol)
+            token = get_nse_token(kite, symbol)
             df    = fetch_ohlcv(kite, token, from_date, to_date)
             results[symbol] = df
             logger.debug("%s: %d OHLCV rows", symbol, len(df))
