@@ -66,7 +66,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            from integrations.kite_oauth import exchange_request_token
+            from new_data_ingestion.kite_oauth import exchange_request_token
             exchange_request_token(request_token)
             _result["ok"] = True
             self.send_response(200)
@@ -86,7 +86,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    from integrations.kite_oauth import get_login_url
+    from new_data_ingestion.kite_oauth import get_login_url
 
     print()
     print("=" * 52)

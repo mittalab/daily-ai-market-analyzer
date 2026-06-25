@@ -1,3 +1,8 @@
+# GAPS
+1. Check if token ceiling is hit, which limits the claude analysis
+2. Fix the days in watchlist
+
+
 ## High Level TODOs
 
 1. When we swtich tabs in the front end dashboard, the manual stock analysis is gone, the last results should persists

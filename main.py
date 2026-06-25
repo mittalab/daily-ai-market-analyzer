@@ -74,8 +74,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[_dashboard_origin],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["X-Session-Date", "X-Session-Id", "X-Generated-At"],
 )
 
 app.include_router(manual_analysis_router)
@@ -108,7 +109,7 @@ async def kite_refresh():
     Start the Kite OAuth flow.
     Opens Zerodha login page — after login, Zerodha redirects to /kite/callback.
     """
-    from integrations.kite_oauth import get_login_url
+    from new_data_ingestion.kite_oauth import get_login_url
     url = get_login_url()
     logger.info("Kite OAuth: redirecting to Zerodha login")
     return RedirectResponse(url)
@@ -124,7 +125,7 @@ async def kite_callback(
     Zerodha OAuth callback — exchanges request_token for access_token and stores in Supabase.
     request_token is single-use: exchanged exactly once here, never logged.
     """
-    from integrations.kite_oauth import exchange_request_token
+    from new_data_ingestion.kite_oauth import exchange_request_token
 
     if status != "success":
         logger.warning("Kite callback: Zerodha returned status=%s", status)

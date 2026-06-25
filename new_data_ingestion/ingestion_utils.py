@@ -1,0 +1,269 @@
+"""
+Consolidated data ingestion utility helpers.
+Provides modular APIs called by the self-healing validation recovery loop.
+"""
+import logging
+import time
+from datetime import date, datetime, timedelta
+import pandas as pd
+import requests
+
+from database.queries import (
+    upsert_price_history,
+    upsert_fii_dii_flow,
+    get_latest_fii_dii,
+    upsert_options_snapshots,
+    upsert_futures_snapshots,
+    get_kite_token,
+)
+from new_data_ingestion.nse_bhavcopy import (
+    fetch_equity_bhavcopy,
+    fetch_indices_bhavcopy,
+    equity_bhavcopy_to_price_rows,
+    indices_to_price_rows,
+    last_trading_day,
+)
+from new_data_ingestion.nse_option_chain import run_snapshot_batch, make_nse_session
+from new_data_ingestion.kite_oauth import get_authenticated_kite
+from new_data_ingestion.kite_ohlcv import fetch_ohlcv_all, ohlcv_to_price_rows, get_kite, get_option_symbols, fetch_option_quotes
+from new_data_ingestion.kite_oi import fetch_futures_oi_all, futures_oi_to_snapshots_rows
+from new_data_ingestion.backfill_vix import run_backfill as run_vix_backfill
+from new_data_ingestion.fo_bhavcopy import run_backfill as run_fo_bhavcopy_backfill
+from new_utils.stock_list import get_stock_list_for_analysis
+
+logger = logging.getLogger(__name__)
+
+
+def ingest_today_bhavcopy(for_date: date | None = None) -> dict:
+    """
+    Download NSE bhavcopy (equity + indices) and FII/DII flows for a specific date (defaults to last trading day).
+    Stores results in Supabase `price_history` and `fii_dii_flows`.
+    """
+    summary: dict = {"ok": True, "errors": [], "trade_date": None, "equity_rows": 0, "index_rows": 0, "fii_ok": False}
+    target_date = last_trading_day(for_date)
+    summary["trade_date"] = str(target_date)
+    symbols = get_stock_list_for_analysis()
+
+    # 1. Equity Bhavcopy
+    try:
+        eq_df, trade_date = fetch_equity_bhavcopy(target_date)
+        eq_df = eq_df[eq_df["SYMBOL"].isin(symbols)]
+        eq_rows = equity_bhavcopy_to_price_rows(eq_df, trade_date)
+        n_upserted = upsert_price_history(eq_rows)
+        summary["equity_rows"] = n_upserted
+        logger.info("Equity bhavcopy ingested: %d rows for %s", n_upserted, trade_date)
+    except Exception as exc:
+        logger.error("Equity bhavcopy ingest FAILED: %s", exc)
+        summary["errors"].append(f"equity_bhavcopy: {exc}")
+        summary["ok"] = False
+
+    # 2. Indices Bhavcopy
+    try:
+        indices, _ = fetch_indices_bhavcopy(target_date)
+        index_rows = indices_to_price_rows(indices, target_date)
+        n_upserted = upsert_price_history(index_rows)
+        summary["index_rows"] = len(index_rows)
+        logger.info("Indices bhavcopy ingested: %d indices for %s", len(index_rows), target_date)
+    except Exception as exc:
+        logger.error("Indices bhavcopy ingest FAILED: %s", exc)
+        summary["errors"].append(f"indices_bhavcopy: {exc}")
+        summary["ok"] = False
+
+    # # 3. FII/DII Scraper
+    # try:
+    #     nse_session = create_nse_session()
+    #     fii_dii = fetch_fii_dii(nse_session)
+    #     db_row = fii_dii_to_db_row(fii_dii, target_date)
+    #     upsert_fii_dii_flow(db_row)
+    #     summary["fii_ok"] = True
+    #     logger.info("FII/DII flow ingested for %s", target_date)
+    # except Exception as exc:
+    #     logger.warning("FII/DII ingest failed, using cached values: %s", exc)
+    #     summary["errors"].append(f"fii_dii: {exc}")
+    #     cached = get_latest_fii_dii()
+    #     if cached:
+    #         cached_row = dict(cached)
+    #         cached_row.pop("id", None)
+    #         cached_row.pop("created_at", None)
+    #         cached_row["source"] = "CACHED"
+    #         cached_row["date"] = str(target_date)
+    #         upsert_fii_dii_flow(cached_row)
+    #         logger.info("FII/DII using cached value from %s", cached.get("date"))
+
+    return summary
+
+
+def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] | None = None) -> dict:
+    """
+    Fetch and store option chain snapshots for all symbols on the snapshot_date (defaults to today).
+    Uses Kite Quotes as primary source and NSE scrape as secondary enrichment.
+    """
+    snap_date = snapshot_date or date.today()
+    summary: dict = {"ok": False, "rows_stored": 0, "source": "NONE", "failed_symbols": [], "errors": []}
+    target_symbols = symbols or get_stock_list_for_analysis()
+
+    # A. Kite Quotes (Primary)
+    kite_rows = []
+    try:
+        token_row = get_kite_token()
+        if token_row:
+            kite = get_kite(token_row["access_token"])
+            for symbol in target_symbols:
+                try:
+                    instruments = get_option_symbols(kite, symbol)
+                    if instruments.empty:
+                        continue
+                    quotes = fetch_option_quotes(kite, instruments)
+                    for tk, q in quotes.items():
+                        try:
+                            tsym = tk.split(":")[-1]
+                            matches = instruments[instruments["tradingsymbol"] == tsym]
+                            if matches.empty:
+                                continue
+                            inst = matches.iloc[0]
+                            expiry = inst["expiry"]
+                            if hasattr(expiry, "date"):
+                                expiry = expiry.date()
+                            oi_high = q.get("oi_day_high") or 0
+                            oi_low  = q.get("oi_day_low")  or 0
+                            kite_rows.append({
+                                "symbol":        symbol,
+                                "snapshot_date": str(snap_date),
+                                "expiry_date":   str(expiry),
+                                "strike":        float(inst["strike"]),
+                                "option_type":   inst["instrument_type"],
+                                "oi":            int(q.get("oi") or 0),
+                                "oi_change":     int(oi_high - oi_low),
+                                "volume":        int(q.get("volume") or 0),
+                                "iv":            None,
+                                "premium_close": float(q.get("last_price") or 0),
+                            })
+                        except Exception:
+                            continue
+                    time.sleep(0.1)
+                except Exception as sym_exc:
+                    logger.warning("Kite option skip %s: %s", symbol, sym_exc)
+            
+            if kite_rows:
+                n = upsert_options_snapshots(kite_rows)
+                summary.update({"ok": True, "rows_stored": n, "source": "KITE"})
+                logger.info("Kite options snapshot stored: %d rows", n)
+        else:
+            summary["errors"].append("Kite token not found in DB")
+    except Exception as exc:
+        logger.error("Kite option snapshot failed: %s", exc)
+        summary["errors"].append(f"kite_options: {exc}")
+
+    # B. NSE Scrape (Secondary/Enrichment for IVs)
+    try:
+        nse_session = make_nse_session()
+        nse_rows, failed = run_snapshot_batch(nse_session, target_symbols, snap_date)
+        if nse_rows:
+            n = upsert_options_snapshots(nse_rows)
+            summary["ok"] = True
+            summary["rows_stored"] = max(summary["rows_stored"], n)
+            summary["source"] = "KITE+NSE" if kite_rows else "NSE"
+            summary["failed_symbols"] = failed
+            logger.info("NSE options snapshot stored/enriched: %d rows (source: %s)", n, summary["source"])
+    except Exception as exc:
+        logger.warning("NSE options enrichment failed (using Kite data): %s", exc)
+        summary["errors"].append(f"nse_options_enrichment: {exc}")
+
+    return summary
+
+
+def ingest_today_kite_data(for_date: date | None = None, symbols: list[str] | None = None) -> dict:
+    """
+    Ingest Kite OHLCV history (250 days) and raw futuressnapshots for today's trading.
+    Stores OHLCV in `price_history` and raw futures snapshots in `futures_snapshots`.
+    """
+    summary: dict = {"ok": True, "errors": [], "symbols_ohlcv": 0, "symbols_oi": 0}
+    target_symbols = symbols or get_stock_list_for_analysis()
+    target_date = for_date or date.today()
+
+    try:
+        kite = get_authenticated_kite()
+        
+        # 1. OHLCV Ingestion
+        ohlcv_data = fetch_ohlcv_all(kite, target_symbols, days=250)
+        price_rows = []
+        for symbol, df in ohlcv_data.items():
+            if not df.empty:
+                price_rows.extend(ohlcv_to_price_rows(symbol, df))
+                summary["symbols_ohlcv"] += 1
+        if price_rows:
+            upsert_price_history(price_rows)
+            logger.info("Kite OHLCV ingested: %d symbols, %d rows", summary["symbols_ohlcv"], len(price_rows))
+
+        # 2. Futures Snaps Ingestion (Raw snapshots)
+        oi_data = fetch_futures_oi_all(kite, target_symbols, days=30)
+        snapshot_rows = []
+        for symbol, entry in oi_data.items():
+            near_df     = entry.get("near")
+            next_df     = entry.get("next")
+            near_expiry = entry.get("near_expiry")
+            next_expiry = entry.get("next_expiry")
+
+            if near_df is None or near_df.empty:
+                continue
+
+            rows = futures_oi_to_snapshots_rows(
+                symbol, near_df, next_df if next_df is not None else pd.DataFrame(),
+                near_expiry, next_expiry
+            )
+            snapshot_rows.extend(rows)
+            summary["symbols_oi"] += 1
+
+        if snapshot_rows:
+            n = upsert_futures_snapshots(snapshot_rows)
+            logger.info("Kite futures snapshots stored: %d rows for %d symbols", n, summary["symbols_oi"])
+        
+    except Exception as exc:
+        logger.error("Kite data fetch FAILED: %s", exc)
+        summary["errors"].append(f"kite_data_fetch: {exc}")
+        summary["ok"] = False
+
+    return summary
+
+
+def backfill_historical_date(target_date: date, symbol: str | None = None) -> dict:
+    """
+    Backfill past historical data for a specific date:
+    - Equity & Indices bhavcopy -> price_history
+    - F&O bhavcopy -> options_snapshots and futures_snapshots
+    - India VIX -> price_history
+    """
+    summary: dict = {"ok": True, "errors": [], "bhavcopy": None, "fo_bhavcopy": None, "vix": None}
+    logger.info("Starting historical backfill for date %s (symbol filter: %s)", target_date, symbol)
+
+    # 1. Equity & Index Bhavcopy
+    try:
+        bhav_summary = ingest_today_bhavcopy(target_date)
+        summary["bhavcopy"] = bhav_summary
+        if not bhav_summary["ok"]:
+            summary["ok"] = False
+    except Exception as exc:
+        logger.error("Bhavcopy backfill failed for %s: %s", target_date, exc)
+        summary["errors"].append(f"bhavcopy: {exc}")
+        summary["ok"] = False
+
+    # 2. F&O Bhavcopy (Populates option snaps and futures snaps)
+    try:
+        fo_summary = run_fo_bhavcopy_backfill([target_date])
+        summary["fo_bhavcopy"] = fo_summary
+        if target_date in fo_summary.get("failed", []):
+            summary["ok"] = False
+    except Exception as exc:
+        logger.error("F&O bhavcopy backfill failed for %s: %s", target_date, exc)
+        summary["errors"].append(f"fo_bhavcopy: {exc}")
+        summary["ok"] = False
+
+    # 3. India VIX Backfill
+    try:
+        vix_summary = run_vix_backfill(target_date, target_date)
+        summary["vix"] = vix_summary
+    except Exception as exc:
+        logger.error("VIX backfill failed for %s: %s", target_date, exc)
+        summary["errors"].append(f"vix: {exc}")
+
+    return summary

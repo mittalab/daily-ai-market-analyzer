@@ -23,14 +23,12 @@ from database.queries import (
     update_analysis_session,
     update_watchlist_staging,
 )
-from integrations.nse_bhavcopy import get_nifty50_symbols
-from integrations.telegram import send_pipeline_complete, send_pipeline_start
+from new_notifications.telegram import send_pipeline_complete, send_pipeline_start
+from new_utils.stock_list import get_stock_list_for_analysis
 from pipeline.claude_session import run_claude_session
 from pipeline.context_builder import build_context_bundle
-from pipeline.data_ingestion import get_ingestion_symbols, run_kite_data_fetch
 from pipeline.level1_filter import fetch_nse_earnings_window, run_level1_filter
 
-from pipeline.market_regime import run_market_regime
 from pipeline.oi_series_builder import run_oi_series_builder
 
 logger = logging.getLogger(__name__)
@@ -48,10 +46,38 @@ def run_pipeline(session_date: date) -> dict:
     """
     session_id = f"SESSION_{session_date.strftime('%Y%m%d')}"
     started_at = datetime.now(IST).isoformat()
-    # FIX: Dynamic symbols list (Nifty 50 + active watchlist)
-    symbols = get_ingestion_symbols()
+    # Resolve target symbols (Nifty 50 + active watchlist)
+    symbols = get_stock_list_for_analysis()
 
     logger.info("Pipeline start: %s | %d symbols", session_id, len(symbols))
+
+    # ── Run Data Validation & Self-Healing first ──────────────────────────────
+    from new_validation.run_validation import run_daily_validation
+    from database.queries import get_validation_state
+    logger.info("Running pre-flight data validation and self-healing for all symbols...")
+    try:
+        run_daily_validation(session_date)
+    except Exception as exc:
+        logger.error("Error during daily validation execution: %s", exc)
+
+    failed_validation = []
+    for symbol in symbols:
+        try:
+            state = get_validation_state(symbol, session_date)
+            if not state or state.get("status") != "PASSED":
+                failed_validation.append(symbol)
+        except Exception as e:
+            logger.error("Error checking validation state for %s: %s", symbol, e)
+            failed_validation.append(symbol)
+
+    if failed_validation:
+        logger.warning("Validation failed (and could not be healed) for symbols: %s", failed_validation)
+        # Filter out failed symbols
+        symbols = [s for s in symbols if s not in failed_validation]
+        if not symbols:
+            logger.error("All target symbols failed validation. Aborting pipeline.")
+            update_analysis_session(session_id, {"status": "ABORTED"})
+            return {"error": "All target symbols failed validation", "session_id": session_id}
 
     # ── Create / reuse session record ─────────────────────────────────────────
     try:
@@ -69,13 +95,14 @@ def run_pipeline(session_date: date) -> dict:
     # ── Kite token check (best-effort) ────────────────────────────────────────
     kite = None
     try:
-        from integrations.kite_oauth import get_authenticated_kite
+        from new_data_ingestion.kite_oauth import get_authenticated_kite
         kite = get_authenticated_kite()
         token_ok = True
     except Exception as exc:
         logger.warning("Kite token unavailable: %s", exc)
         token_ok = False
 
+    #AI: Check what is snapshot_ok and bhavcopy_ok mean and why it is send as TRUE here, as it is not validated yet?
     send_pipeline_start(
         trade_date=str(session_date),
         token_ok=token_ok,
@@ -99,24 +126,6 @@ def run_pipeline(session_date: date) -> dict:
         }
     })
 
-    # ── Stage 2.6: Market Regime ──────────────────────────────────────────────
-    logger.info("Stage 2.6: Market Regime Detection...")
-    regime_result = run_market_regime(session_date)
-    logger.info("Regime: %s | Nifty=%.1f | VIX=%.2f",
-                regime_result["regime"], regime_result["nifty_close"] or 0,
-                regime_result["vix"] or 0)
-    update_analysis_session(session_id, {
-        "market_regime": regime_result["regime"],
-        "nifty_close":   regime_result["nifty_close"],
-        "vix_close":     regime_result["vix"],
-        "stage_statuses": {
-            "data_ingestion": "COMPLETE",
-            "oi_series":      "COMPLETE" if not oi_result["errors"] else "PARTIAL",
-            "regime_detect":  "COMPLETE",
-            "regime_value":   regime_result["regime"],
-        }
-    })
-
     # ── Stage 3: Level 1 Filter ───────────────────────────────────────────────
     logger.info("Stage 3: Level 1 Filter...")
     earnings_window = fetch_nse_earnings_window(session_date)
@@ -132,7 +141,6 @@ def run_pipeline(session_date: date) -> dict:
         "stage_statuses": {
             "data_ingestion": "COMPLETE",
             "oi_series":      "COMPLETE" if not oi_result["errors"] else "PARTIAL",
-            "regime_detect":  "COMPLETE",
             "level1_filter":  "COMPLETE" if not l1_result["errors"] else "PARTIAL",
             "l1_passed":      len(level1_passed),
             "l1_eliminated":  len(l1_result["eliminated"]),
@@ -146,7 +154,7 @@ def run_pipeline(session_date: date) -> dict:
 
     # ── Stage 4: Context Bundle ───────────────────────────────────────────────
     logger.info("Stage 4: Building context bundle...")
-    context_bundle = build_context_bundle(session_date, session_id, regime_result=regime_result)
+    context_bundle = build_context_bundle(session_date, session_id, regime_result=None)
 
     # ── Stage 4.5: Watchlist Priority ─────────────────────────────────────────
     # Fetch active watchlist stocks and prioritize for deep analysis
@@ -164,7 +172,7 @@ def run_pipeline(session_date: date) -> dict:
                 "days_in_stage": r.get("days_in_stage", 0)
             } 
             for r in active_wl 
-            if r.get("current_stage") in ("WATCH", "ON_RADAR") and r.get("days_in_stage", 0) <= 10
+            if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY", "MANUAL_ADD") and r.get("days_in_stage", 0) <= 10
         ]
         if watchlist_stocks:
             logger.info("Watchlist re-analysis: %d stocks prioritized", len(watchlist_stocks))
@@ -174,6 +182,7 @@ def run_pipeline(session_date: date) -> dict:
     # ── Stage 5: Claude Session ───────────────────────────────────────────────
     logger.info("Stage 5: Claude multi-turn session (%d stocks)...", len(level1_passed))
     claude_result = run_claude_session(context_bundle, level1_passed, session_id, watchlist_priority=watchlist_stocks)
+    regime_result = claude_result["regime_result"]
 
     # ── Pipeline complete ─────────────────────────────────────────────────────
     # FIX: Ground-truth DB validation before final notification

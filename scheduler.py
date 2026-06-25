@@ -9,7 +9,7 @@ Schedule (spec Section 6):
   19:00 Mon-Fri      — Telegram token reminder (trading days only)
   15:25 Mon-Fri      — Option chain snapshot (IV capture 5 min before close)
   18:30 Mon-Fri      — NSE bhavcopy + FII/DII download
-  22:00 Mon-Fri      — Main analysis pipeline (stub — Week 3+)
+  16:00 Mon-Fri      — Main analysis pipeline
 """
 import logging
 
@@ -77,7 +77,7 @@ def job_token_reminder() -> None:
     except Exception as exc:
         logger.warning("Token validity check failed: %s — defaulting to LOUD reminder", exc)
 
-    from integrations.telegram import send_token_reminder, send_token_valid
+    from new_notifications.telegram import send_token_reminder, send_token_valid
     if token_valid:
         mid = send_token_valid()
         if mid:
@@ -92,8 +92,8 @@ def job_token_reminder() -> None:
 
 def job_option_snapshot() -> None:
     """15:20 Mon-Fri — fetch and store option chain IV snapshot for all Nifty 50 stocks."""
-    from pipeline.data_ingestion import run_snapshot_job
-    from integrations.telegram import send_snapshot_failed
+    from new_data_ingestion.ingestion_utils import ingest_today_options
+    from new_notifications.telegram import send_snapshot_failed
     from database.queries import get_row_count
     from datetime import date, datetime
     import pytz
@@ -103,7 +103,7 @@ def job_option_snapshot() -> None:
     job_start = datetime.now(pytz.utc) 
     
     logger.info("Option snapshot job starting for %s", today)
-    summary = run_snapshot_job(today)
+    summary = ingest_today_options(today)
 
     # ── DB Validation ─────────────────────────────────────────────────────────
     # Verify rows exist for TODAY and were created AFTER the job started.
@@ -118,7 +118,7 @@ def job_option_snapshot() -> None:
             "Option snapshot VERIFIED: %d NEW rows in DB (process reported %d) Source: %s",
             actual_rows, summary.get("rows_stored", 0), summary.get("source", "NSE")
         )
-        from integrations.telegram import send_snapshot_verified
+        from new_notifications.telegram import send_snapshot_verified
         send_snapshot_verified(str(today), actual_rows, summary.get("source", "NSE"))
     else:
         logger.error("Option snapshot VERIFIED FAILURE: 0 NEW rows found in DB for %s", today)
@@ -127,9 +127,9 @@ def job_option_snapshot() -> None:
 
 def job_bhavcopy() -> None:
     """18:30 Mon-Fri — download NSE equity + indices bhavcopy and FII/DII flows."""
-    from pipeline.data_ingestion import run_bhavcopy_job
+    from new_data_ingestion.ingestion_utils import ingest_today_bhavcopy
     from database.queries import get_row_count
-    from integrations.telegram import send_silent, send_loud
+    from new_notifications.telegram import send_silent, send_loud
     from datetime import datetime
     import pytz
 
@@ -140,7 +140,7 @@ def job_bhavcopy() -> None:
 
     job_start = datetime.now(pytz.utc)
     logger.info("Bhavcopy job starting")
-    summary = run_bhavcopy_job()
+    summary = ingest_today_bhavcopy()
 
     # ── DB Validation ─────────────────────────────────────────────────────────
     # Verify rows exist for TODAY and were created AFTER the job started.
@@ -182,8 +182,8 @@ def job_bhavcopy_retry() -> None:
     except Exception:
         pass
     logger.info("Bhavcopy retry starting for %s", today)
-    from pipeline.data_ingestion import run_bhavcopy_job
-    summary = run_bhavcopy_job()
+    from new_data_ingestion.ingestion_utils import ingest_today_bhavcopy
+    summary = ingest_today_bhavcopy()
     if summary["ok"]:
         logger.info("Bhavcopy retry OK: equity=%d rows", summary.get("equity_rows", 0))
     else:
@@ -254,23 +254,27 @@ def job_preflight_check() -> None:
         failures.append(f"Data freshness check error: {exc}")
 
     if failures:
-        from integrations.telegram import send_preflight_check_failed
+        from new_notifications.telegram import send_preflight_check_failed
         send_preflight_check_failed(failures, str(today))
         logger.warning("Pre-flight FAILED: %s", failures)
     else:
-        from integrations.telegram import send_silent
+        from new_notifications.telegram import send_silent
         send_silent(f"✅ <b>Pre-flight OK — {today}</b>\nAll systems ready. Pipeline fires at <b>22:00</b>.")
         logger.info("Pre-flight check OK — all systems ready for 22:00 pipeline")
 
 
 def job_main_pipeline() -> None:
-    """22:00 Mon-Fri — main analysis pipeline + paper trade engine + schedule morning brief."""
-    from datetime import date
+    """16:00 Mon-Fri — main analysis pipeline + paper trade engine + schedule morning brief."""
+    from datetime import datetime
     from apscheduler.triggers.date import DateTrigger
     import pytz
 
-    today = date.today()
     IST   = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(IST).date()
+
+    if not is_trading_day(today):
+        logger.info("Main pipeline job skipped — %s is not a trading day", today)
+        return
 
     # ── Run main pipeline ─────────────────────────────────────────────────────
     try:
@@ -278,7 +282,7 @@ def job_main_pipeline() -> None:
         run_pipeline(today)
     except Exception as exc:
         logger.error("Main pipeline failed: %s", exc)
-        from integrations.telegram import send_preflight_failed
+        from new_notifications.telegram import send_preflight_failed
         send_preflight_failed(str(exc)[:200], str(today))
         return
 
@@ -415,18 +419,18 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         misfire_grace_time=300,
     )
 
-    # 22:00 Mon-Fri — main pipeline (DISABLED)
-    # scheduler.add_job(
-    #     job_main_pipeline,
-    #     CronTrigger(day_of_week="mon-fri", hour=22, minute=0, **ist_kwargs),
-    #     id="main_pipeline",
-    #     name="Main analysis pipeline",
-    #     replace_existing=True,
-    #     misfire_grace_time=1800,
-    # )
+    # 16:00 Mon-Fri — main pipeline
+    scheduler.add_job(
+        job_main_pipeline,
+        CronTrigger(day_of_week="mon-fri", hour=16, minute=0, **ist_kwargs),
+        id="main_pipeline",
+        name="Main analysis pipeline",
+        replace_existing=True,
+        misfire_grace_time=1800,
+    )
 
     logger.info(
         "Scheduler: %d jobs registered (keepalive, token_reminder, option_snapshot, "
-        "bhavcopy, 3x bhavcopy_retry, preflight_check)",
-        9,
+        "bhavcopy, 3x bhavcopy_retry, preflight_check, main_pipeline)",
+        10,
     )

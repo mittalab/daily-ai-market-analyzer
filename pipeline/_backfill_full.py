@@ -13,6 +13,7 @@ from integrations.kite_oauth import get_authenticated_kite
 from integrations.kite_ohlcv import fetch_ohlcv, get_equity_token, ohlcv_to_price_rows, get_instruments
 from integrations.nse_bhavcopy import get_nifty50_symbols
 from database.queries import upsert_price_history, get_watchlist
+from config.constants import SYMBOL_INDIA_VIX
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', stream=sys.stdout)
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def run_backfill():
     for symbol in all_targets:
         try:
             # Skip indices (VIX/NIFTY50) as they use different symbol format in Kite
-            if symbol.startswith("NIFTY_") or symbol == "INDIA_VIX":
+            if symbol.startswith("NIFTY_") or symbol == SYMBOL_INDIA_VIX:
                 # Special handling for Nifty Indices in Kite if needed
                 # For now, focusing on the stocks as requested
                 continue

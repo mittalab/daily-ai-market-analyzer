@@ -1170,3 +1170,78 @@ INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
 INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "GET /api/session/today/chat-context HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "GET /api/session/today/chat-context HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     149.154.161.213:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     172.216.31.19:0 - "GET / HTTP/1.1" 404 Not Found
+INFO:     172.216.31.19:0 - "GET /wp-login.php HTTP/1.1" 404 Not Found
+INFO:     172.216.31.19:0 - "GET /administrator/index.php HTTP/1.1" 404 Not Found
+INFO:     172.216.31.19:0 - "GET /api/index.php/v1/config/application?public=true HTTP/1.1" 404 Not Found
+INFO:     106.219.121.82:0 - "OPTIONS /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /kite/refresh HTTP/1.1" 307 Temporary Redirect
+INFO:     106.219.121.82:0 - "GET /kite/callback?action=login&type=login&status=success&request_token=gYt8uK9qw7c3bAMSBXhG4MDESWR6LkYY HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "OPTIONS /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "OPTIONS /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/watchlist HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/today HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "GET /api/deep-analysis HTTP/1.1" 200 OK
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed
+INFO:     106.219.121.82:0 - "HEAD /api/session/today/chat-context HTTP/1.1" 405 Method Not Allowed

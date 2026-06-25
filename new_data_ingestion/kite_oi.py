@@ -2,8 +2,7 @@
 Kite Connect — historical OI for Nifty 50 futures (near + next month).
 
 OI units: returned in SHARES — always divide by lot_size for lots.
-oi=True is MANDATORY — without it the OI column is absent, no error raised.
-Expiry day OI drops to 0 (settlement) — mark is_expiry_day=True.
+oi=True is MANDATORY.
 """
 import logging
 import time
@@ -12,26 +11,23 @@ from datetime import date, timedelta
 import pandas as pd
 from kiteconnect import KiteConnect
 
-from integrations.kite_ohlcv import get_instruments
+from new_data_ingestion.kite_ohlcv import get_instruments
 
 logger = logging.getLogger(__name__)
 
 
 def get_nfo_instruments(kite: KiteConnect) -> pd.DataFrame:
-    """NFO instrument master — cached. ~46,000 rows covering all F&O contracts."""
+    """NFO instrument master — cached."""
     return get_instruments(kite, "NFO")
 
 
 def get_futures_contracts(
     kite: KiteConnect,
     symbol: str,
-    max_expiries: int = 2,
+    max_expiries: int = 3,
 ) -> list[tuple[int, int, date]]:
     """
     Return near + next month futures contracts for a symbol.
-
-    Returns list of (instrument_token, lot_size, expiry_date), sorted by expiry.
-    max_expiries=2 gives near month + next month (far month excluded per spec).
     """
     df = get_nfo_instruments(kite)
     futs = df[
@@ -61,16 +57,13 @@ def fetch_futures_oi_series(
 ) -> pd.DataFrame:
     """
     Fetch daily OHLCV + OI for a futures contract.
-
-    Returns DataFrame with: date, open, high, low, close, volume, oi, oi_lots, oi_change.
-    oi_lots = oi / lot_size (shares → lots).
     """
     raw = kite.historical_data(
         instrument_token=instrument_token,
         from_date=str(from_date),
         to_date=str(to_date),
         interval="day",
-        oi=True,    # MANDATORY — without this flag, OI column is absent
+        oi=True,
     )
     if not raw:
         return pd.DataFrame(
@@ -89,11 +82,7 @@ def fetch_futures_oi_all(
     days: int = 30,
 ) -> dict[str, dict]:
     """
-    Fetch near + next month futures OI for all Nifty 50 symbols.
-
-    Returns {symbol: {"near": df, "next": df, "lot_size": int, "near_expiry": date, "next_expiry": date}}.
-    Failed symbols are logged and excluded.
-    Sleeps 0.35s between calls.
+    Fetch near + next month futures OI for all target symbols.
     """
     to_date   = date.today()
     from_date = to_date - timedelta(days=days)
@@ -127,68 +116,58 @@ def fetch_futures_oi_all(
     return results
 
 
-def futures_oi_to_series_rows(
+def futures_oi_to_snapshots_rows(
     symbol: str,
     near_df: pd.DataFrame,
     next_df: pd.DataFrame,
-    lot_size: int,
     near_expiry: date,
     next_expiry: date,
-    rollover_phase: str,
 ) -> list[dict]:
     """
-    Convert near + next month OI DataFrames to futures_continuous_series rows.
-
-    Marks is_expiry_day=True where OI drops to 0 (settlement noise — never use as signal).
+    Convert Kite near + next month futures OI DataFrames into futures_snapshots rows.
     """
-    # Build lookup for next month OI by date
-    next_oi_by_date: dict[date, int] = {}
+    rows = []
+    
+    if not near_df.empty:
+        for _, row in near_df.iterrows():
+            dt = row["date"]
+            if hasattr(dt, "date"):
+                dt = dt.date()
+                
+            rows.append({
+                "symbol": symbol,
+                "snapshot_date": str(dt),
+                "expiry_date": str(near_expiry),
+                "open_price": float(row["open"]) if pd.notna(row.get("open")) else None,
+                "high_price": float(row["high"]) if pd.notna(row.get("high")) else None,
+                "low_price": float(row["low"]) if pd.notna(row.get("low")) else None,
+                "close_price": float(row["close"]) if pd.notna(row.get("close")) else None,
+                "settle_price": float(row["close"]) if pd.notna(row.get("close")) else None,
+                "oi": int(row["oi"]) if pd.notna(row.get("oi")) else None,
+                "oi_change": int(row["oi_change"]) if pd.notna(row.get("oi_change")) else None,
+                "volume": int(row["volume"]) if pd.notna(row.get("volume")) else None,
+                "underlying_price": None,
+            })
+            
     if not next_df.empty:
         for _, row in next_df.iterrows():
             dt = row["date"]
             if hasattr(dt, "date"):
                 dt = dt.date()
-            next_oi_by_date[dt] = int(row["oi"])
-
-    rows = []
-    for _, row in near_df.iterrows():
-        dt = row["date"]
-        if hasattr(dt, "date"):
-            dt = dt.date()
-
-        near_oi       = int(row["oi"])
-        near_oi_lots  = float(row["oi_lots"])
-        is_expiry_day = (near_oi == 0)   # OI drops to 0 on expiry — mark it
-
-        next_oi      = next_oi_by_date.get(dt, 0)
-        total_oi     = near_oi + next_oi
-        rollover_pct = (next_oi / total_oi * 100) if total_oi > 0 else None
-
-        futures_close  = float(row["close"])   # futures close used as proxy until bhavcopy loaded
-        futures_open   = float(row["open"])   if "open"   in row and row["open"]   is not None else None
-        futures_high   = float(row["high"])   if "high"   in row and row["high"]   is not None else None
-        futures_low    = float(row["low"])    if "low"    in row and row["low"]    is not None else None
-        futures_volume = int(row["volume"])   if "volume" in row and row["volume"] is not None else None
-
-        rows.append({
-            "symbol":         symbol,
-            "date":           str(dt),
-            "rollover_phase": rollover_phase,
-            "near_expiry":    str(near_expiry),
-            "next_expiry":    str(next_expiry),
-            "futures_price":  futures_close,
-            "futures_open":   futures_open,
-            "futures_high":   futures_high,
-            "futures_low":    futures_low,
-            "futures_volume": futures_volume,
-            "spot_price":     None,   # set later from bhavcopy CLOSE
-            "basis":          None,
-            "basis_pct":      None,
-            "near_month_oi":  near_oi,
-            "next_month_oi":  next_oi,
-            "oi_change":      int(row["oi_change"]),
-            "in_rollover_week": rollover_phase in ("ROLLOVER_WATCH", "TRANSITION"),
-            "is_expiry_day":  is_expiry_day,
-            "rollover_pct":   rollover_pct,
-        })
+                
+            rows.append({
+                "symbol": symbol,
+                "snapshot_date": str(dt),
+                "expiry_date": str(next_expiry),
+                "open_price": float(row["open"]) if pd.notna(row.get("open")) else None,
+                "high_price": float(row["high"]) if pd.notna(row.get("high")) else None,
+                "low_price": float(row["low"]) if pd.notna(row.get("low")) else None,
+                "close_price": float(row["close"]) if pd.notna(row.get("close")) else None,
+                "settle_price": float(row["close"]) if pd.notna(row.get("close")) else None,
+                "oi": int(row["oi"]) if pd.notna(row.get("oi")) else None,
+                "oi_change": int(row["oi_change"]) if pd.notna(row.get("oi_change")) else None,
+                "volume": int(row["volume"]) if pd.notna(row.get("volume")) else None,
+                "underlying_price": None,
+            })
+            
     return rows

@@ -38,6 +38,8 @@ from indicators.technical import (
     volume_ratio,
 )
 
+from config.constants import SYMBOL_NIFTY_50, NIFTY_50_DAYS
+
 logger = logging.getLogger(__name__)
 
 CAPITAL_INR  = 500_000     # ₹5 lakh
@@ -99,6 +101,7 @@ def _atm_iv(options: list[dict], spot: float | None) -> float | None:
     return round(float(iv), 2) if iv else None
 
 
+#AI: Should we remove the values which are too far from the spot price, as they might not give more valuable insights
 def oi_walls(options: list[dict], near_expiry_str: str, top_n: int = 5) -> dict:
     near = [r for r in options if str(r.get("expiry_date", "")) == near_expiry_str]
     ce   = sorted([r for r in near if r["option_type"] == "CE"],
@@ -261,7 +264,7 @@ def build_stock_package(symbol: str, session_date: date, quality_notes: list) ->
     # Sector context
     sector, sector_index = _sector_info(symbol)
     sector_rows = get_price_history(sector_index, days=30) if sector_index != "UNKNOWN" else []
-    nifty_rows  = get_price_history("NIFTY_50", days=30)
+    nifty_rows  = get_price_history(SYMBOL_NIFTY_50, days=NIFTY_50_DAYS)
 
     # Relative performance metrics
     sector_20d_ret = None

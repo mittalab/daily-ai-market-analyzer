@@ -35,22 +35,25 @@ def calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
 
 def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     """
-    Average True Range.
-    true_range = max(H-L, |H-prev_C|, |L-prev_C|)
-    ATR(14) = ewm(true_range, span=14)
-    df must have columns: high, low, close (lowercase).
+    Average True Range using standard Welles Wilder smoothing.
+    Matches TradingView, Zerodha Kite, and standard industry baselines.
     """
-    high      = df["high"]
-    low       = df["low"]
+    high = df["high"]
+    low = df["low"]
     prev_close = df["close"].shift(1)
 
-    tr = pd.concat([
+    # Calculate individual components of True Range
+    tr_components = [
         high - low,
         (high - prev_close).abs(),
-        (low  - prev_close).abs(),
-    ], axis=1).max(axis=1)
+        (low - prev_close).abs()
+    ]
 
-    return tr.ewm(span=period, adjust=False).mean()
+    tr = pd.concat(tr_components, axis=1).max(axis=1)
+
+    # Wilder's Smoothing formula translates to alpha = 1 / period in pandas EWM
+    # We also add min_periods to prevent premature calculations on incomplete windows
+    return tr.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
 
 def calculate_macd(
@@ -82,7 +85,8 @@ def atr_pct(df: pd.DataFrame, period: int = 14) -> pd.Series:
     """
     atr   = calculate_atr(df, period)
     close = df["close"]
-    return (atr / close) * 100
+    # Simple, vectorized protection against divide-by-zero errors
+    return (atr / close * 100) if not close.empty else pd.Series(dtype=float)
 
 
 def volume_ratio(volume: pd.Series, short: int = 3, long: int = 20) -> pd.Series:

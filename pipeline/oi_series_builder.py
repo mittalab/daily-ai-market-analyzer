@@ -181,12 +181,18 @@ def run_oi_series_builder(symbols: list[str], analysis_date: date) -> dict:
         try:
             # ── Spot price (bhavcopy close) ────────────────────────────────
             spot_price: float | None = None
+            #AI: This assumes that price data is available for today. You can't run the analysis on any other day.
+            # instead, use the last day available data and send alert that using which date of data. This is needed
+            # only for manual analysis AND NOT DAILY ANLAYSIS.
             for pr in reversed(get_price_history(symbol, days=5)):
                 if str(pr["date"]) == str(analysis_date):
                     spot_price = float(pr["close"])
                     break
 
             # ── Futures series row ─────────────────────────────────────────
+            #AI: Check how is futures_continuous_series table populated?
+            # also use the same date logic as that of price. May be from top, pass the analysis date as the last run
+            # date for manual analysis.
             fut = get_futures_row(symbol, analysis_date)
             if fut is None:
                 logger.warning("%s: no futures row for %s — skipping", symbol, analysis_date)
@@ -215,10 +221,12 @@ def run_oi_series_builder(symbols: list[str], analysis_date: date) -> dict:
                 pcr_near, pcr_total, near_oi, next_oi = _pcr_and_oi_from_options(
                     opt_rows, near_expiry_str
                 )
+                #AI: Can we get max_pain from the KITE or somewhere else
                 max_pain    = _calc_max_pain(opt_rows, near_expiry_str)
                 total_oi    = near_oi + next_oi
                 rollover_pct = round(next_oi / total_oi * 100, 2) if total_oi > 0 else None
             else:
+                #AI: Show warning option data is not available. This should never happen
                 no_options.append(symbol)
                 # Fall back to futures OI when snapshot unavailable
                 near_oi      = int(fut.get("near_month_oi") or 0)
@@ -229,6 +237,7 @@ def run_oi_series_builder(symbols: list[str], analysis_date: date) -> dict:
 
             # ── OI change vs previous day ──────────────────────────────────
             prev = _prev_total_oi(symbol, analysis_date)
+            #AI: Should oi_change be computed for each strike individually as well
             oi_change = (total_oi - prev) if prev is not None else None
 
             upsert_continuous_oi({

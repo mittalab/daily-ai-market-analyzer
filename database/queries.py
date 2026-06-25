@@ -51,6 +51,19 @@ def get_dashboard_url() -> str:
     return url or "https://trading.abhishekmittal.in"
 
 
+def get_interested_stocks() -> list[str]:
+    """Return extra symbols from system_config 'interested_stocks' (comma-separated)."""
+    raw = get_system_config("interested_stocks") or ""
+    return [s.strip().upper() for s in raw.split(",") if s.strip()]
+
+
+def set_system_config(key: str, value: str) -> None:
+    """Upsert a single system_config entry."""
+    get_client().table("system_config").upsert(
+        {"key": key, "value": value}, on_conflict="key"
+    ).execute()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # kite_tokens
 # ─────────────────────────────────────────────────────────────────────────────
@@ -199,14 +212,18 @@ def upsert_single_lot_size(symbol: str, lot_size: int) -> None:
 # options_snapshots
 # ─────────────────────────────────────────────────────────────────────────────
 
-def upsert_options_snapshots(rows: list[dict]) -> int:
+def upsert_options_snapshots(rows: list[dict], batch_size: int = 2000) -> int:
     """
-    Bulk upsert 3:25 PM options snapshot rows.
+    Bulk upsert options snapshot rows in batches to avoid Supabase response size limits.
     Unique constraint is (symbol, snapshot_date, expiry_date, strike, option_type).
     """
     if not rows:
         return 0
-    get_client().table("options_snapshots").upsert(rows, on_conflict="symbol,snapshot_date,expiry_date,strike,option_type").execute()
+    for i in range(0, len(rows), batch_size):
+        get_client().table("options_snapshots").upsert(
+            rows[i : i + batch_size],
+            on_conflict="symbol,snapshot_date,expiry_date,strike,option_type",
+        ).execute()
     return len(rows)
 
 
@@ -284,54 +301,256 @@ def get_options_by_date(symbol: str, snapshot_date: date) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# futures_continuous_series
+# futures_snapshots  (raw per-expiry, from bhavcopy)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def upsert_futures_snapshots(rows: list[dict], batch_size: int = 2000) -> int:
+    """
+    Bulk upsert per-expiry futures snapshot rows in batches.
+    Unique constraint is (symbol, snapshot_date, expiry_date).
+    """
+    if not rows:
+        return 0
+    for i in range(0, len(rows), batch_size):
+        get_client().table("futures_snapshots").upsert(
+            rows[i : i + batch_size],
+            on_conflict="symbol,snapshot_date,expiry_date",
+        ).execute()
+    return len(rows)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# futures_continuous_series (dropped: redirected to futures_snapshots)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def upsert_futures_series(data: dict) -> None:
-    """
-    Upsert one row of the futures continuous series (one symbol, one date).
-    New columns futures_open, futures_high, futures_low are included only if
-    present in data (migration 008 must be applied first for them to persist).
-    """
-    get_client().table("futures_continuous_series").upsert(data, on_conflict="symbol,date").execute()
+    """No-op: Continuous series table dropped in favor of raw snapshots."""
+    pass
 
 
 def get_futures_row(symbol: str, date_: date) -> dict | None:
-    """Fetch the futures series row for a specific symbol and date."""
+    """Fetch the continuous-like futures row for a symbol and date, derived dynamically."""
     resp = (
         get_client()
-        .table("futures_continuous_series")
+        .table("futures_snapshots")
         .select("*")
         .eq("symbol", symbol)
-        .eq("date", str(date_))
+        .eq("snapshot_date", str(date_))
         .execute()
     )
-    return resp.data[0] if resp.data else None
+    if not resp.data:
+        return None
+        
+    contracts = sorted(resp.data, key=lambda x: x["expiry_date"])
+    near_contract = contracts[0]
+    next_contract = contracts[1] if len(contracts) > 1 else None
+    
+    near_oi = int(near_contract.get("oi") or 0)
+    next_oi = int(next_contract.get("oi") or 0) if next_contract else 0
+    total_oi = near_oi + next_oi
+    
+    rollover_pct = None
+    if total_oi > 0:
+        rollover_pct = round(next_oi / total_oi * 100, 4)
+        
+    futures_price = float(near_contract["settle_price"] or near_contract["close_price"] or 0)
+    
+    return {
+        "symbol": symbol,
+        "date": str(date_),
+        "futures_price": futures_price,
+        "near_expiry": near_contract["expiry_date"],
+        "next_expiry": next_contract["expiry_date"] if next_contract else None,
+        "near_month_oi": near_oi,
+        "next_month_oi": next_oi,
+        "rollover_pct": rollover_pct,
+        "futures_open": float(near_contract["open_price"]) if near_contract.get("open_price") is not None else None,
+        "futures_high": float(near_contract["high_price"]) if near_contract.get("high_price") is not None else None,
+        "futures_low": float(near_contract["low_price"]) if near_contract.get("low_price") is not None else None,
+        "futures_volume": int(near_contract["volume"]) if near_contract.get("volume") is not None else None,
+    }
 
 
 def update_futures_spot(
     symbol: str, date_: date, spot_price: float, basis: float, basis_pct: float
 ) -> None:
-    """Patch spot_price, basis, basis_pct on a futures_continuous_series row."""
-    get_client().table("futures_continuous_series").update({
-        "spot_price": spot_price,
-        "basis":      basis,
-        "basis_pct":  basis_pct,
-    }).eq("symbol", symbol).eq("date", str(date_)).execute()
+    """No-op: spot/basis values are computed dynamically in get_futures_series."""
+    pass
 
 
 def get_futures_series(symbol: str, days: int = 30) -> list[dict]:
-    """Fetch last N rows of futures series for a symbol, ordered ascending."""
+    """Dynamically compile continuous futures series from futures_snapshots and price_history."""
     resp = (
         get_client()
-        .table("futures_continuous_series")
+        .table("futures_snapshots")
         .select("*")
         .eq("symbol", symbol)
-        .order("date", desc=True)
-        .limit(days)
+        .order("snapshot_date", desc=True)
+        .limit(days * 4)
         .execute()
     )
-    return list(reversed(resp.data))
+    if not resp.data:
+        return []
+
+    from collections import defaultdict
+    by_date = defaultdict(list)
+    for row in resp.data:
+        by_date[row["snapshot_date"]].append(row)
+
+    sorted_dates = sorted(by_date.keys(), reverse=True)[:days]
+
+    spot_resp = (
+        get_client()
+        .table("price_history")
+        .select("date,close")
+        .eq("symbol", symbol)
+        .in_("date", sorted_dates)
+        .execute()
+    )
+    spot_by_date = {row["date"]: float(row["close"]) for row in spot_resp.data if row.get("close") is not None}
+
+    compiled_rows = []
+    total_oi_by_date = {}
+    ascending_dates = sorted(sorted_dates)
+    
+    import json
+    from pathlib import Path
+    try:
+        sector_map = json.loads(Path(r"C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\config\sector_map.json").read_text())
+        holidays = {datetime.strptime(d, "%Y-%m-%d").date() for d in sector_map.get("holidays_2026", [])}
+    except Exception:
+        holidays = set()
+
+    for idx, snap_date in enumerate(ascending_dates):
+        contracts = by_date[snap_date]
+        contracts_sorted = sorted(contracts, key=lambda x: x["expiry_date"])
+        if not contracts_sorted:
+            continue
+            
+        near_contract = contracts_sorted[0]
+        next_contract = contracts_sorted[1] if len(contracts_sorted) > 1 else None
+        
+        near_expiry = near_contract["expiry_date"]
+        next_expiry = next_contract["expiry_date"] if next_contract else None
+        
+        near_oi = int(near_contract.get("oi") or 0)
+        next_oi = int(next_contract.get("oi") or 0) if next_contract else 0
+        total_oi = near_oi + next_oi
+        total_oi_by_date[snap_date] = total_oi
+        
+        prev_date = ascending_dates[idx - 1] if idx > 0 else None
+        prev_total = total_oi_by_date.get(prev_date) if prev_date else None
+        oi_change = (total_oi - prev_total) if prev_total is not None else 0
+        
+        futures_price = float(near_contract["settle_price"] or near_contract["close_price"] or 0)
+        spot_price = spot_by_date.get(snap_date)
+        
+        basis = None
+        basis_pct = None
+        if spot_price is not None and futures_price > 0:
+            basis = round(futures_price - spot_price, 2)
+            basis_pct = round(basis / spot_price * 100, 4)
+            
+        rollover_pct = None
+        if total_oi > 0:
+            rollover_pct = round(next_oi / total_oi * 100, 4)
+
+        d_start = datetime.strptime(snap_date, "%Y-%m-%d").date()
+        d_end = datetime.strptime(near_expiry, "%Y-%m-%d").date()
+        
+        trading_days = 0
+        curr = d_start
+        while curr < d_end:
+            curr += timedelta(days=1)
+            if curr.weekday() < 5 and curr not in holidays:
+                trading_days += 1
+                
+        if trading_days <= 1:
+            rollover_phase = "EXPIRY"
+        elif trading_days == 2:
+            rollover_phase = "TRANSITION"
+        elif trading_days <= 5:
+            rollover_phase = "ROLLOVER_WATCH"
+        else:
+            rollover_phase = "NORMAL"
+
+        compiled_rows.append({
+            "symbol": symbol,
+            "date": snap_date,
+            "futures_price": futures_price,
+            "spot_price": spot_price,
+            "basis": basis,
+            "basis_pct": basis_pct,
+            "near_month_oi": near_oi,
+            "next_month_oi": next_oi,
+            "oi_change": int(oi_change),
+            "in_rollover_week": rollover_phase in ("ROLLOVER_WATCH", "TRANSITION", "EXPIRY"),
+            "is_expiry_day": (snap_date == near_expiry),
+            "rollover_pct": rollover_pct,
+            "rollover_phase": rollover_phase,
+            "futures_open": float(near_contract["open_price"]) if near_contract.get("open_price") is not None else None,
+            "futures_high": float(near_contract["high_price"]) if near_contract.get("high_price") is not None else None,
+            "futures_low": float(near_contract["low_price"]) if near_contract.get("low_price") is not None else None,
+            "futures_volume": int(near_contract["volume"]) if near_contract.get("volume") is not None else None,
+        })
+        
+    return compiled_rows
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# validation_states
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_validation_state(symbol: str, validation_date: date) -> dict | None:
+    """Fetch the cached validation state for a symbol on a specific date."""
+    resp = (
+        get_client()
+        .table("validation_states")
+        .select("*")
+        .eq("symbol", symbol)
+        .eq("validation_date", str(validation_date))
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def get_last_passed_validation_date(symbol: str) -> date | None:
+    """Fetch the maximum validation date where status is PASSED."""
+    resp = (
+        get_client()
+        .table("validation_states")
+        .select("validation_date")
+        .eq("symbol", symbol)
+        .eq("status", "PASSED")
+        .order("validation_date", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if resp.data:
+        return date.fromisoformat(resp.data[0]["validation_date"])
+    return None
+
+
+def upsert_validation_state(
+    symbol: str,
+    validation_date: date,
+    run_type: str,
+    status: str,
+    check_results: dict,
+    error_message: str | None = None
+) -> None:
+    """Insert or update the validation state for a symbol and date."""
+    get_client().table("validation_states").upsert({
+        "symbol": symbol,
+        "validation_date": str(validation_date),
+        "run_type": run_type,
+        "status": status,
+        "check_results": check_results,
+        "error_message": error_message,
+        "updated_at": datetime.utcnow().isoformat()
+    }, on_conflict="symbol,validation_date").execute()
+
 
 
 def get_option_history_window(

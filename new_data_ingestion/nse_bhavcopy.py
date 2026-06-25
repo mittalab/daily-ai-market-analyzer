@@ -17,6 +17,19 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from config.constants import (
+    SYMBOL_NIFTY_50,
+    SYMBOL_NIFTY_BANK,
+    SYMBOL_NIFTY_IT,
+    SYMBOL_NIFTY_AUTO,
+    SYMBOL_NIFTY_PHARMA,
+    SYMBOL_NIFTY_FMCG,
+    SYMBOL_NIFTY_METAL,
+    SYMBOL_NIFTY_ENERGY,
+    SYMBOL_NIFTY_FIN_SERVICE,
+    SYMBOL_INDIA_VIX,
+)
+
 logger = logging.getLogger(__name__)
 
 # ── URLs ───────────────────────────────────────────────────────────────────────
@@ -47,24 +60,30 @@ _TRACKED_INDICES = [
     "Nifty Metal",
     "Nifty Energy",
     "Nifty Financial Services",
-    "India VIX",
+    "Nifty India Consumption",
+    "Nifty Infrastructure",
+    "Nifty Media",
 ]
 
 # Normalised symbol names stored in price_history (spaces → underscores)
 _INDEX_SYMBOL_MAP = {
-    "Nifty 50":               "NIFTY_50",
-    "Nifty Bank":             "NIFTY_BANK",
-    "Nifty IT":               "NIFTY_IT",
-    "Nifty Auto":             "NIFTY_AUTO",
-    "Nifty Pharma":           "NIFTY_PHARMA",
-    "Nifty FMCG":             "NIFTY_FMCG",
-    "Nifty Metal":            "NIFTY_METAL",
-    "Nifty Energy":           "NIFTY_ENERGY",
-    "Nifty Financial Services": "NIFTY_FIN_SERVICE",
-    "India VIX":              "INDIA_VIX",
+    "Nifty 50":                 SYMBOL_NIFTY_50,
+    "Nifty Bank":               SYMBOL_NIFTY_BANK,
+    "Nifty IT":                 SYMBOL_NIFTY_IT,
+    "Nifty Auto":               SYMBOL_NIFTY_AUTO,
+    "Nifty Pharma":             SYMBOL_NIFTY_PHARMA,
+    "Nifty FMCG":               SYMBOL_NIFTY_FMCG,
+    "Nifty Metal":              SYMBOL_NIFTY_METAL,
+    "Nifty Energy":             SYMBOL_NIFTY_ENERGY,
+    "Nifty Financial Services": SYMBOL_NIFTY_FIN_SERVICE,
+    "Nifty India Consumption":  "NIFTY_CONSUMPTION",
+    "Nifty Infrastructure":     "NIFTY_INFRA",
+    "Nifty Media":              "NIFTY_MEDIA",
 }
 
 _SECTOR_MAP_PATH = Path(__file__).parent.parent / "config" / "sector_map.json"
+_TMP_DIR = Path(__file__).parent.parent / "tmp"
+_TMP_DIR.mkdir(parents=True, exist_ok=True)
 _sector_map_cache: dict | None = None
 
 
@@ -113,36 +132,43 @@ def fetch_equity_bhavcopy(for_date: date | None = None) -> tuple[pd.DataFrame, d
     Raises ConnectionError on network failure.
     """
     target  = last_trading_day(for_date)
-    nifty50 = get_nifty50_symbols()
 
     for attempt in range(3):
-        url = _EQUITY_URL.format(ddmmyyyy=target.strftime("%d%m%Y"))
-        logger.debug("Equity bhavcopy attempt %d: %s", attempt + 1, url)
+        filename = f"sec_bhavdata_full_{target.strftime('%d%m%Y')}.csv"
+        local_path = _TMP_DIR / filename
 
-        try:
-            r = requests.get(url, headers=_HEADERS, timeout=30)
-        except requests.RequestException as exc:
-            raise ConnectionError(f"Network error fetching equity bhavcopy: {exc}") from exc
+        if local_path.exists():
+            logger.info("Found equity bhavcopy in tmp folder: %s", local_path)
+        else:
+            url = _EQUITY_URL.format(ddmmyyyy=target.strftime("%d%m%Y"))
+            logger.info("Equity bhavcopy not found in tmp folder, downloading: %s", url)
+            logger.debug("Equity bhavcopy attempt %d: %s", attempt + 1, url)
 
-        if r.status_code == 200 and len(r.content) > 1000:
-            df = pd.read_csv(StringIO(r.text))
-            df.columns = df.columns.str.strip()     # spec: always strip after read
-            df = df[
-                (df["SERIES"].str.strip() == "EQ") &
-                (df["SYMBOL"].isin(nifty50))
-            ].copy()
-            logger.info("Equity bhavcopy fetched: %d Nifty 50 rows for %s", len(df), target)
-            return df, target
+            try:
+                r = requests.get(url, headers=_HEADERS, timeout=30)
+            except requests.RequestException as exc:
+                raise ConnectionError(f"Network error fetching equity bhavcopy: {exc}") from exc
 
-        if r.status_code == 404 and attempt < 2:
-            logger.warning("Bhavcopy 404 for %s — trying previous day", target)
-            target = last_trading_day(target - timedelta(days=1))
-            time.sleep(2)
-            continue
+            if r.status_code == 200 and len(r.content) > 1000:
+                local_path.write_bytes(r.content)
+                logger.info("Equity bhavcopy downloaded and saved to tmp: %s", local_path)
+            elif r.status_code == 404 and attempt < 2:
+                logger.warning("Bhavcopy 404 for %s — trying previous day", target)
+                target = last_trading_day(target - timedelta(days=1))
+                time.sleep(2)
+                continue
+            else:
+                raise FileNotFoundError(
+                    f"Equity bhavcopy unavailable for {target}: HTTP {r.status_code}"
+                )
 
-        raise FileNotFoundError(
-            f"Equity bhavcopy unavailable for {target}: HTTP {r.status_code}"
-        )
+        df = pd.read_csv(local_path)
+        df.columns = df.columns.str.strip()     # spec: always strip after read
+        df = df[
+            (df["SERIES"].str.strip() == "EQ")
+        ].copy()
+        logger.info("Equity bhavcopy processed: %d Nifty 50 rows for %s", len(df), target)
+        return df, target
 
     raise FileNotFoundError("Equity bhavcopy unavailable after all retries")
 
@@ -177,45 +203,47 @@ def fetch_indices_bhavcopy(for_date: date | None = None) -> tuple[dict, date]:
     target = last_trading_day(for_date)
 
     for attempt in range(3):
-        url = _INDICES_URL.format(ddmmyyyy=target.strftime("%d%m%Y"))
-        logger.debug("Indices bhavcopy attempt %d: %s", attempt + 1, url)
+        filename = f"ind_close_all_{target.strftime('%d%m%Y')}.csv"
+        local_path = _TMP_DIR / filename
 
-        try:
-            r = requests.get(url, headers=_HEADERS, timeout=30)
-        except requests.RequestException as exc:
-            raise ConnectionError(f"Network error fetching indices bhavcopy: {exc}") from exc
+        if local_path.exists():
+            logger.info("Found indices bhavcopy in tmp folder: %s", local_path)
+        else:
+            url = _INDICES_URL.format(ddmmyyyy=target.strftime("%d%m%Y"))
+            logger.info("Indices bhavcopy not found in tmp folder, downloading: %s", url)
+            logger.debug("Indices bhavcopy attempt %d: %s", attempt + 1, url)
 
-        if r.status_code == 200 and len(r.content) > 500:
-            df = pd.read_csv(StringIO(r.text))
-            df.columns = df.columns.str.strip()          # spec: always strip
-            df["Index Name"] = df["Index Name"].str.strip()
-            df = df.set_index("Index Name")
+            try:
+                r = requests.get(url, headers=_HEADERS, timeout=30)
+            except requests.RequestException as exc:
+                raise ConnectionError(f"Network error fetching indices bhavcopy: {exc}") from exc
 
-            result: dict[str, float] = {}
-            for idx_name in _TRACKED_INDICES:
-                if idx_name in df.index:
-                    result[idx_name] = float(df.loc[idx_name, "Closing Index Value"])
-                else:
-                    logger.warning("Index '%s' not found in bhavcopy", idx_name)
+            if r.status_code == 200 and len(r.content) > 500:
+                local_path.write_bytes(r.content)
+                logger.info("Indices bhavcopy downloaded and saved to tmp: %s", local_path)
+            elif r.status_code == 404 and attempt < 2:
+                logger.warning("Indices 404 for %s — trying previous day", target)
+                target = last_trading_day(target - timedelta(days=1))
+                time.sleep(2)
+                continue
+            else:
+                raise FileNotFoundError(
+                    f"Indices bhavcopy unavailable for {target}: HTTP {r.status_code}"
+                )
 
-            vix = result.get("India VIX")
-            logger.info(
-                "Indices bhavcopy fetched for %s — VIX: %s, Nifty50: %s",
-                target,
-                vix,
-                result.get("Nifty 50"),
-            )
-            return result, target
+        df = pd.read_csv(local_path)
+        df.columns = df.columns.str.strip()          # spec: always strip
+        df["Index Name"] = df["Index Name"].str.strip()
+        df = df.set_index("Index Name")
 
-        if r.status_code == 404 and attempt < 2:
-            logger.warning("Indices 404 for %s — trying previous day", target)
-            target = last_trading_day(target - timedelta(days=1))
-            time.sleep(2)
-            continue
+        result: dict[str, float] = {}
+        for idx_name in _TRACKED_INDICES:
+            if idx_name in df.index:
+                result[idx_name] = float(df.loc[idx_name, "Closing Index Value"])
+            else:
+                logger.warning("Index '%s' not found in bhavcopy", idx_name)
 
-        raise FileNotFoundError(
-            f"Indices bhavcopy unavailable for {target}: HTTP {r.status_code}"
-        )
+        return result, target
 
     raise FileNotFoundError("Indices bhavcopy unavailable after all retries")
 

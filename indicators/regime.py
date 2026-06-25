@@ -10,6 +10,7 @@ import pandas as pd
 from indicators.technical import calculate_ema
 
 
+#AI: Can we use claude AI to determine the Market Regime
 def detect_regime(nifty_df: pd.DataFrame, vix_series: pd.Series) -> str:
     """
     Classify current market regime from spec Section 11.

@@ -32,7 +32,7 @@ from database.queries import (
     get_trade_setups_by_date,
     update_trade_setup,
 )
-from integrations.telegram import send_paper_trade_outcome
+from new_notifications.telegram import send_paper_trade_outcome
 
 logger = logging.getLogger(__name__)
 

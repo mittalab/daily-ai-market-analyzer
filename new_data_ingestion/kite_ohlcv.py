@@ -2,9 +2,9 @@
 Kite Connect — historical OHLCV for Nifty 50 equity stocks.
 
 Credentials from .env: KITE_API_KEY.
-Access token loaded from Supabase kite_tokens table (not a file).
-Rate limit: 0.35s between calls (~3 req/sec — confirmed safe).
-Lookback: 180 calendar days (spec: 6 months).
+Access token loaded from Supabase kite_tokens table.
+Rate limit: 0.35s between calls.
+Lookback: 180 calendar days.
 """
 import logging
 import os
@@ -18,15 +18,12 @@ from kiteconnect import KiteConnect
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# ── Instrument master cache (process-lifetime, fetched once per pipeline run) ──
+# ── Instrument master cache ──
 _instrument_cache: dict[str, pd.DataFrame] = {}
 
 
 def get_kite(access_token: str) -> KiteConnect:
-    """
-    Return an authenticated KiteConnect instance.
-    Caller provides the access token (loaded from Supabase by data_ingestion).
-    """
+    """Return an authenticated KiteConnect instance."""
     api_key = os.getenv("KITE_API_KEY")
     if not api_key:
         raise RuntimeError("KITE_API_KEY not set in .env")
@@ -36,10 +33,7 @@ def get_kite(access_token: str) -> KiteConnect:
 
 
 def get_instruments(kite: KiteConnect, exchange: str = "NSE") -> pd.DataFrame:
-    """
-    Load instrument master for exchange. Cached for the process lifetime.
-    NEVER call per symbol — fetches ~4 MB once and caches.
-    """
+    """Load instrument master for exchange. Cached for the process lifetime."""
     if exchange not in _instrument_cache:
         logger.info("Loading %s instruments master (~4MB)...", exchange)
         _instrument_cache[exchange] = pd.DataFrame(kite.instruments(exchange))
@@ -65,11 +59,7 @@ def fetch_ohlcv(
     from_date: date,
     to_date: date,
 ) -> pd.DataFrame:
-    """
-    Fetch daily OHLCV for an instrument token.
-    Returns DataFrame: date, open, high, low, close, volume.
-    Date column is timezone-aware (+05:30) — use .dt.date for comparisons.
-    """
+    """Fetch daily OHLCV for an instrument token."""
     raw = kite.historical_data(
         instrument_token=instrument_token,
         from_date=str(from_date),
@@ -87,12 +77,7 @@ def fetch_ohlcv_all(
     symbols: list[str],
     days: int = 180,
 ) -> dict[str, pd.DataFrame]:
-    """
-    Fetch 6-month daily OHLCV for all Nifty 50 symbols.
-
-    Returns {symbol: DataFrame}. Failed symbols get empty DataFrame.
-    Sleeps 0.35s between calls (confirmed ~3 req/sec safe rate).
-    """
+    """Fetch daily OHLCV for all target symbols."""
     to_date   = date.today()
     from_date = to_date - timedelta(days=days)
     results: dict[str, pd.DataFrame] = {}
@@ -114,33 +99,25 @@ def fetch_ohlcv_all(
 
 
 def get_option_symbols(kite: KiteConnect, symbol: str, expiries_count: int = 2) -> pd.DataFrame:
-    """
-    Fetch all NFO option instruments for a symbol, filtered by first N expiries.
-    """
+    """Fetch all NFO option instruments for a symbol, filtered by first N expiries."""
     df = get_instruments(kite, "NFO")
     if df.empty:
         return pd.DataFrame()
     
-    # Filter for options of this symbol
     options = df[(df["name"] == symbol) & (df["segment"] == "NFO-OPT")].copy()
     if options.empty:
         return pd.DataFrame()
     
-    # Identify first two expiries
     expiries = sorted(options["expiry"].unique())[:expiries_count]
     return options[options["expiry"].isin(expiries)]
 
 
 def fetch_option_quotes(kite: KiteConnect, instruments: pd.DataFrame) -> dict:
-    """
-    Fetch real-time quotes (LTP, OI) for a list of instrument tokens.
-    Kite allows up to 500 tokens per quote call.
-    """
+    """Fetch real-time quotes (LTP, OI) for option instruments."""
     if instruments.empty:
         return {}
     
     tokens = [f"NFO:{s}" for s in instruments["tradingsymbol"].tolist()]
-    # Batch in 500s if needed (but Nifty 50 per stock options < 500)
     try:
         quotes = kite.quote(tokens)
         return quotes
@@ -154,7 +131,6 @@ def ohlcv_to_price_rows(symbol: str, df: pd.DataFrame) -> list[dict]:
     rows = []
     for _, row in df.iterrows():
         dt = row["date"]
-        # Kite returns timezone-aware datetimes — extract just the date
         if hasattr(dt, "date"):
             dt = dt.date()
         rows.append({

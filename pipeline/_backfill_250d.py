@@ -13,6 +13,7 @@ from integrations.kite_oauth import get_authenticated_kite
 from integrations.kite_ohlcv import fetch_ohlcv, get_equity_token, ohlcv_to_price_rows, get_instruments
 from integrations.nse_bhavcopy import get_nifty50_symbols
 from database.queries import upsert_price_history, get_row_count
+from config.constants import SYMBOL_NIFTY_50, SYMBOL_INDIA_VIX
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def run_backfill():
     symbols = list(get_nifty50_symbols())
     
     # Add main indices
-    indices = ["NIFTY_50", "INDIA_VIX"]
+    indices = [SYMBOL_NIFTY_50, SYMBOL_INDIA_VIX]
     
     # Add sector indices from map
     try:

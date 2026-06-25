@@ -17,7 +17,7 @@ import pytz
 
 from integrations.nse_bhavcopy import get_nifty50_symbols, last_trading_day
 from pipeline.oi_series_builder import run_oi_series_builder
-from pipeline.market_regime import run_market_regime
+from pipeline.market_regime import get_index_indicators
 from pipeline.level1_filter import run_level1_filter, fetch_nse_earnings_window
 from database.queries import create_analysis_session, update_analysis_session, get_analysis_session
 
@@ -71,29 +71,22 @@ update_analysis_session(session_id, {
     }
 })
 
-# ── STAGE 2.6: Market Regime ──────────────────────────────────────────────────
-print("\n[STAGE 2.6] Market Regime Detection...")
-regime_result = run_market_regime(analysis_date)
-print(f"  Regime        : {regime_result['regime']}")
-print(f"  Nifty close   : {regime_result['nifty_close']}")
-print(f"  EMA20         : {regime_result['ema20']}")
-print(f"  EMA50         : {regime_result['ema50']}")
-print(f"  20-day return : {regime_result['ret20d']}%")
-print(f"  VIX           : {regime_result['vix']}")
-print(f"  Fallback      : {regime_result['fallback']}")
-print(f"  Favour        : {regime_result['guidance']['favour']}")
-print(f"  Caution       : {regime_result['guidance']['caution']}")
+# ── STAGE 2.6: Index Indicators ───────────────────────────────────────────────
+print("\n[STAGE 2.6] Index Indicators...")
+nifty = get_index_indicators(analysis_date, "NIFTY_50")
+vix   = get_index_indicators(analysis_date, "INDIA_VIX")
+print(f"  Nifty close   : {nifty['close']}")
+print(f"  EMA20         : {nifty['ema20']}")
+print(f"  EMA50         : {nifty['ema50']}")
+print(f"  20-day return : {nifty['ret20d']}%")
+print(f"  VIX close     : {vix['close']}")
 
 update_analysis_session(session_id, {
-    "market_regime": regime_result["regime"],
-    "nifty_close":   regime_result["nifty_close"],
-    "vix_close":     regime_result["vix"],
+    "nifty_close":   nifty["close"],
+    "vix_close":     vix["close"],
     "stage_statuses": {
         "data_ingestion": "COMPLETE",
         "oi_series":      "COMPLETE" if not oi_result["errors"] else "PARTIAL",
-        "regime_detect":  "COMPLETE",
-        "regime_value":   regime_result["regime"],
-        "regime_fallback": regime_result["fallback"],
     }
 })
 
@@ -123,15 +116,13 @@ for e in l1_result["eliminated"]:
 # ── STEP 5: Final session update ──────────────────────────────────────────────
 update_analysis_session(session_id, {
     "stocks_level1_passed": len(l1_result["passed"]),
-    "nifty_close":          regime_result["nifty_close"],
-    "vix_close":            regime_result["vix"],
-    "market_regime":        regime_result["regime"],
+    "nifty_close":          nifty["close"],
+    "vix_close":            vix["close"],
     "status":               "PRE_PROCESSING_COMPLETE",
     "stage_statuses": {
         "data_ingestion": "COMPLETE",
         "level1_filter":  "COMPLETE" if not l1_result["errors"] else "PARTIAL",
         "oi_series":      "COMPLETE" if not oi_result["errors"] else "PARTIAL",
-        "regime_detect":  "COMPLETE",
         "l1_passed":      len(l1_result["passed"]),
         "l1_eliminated":  len(l1_result["eliminated"]),
         "eliminated_list": [e["symbol"] for e in l1_result["eliminated"]],
@@ -144,7 +135,7 @@ print("WEEK 3 INTEGRATION TEST — SUMMARY")
 print("=" * 60)
 print(f"Date           : {analysis_date}")
 print(f"Session ID     : {session_id}")
-print(f"Market Regime  : {regime_result['regime']}  (VIX={regime_result['vix']})")
+print(f"Nifty close    : {nifty['close']}  (VIX={vix['close']})")
 print(f"OI Rows Stored : {oi_result['stored']}")
 print(f"Level 1 Passed : {len(l1_result['passed'])} / {len(symbols)}")
 print(f"Eliminated     : {[e['symbol'] for e in l1_result['eliminated']]}")

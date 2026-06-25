@@ -32,20 +32,10 @@ from integrations.nse_bhavcopy import (
     last_trading_day,
 )
 from database.queries import get_client, upsert_price_history
+from config.constants import TRACKED_INDICES
 
 # Target symbols (stored with underscores in price_history)
-TARGET_SYMBOLS = {
-    "NIFTY_50",
-    "NIFTY_BANK",
-    "NIFTY_IT",
-    "NIFTY_AUTO",
-    "NIFTY_PHARMA",
-    "NIFTY_FMCG",
-    "NIFTY_METAL",
-    "NIFTY_ENERGY",
-    "NIFTY_FIN_SERVICE",
-    "INDIA_VIX",
-}
+TARGET_SYMBOLS = TRACKED_INDICES
 
 LOOKBACK_DAYS = 250
 

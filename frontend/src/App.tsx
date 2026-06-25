@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import BottomNav, { type Screen } from './components/BottomNav';
+import ChatWidget from './components/ChatWidget';
 import TodayScreen from './screens/TodayScreen';
 import WatchlistScreen from './screens/WatchlistScreen';
 import AnalyseScreen from './screens/AnalyseScreen';
@@ -22,6 +23,7 @@ export default function App() {
         </main>
         <BottomNav active={screen} onChange={setScreen} />
       </div>
+      <ChatWidget />
     </div>
   );
 }

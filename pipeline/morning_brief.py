@@ -21,7 +21,7 @@ from database.queries import (
     get_watchlist,
     get_recent_setups_for_symbol
 )
-from integrations.telegram import send_loud, send_silent
+from new_notifications.telegram import send_loud, send_silent
 
 logger = logging.getLogger(__name__)
 

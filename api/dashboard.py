@@ -1,19 +1,28 @@
 """
 Dashboard API endpoints — read-only queries for the React frontend.
 
-GET /api/today          — market context + today's setups
-GET /api/setup/{id}     — full setup detail
-GET /api/positions      — live Kite positions
-GET /api/watchlist      — watchlist_staging entries
-GET /api/system/status  — scheduler, token, DB health
+GET  /api/today                       — market context + today's setups
+GET  /api/setup/{id}                  — full setup detail
+GET  /api/positions                   — live Kite positions
+GET  /api/watchlist                   — watchlist_staging entries
+GET  /api/system/status               — scheduler, token, DB health
+GET  /api/session/today/chat-context  — plain-text context for Claude.ai paste
+POST /api/chat                        — in-widget chat with Claude (Sonnet)
 """
+import json
 import logging
+import os
+import time
 from datetime import date, datetime, timezone
 
+import anthropic
 import pytz
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
 
 from database.queries import (
+    get_latest_fii_dii,
     get_latest_session,
     get_open_trade_setups,
     get_trade_setup,
@@ -25,6 +34,14 @@ from database.queries import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["dashboard"])
 IST    = pytz.timezone("Asia/Kolkata")
+
+_CHAT_MODEL   = "claude-sonnet-4-6"
+_CHAT_BACKOFF = [5, 10, 20]          # seconds between retries
+
+
+class ChatRequest(BaseModel):
+    messages:   list[dict]       # [{"role": "user"|"assistant", "content": str}]
+    session_id: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -260,6 +277,493 @@ async def add_to_watchlist(body: dict):
     })
     logger.info("Watchlist: manually added %s", symbol)
     return {"status": "added", "symbol": symbol}
+
+
+# ── GET /api/session/today/chat-context ──────────────────────────────────────
+
+def _strip_json_fences(text: str) -> str:
+    """Remove markdown ```json ... ``` fences — same logic as get_deep_analysis_turns."""
+    t = text.strip()
+    if t.startswith("```"):
+        nl = t.find("\n")
+        t  = t[nl + 1:] if nl != -1 else t[3:]
+    if t.endswith("```"):
+        t = t[:-3]
+    return t.strip()
+
+
+def _fmt_val(v, prefix: str = "") -> str:
+    """Return a display string for a value that may be None/null."""
+    if v is None:
+        return "Not available"
+    return f"{prefix}{v}"
+
+
+def _fmt_date(d) -> str:
+    """Format a date or date-string as '07 Jun 2026'."""
+    try:
+        if isinstance(d, str):
+            d = date.fromisoformat(d)
+        return d.strftime("%d %b %Y")
+    except Exception:
+        return str(d) if d else "Not available"
+
+
+def _format_chat_context(
+    session: dict,
+    turn1: dict | None,
+    turn2: list | None,
+    setups: list[dict],
+    fii_row: dict | None,
+) -> str:
+    session_date_str = _fmt_date(session.get("session_date"))
+    generated_at     = datetime.now(IST).strftime("%H:%M")
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    lines: list[str] = [
+        "═══════════════════════════════════════════════════",
+        f"SWING TRADING ANALYSIS — {session_date_str}",
+        "Complete context for Claude.ai discussion",
+        f"Generated: {generated_at} IST",
+        "═══════════════════════════════════════════════════",
+        "",
+        "INSTRUCTIONS FOR CLAUDE:",
+        "You are the AI analyst who performed tonight's",
+        "swing trading analysis for Indian F&O markets.",
+        "The user wants to discuss, question, or challenge",
+        "your recommendations. You have complete knowledge",
+        "of all data and reasoning shown below.",
+        "",
+        "Be direct and honest. If the user raises a valid",
+        "point that challenges your analysis, acknowledge",
+        "it. If they provide new information (news, intraday",
+        "data), factor it into your response.",
+        "",
+        "You are analysing Nifty 50 stocks for swing trades",
+        "using stock options (CE for long, PE for short).",
+        "Capital: Rs 5,00,000 | Risk per trade: 2-3%",
+        "Min R:R: 1:2 | Max concurrent trades: 3",
+        "",
+    ]
+
+    # ── Market context ────────────────────────────────────────────────────────
+    lines += [
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "MARKET CONTEXT TONIGHT",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+        f"Date        : {session_date_str}",
+        f"Regime      : {_fmt_val(session.get('market_regime'))}",
+        f"Nifty Close : {_fmt_val(session.get('nifty_close'))}",
+        f"VIX         : {_fmt_val(session.get('vix_close'))}",
+        f"FII Flow    : {_fmt_val(fii_row.get('fii_net_cr') if fii_row else None)} Cr",
+        f"DII Flow    : {_fmt_val(fii_row.get('dii_net_cr') if fii_row else None)} Cr",
+        "",
+    ]
+
+    if turn1:
+        narrative = turn1.get("session_narrative") or ""
+        risk_flags = turn1.get("risk_flags") or []
+        favourable = turn1.get("favourable_setups") or "Not available"
+        levels     = turn1.get("index_key_levels") or {}
+        support    = levels.get("support",    "Not available")
+        resistance = levels.get("resistance", "Not available")
+
+        lines.append(f"Your Market Narrative:")
+        lines.append(narrative if narrative else "Not available")
+        lines.append("")
+        lines.append("Risk Flags You Identified:")
+        if risk_flags:
+            for flag in risk_flags:
+                lines.append(f"  • {flag}")
+        else:
+            lines.append("  Not available")
+        lines.append("")
+        lines.append(f"Favourable Setups : {favourable}")
+        lines.append(f"Key Support       : {support}")
+        lines.append(f"Key Resistance    : {resistance}")
+    else:
+        lines.append("Market narrative not available.")
+
+    lines.append("")
+
+    # ── Setups ────────────────────────────────────────────────────────────────
+    total = len(setups)
+    lines += [
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"TONIGHT'S RECOMMENDATIONS ({total} setups)",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+    ]
+
+    for s in setups:
+        symbol    = s.get("symbol") or "UNKNOWN"
+        direction = s.get("direction") or "?"
+        stage     = s.get("stage") or "?"
+
+        lines.append(f"─── {symbol} | {direction} | {stage} ───────────")
+        lines.append(f"Conviction : {_fmt_val(s.get('conviction_score'))}/100")
+        lines.append(f"Setup      : {_fmt_val(s.get('setup_type'))} ({_fmt_val(s.get('setup_maturity'))})")
+        lines.append(
+            f"Instrument : {_fmt_val(s.get('option_type'))} {_fmt_val(s.get('strike'))}"
+            f" expiry {_fmt_date(s.get('expiry_date'))}"
+            f" ({_fmt_val(s.get('days_to_expiry_at_flag'))} trading days)"
+        )
+        lines.append(f"IV Context : {_fmt_val(s.get('iv_assessment'))}")
+        lines.append(f"Rollover   : {_fmt_val(s.get('rollover_phase'))} at time of analysis")
+        lines.append("")
+        lines.append(f"Entry Zone : Rs {_fmt_val(s.get('entry_zone_low'))} to Rs {_fmt_val(s.get('entry_zone_high'))}")
+        lines.append(f"Stop Loss  : Rs {_fmt_val(s.get('stop_loss_premium'))}")
+        lines.append(f"Target 1   : Rs {_fmt_val(s.get('target_1_premium'))} (50% exit)")
+        lines.append(f"Target 2   : Rs {_fmt_val(s.get('target_2_premium'))} (full exit)")
+        lines.append(f"Underlying SL : Rs {_fmt_val(s.get('underlying_stop'))}")
+        lines.append("")
+        lines.append(f"Position   : {_fmt_val(s.get('lots'))} lots x {_fmt_val(s.get('lot_size'))}")
+        lines.append(f"Max Risk   : Rs {_fmt_val(s.get('max_risk_inr'))} ({_fmt_val(s.get('risk_pct_capital'))}% of capital)")
+        lines.append(f"R:R Ratio  : 1:{_fmt_val(s.get('risk_reward'))}")
+        lines.append("")
+
+        # Scoring breakdown
+        sb = s.get("scoring_breakdown") or {}
+        if isinstance(sb, str):
+            try:
+                sb = json.loads(sb)
+            except Exception:
+                sb = {}
+        lines.append("Scoring:")
+        lines.append(f"  Price Structure    {sb.get('price_structure', 'N/A')}/30")
+        lines.append(f"  Momentum/Volume    {sb.get('momentum_volume', 'N/A')}/25")
+        lines.append(f"  Index F&O Context  {sb.get('index_fo_context', 'N/A')}/25")
+        lines.append(f"  Stock F&O          {sb.get('stock_fo', 'N/A')}/10")
+        lines.append(f"  Market Context     {sb.get('market_context', 'N/A')}/10")
+        lines.append(f"  TOTAL              {_fmt_val(s.get('conviction_score'))}/100")
+        lines.append("")
+
+        # Signals
+        signals = s.get("signals_contributing") or []
+        lines.append("Signals That Contributed:")
+        if signals:
+            for sig in signals:
+                lines.append(f"  • {sig}")
+        else:
+            lines.append("  Not available")
+        lines.append("")
+
+        lines.append("Your Full Analysis:")
+        lines.append(s.get("claude_full_rationale") or "Not available")
+        lines.append("")
+        lines.append("Mentor Explanation:")
+        lines.append(s.get("mentor_explanation") or "Not available")
+        lines.append("")
+        lines.append("Why This Could Be Wrong:")
+        lines.append(s.get("why_could_be_wrong") or "Not available")
+        lines.append("")
+        lines.append("Key Learning:")
+        lines.append(s.get("key_learning_today") or "Not available")
+        lines.append("")
+        paper = s.get("paper_outcome") or "Monitoring"
+        lines.append(f"Paper Trade Status: {paper}")
+        lines.append("")
+
+    # ── Pre-scan summary ──────────────────────────────────────────────────────
+    lines += [
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "PRE-SCAN SUMMARY",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+        f"Stocks Level 1 passed : {_fmt_val(session.get('stocks_level1_passed'))}",
+    ]
+
+    forwarded: list[dict] = []
+    skipped:   list[dict] = []
+    if turn2:
+        for stock in turn2:
+            if stock.get("forward_to_deep"):
+                forwarded.append(stock)
+            else:
+                skipped.append(stock)
+    deep_count = len([s for s in setups])  # one setup per deep-analysed symbol
+
+    lines.append(f"Forwarded for deep    : {len(forwarded)}")
+    lines.append(f"Deep analysed         : {deep_count}")
+    lines.append("")
+
+    lines.append("Forwarded stocks:")
+    if forwarded:
+        for stock in forwarded:
+            sym  = stock.get("symbol", "?")
+            dire = stock.get("direction", "?")
+            pri  = stock.get("priority", "?")
+            lines.append(f"  {sym} - {dire} - {pri}")
+    else:
+        lines.append("  Not available")
+    lines.append("")
+
+    lines.append("Notable skips:")
+    if skipped:
+        for stock in skipped[:10]:
+            sym    = stock.get("symbol", "?")
+            reason = stock.get("pre_scan_reasoning") or "No reason given"
+            # Keep to one line
+            reason = reason.replace("\n", " ")[:120]
+            lines.append(f"  {sym}: {reason}")
+    else:
+        lines.append("  Not available")
+    lines.append("")
+
+    # ── Session info ──────────────────────────────────────────────────────────
+    lines += [
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "SESSION INFO",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+        f"Session ID   : {_fmt_val(session.get('session_id'))}",
+        f"Session Date : {session_date_str}",
+        f"Analysis Cost: ${_fmt_val(session.get('claude_cost_usd'))}",
+        "",
+        "═══════════════════════════════════════════════════",
+        f"End of analysis context — {session_date_str}",
+        "═══════════════════════════════════════════════════",
+    ]
+
+    return "\n".join(lines)
+
+
+@router.get("/session/today/chat-context", response_class=PlainTextResponse)
+async def get_chat_context(response: Response):
+    """
+    Returns plain-text analysis context formatted for pasting into Claude.ai.
+    Frontend uses response headers (X-Session-Date, X-Session-Id, X-Generated-At)
+    for staleness detection — HEAD requests work without downloading the body.
+    """
+    from database.client import get_client
+
+    # 1. Most recent ANALYSIS_COMPLETE session
+    try:
+        res = (
+            get_client()
+            .table("analysis_sessions")
+            .select("*")
+            .eq("status", "ANALYSIS_COMPLETE")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("chat-context: DB error fetching session: %s", exc)
+        raise HTTPException(status_code=500, detail="Database error")
+
+    if not res.data:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "no_session", "message": "No completed analysis found. Pipeline runs at 10 PM tonight."},
+        )
+    session    = res.data[0]
+    session_id = session["session_id"]
+    session_date = date.fromisoformat(str(session["session_date"]))
+
+    # 2. Fetch market_context + prescan turns
+    turn1_data: dict | None = None
+    turn2_data: list | None = None
+    try:
+        turns_res = (
+            get_client()
+            .table("session_claude_turns")
+            .select("turn_type,output_text")
+            .eq("session_id", session_id)
+            .in_("turn_type", ["market_context", "prescan"])
+            .execute()
+        )
+        for row in turns_res.data:
+            try:
+                parsed = json.loads(_strip_json_fences(row["output_text"] or ""))
+                if row["turn_type"] == "market_context":
+                    turn1_data = parsed if isinstance(parsed, dict) else None
+                elif row["turn_type"] == "prescan":
+                    turn2_data = parsed if isinstance(parsed, list) else None
+            except Exception as parse_exc:
+                logger.warning("chat-context: parse failure for turn_type=%s: %s", row["turn_type"], parse_exc)
+    except Exception as exc:
+        logger.warning("chat-context: failed to fetch turns: %s", exc)
+
+    # 3. Trade setups ordered by conviction DESC
+    setups = get_trade_setups_by_date(session_date)
+    setups.sort(key=lambda s: s.get("conviction_score") or 0, reverse=True)
+
+    # 4. FII/DII
+    fii_row: dict | None = None
+    try:
+        fii_row = get_latest_fii_dii()
+    except Exception as exc:
+        logger.warning("chat-context: FII fetch failed: %s", exc)
+
+    # 5. Format
+    text = _format_chat_context(session, turn1_data, turn2_data, setups, fii_row)
+
+    # 6. Set headers so frontend can check session availability via HEAD
+    now_ist = datetime.now(IST)
+    response.headers["X-Session-Date"]  = str(session["session_date"])
+    response.headers["X-Session-Id"]    = session_id
+    response.headers["X-Generated-At"]  = now_ist.isoformat()
+
+    return PlainTextResponse(content=text, headers=dict(response.headers))
+
+
+# ── POST /api/chat ────────────────────────────────────────────────────────────
+
+@router.post("/chat")
+async def chat(body: ChatRequest):
+    """
+    In-widget chat endpoint. Accepts a message history, prepends the full analysis
+    context as a cached system prompt, and returns Claude Sonnet's reply.
+
+    Stateless — caller is responsible for sending the full conversation history.
+    History is capped at 20 exchanges to bound token use.
+    """
+    from database.client import get_client
+
+    # ── Validate messages ─────────────────────────────────────────────────────
+    messages = body.messages
+    if not messages:
+        raise HTTPException(status_code=422, detail="messages must not be empty")
+    if messages[-1].get("role") != "user":
+        raise HTTPException(status_code=422, detail="last message must have role=user")
+
+    # Cap at 20 exchanges (40 messages) — keep most recent
+    if len(messages) > 40:
+        messages = messages[-40:]
+
+    # Sanitise: only allow role/content keys, block anything else
+    clean_messages = [
+        {"role": m["role"], "content": str(m["content"])}
+        for m in messages
+        if m.get("role") in ("user", "assistant")
+    ]
+    if not clean_messages:
+        raise HTTPException(status_code=422, detail="no valid messages after sanitisation")
+
+    # ── Build system prompt (reuse chat-context data pipeline) ────────────────
+    try:
+        # Find the target session
+        if body.session_id:
+            res = (
+                get_client()
+                .table("analysis_sessions")
+                .select("*")
+                .eq("session_id", body.session_id)
+                .limit(1)
+                .execute()
+            )
+        else:
+            res = (
+                get_client()
+                .table("analysis_sessions")
+                .select("*")
+                .eq("status", "ANALYSIS_COMPLETE")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+    except Exception as exc:
+        logger.error("chat: DB error fetching session: %s", exc)
+        raise HTTPException(status_code=500, detail="Database error")
+
+    if not res.data:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "no_session", "message": "No completed analysis found."},
+        )
+    session      = res.data[0]
+    session_id   = session["session_id"]
+    session_date = date.fromisoformat(str(session["session_date"]))
+
+    # Fetch turns, setups, FII/DII (same as get_chat_context)
+    turn1_data: dict | None = None
+    turn2_data: list | None = None
+    try:
+        turns_res = (
+            get_client()
+            .table("session_claude_turns")
+            .select("turn_type,output_text")
+            .eq("session_id", session_id)
+            .in_("turn_type", ["market_context", "prescan"])
+            .execute()
+        )
+        for row in turns_res.data:
+            try:
+                parsed = json.loads(_strip_json_fences(row["output_text"] or ""))
+                if row["turn_type"] == "market_context":
+                    turn1_data = parsed if isinstance(parsed, dict) else None
+                elif row["turn_type"] == "prescan":
+                    turn2_data = parsed if isinstance(parsed, list) else None
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.warning("chat: turn fetch failed: %s", exc)
+
+    setups = get_trade_setups_by_date(session_date)
+    setups.sort(key=lambda s: s.get("conviction_score") or 0, reverse=True)
+
+    fii_row: dict | None = None
+    try:
+        fii_row = get_latest_fii_dii()
+    except Exception:
+        pass
+
+    system_prompt = _format_chat_context(session, turn1_data, turn2_data, setups, fii_row)
+
+    # ── Call Claude with retry ────────────────────────────────────────────────
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
+
+    client  = anthropic.Anthropic(api_key=api_key, max_retries=0)
+    last_exc: Exception | None = None
+
+    for attempt, backoff in enumerate([0] + _CHAT_BACKOFF):
+        if backoff:
+            time.sleep(backoff)
+        try:
+            response = client.messages.create(
+                model=_CHAT_MODEL,
+                max_tokens=1024,
+                system=[{
+                    "type":          "text",
+                    "text":          system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }],
+                messages=clean_messages,
+            )
+            break
+        except anthropic.RateLimitError as exc:
+            last_exc = exc
+            logger.warning("chat: rate-limit attempt %d: %s", attempt + 1, exc)
+        except anthropic.APIStatusError as exc:
+            if exc.status_code >= 500:
+                last_exc = exc
+                logger.warning("chat: API %d attempt %d: %s", exc.status_code, attempt + 1, exc)
+            else:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc))
+        except anthropic.APIConnectionError as exc:
+            last_exc = exc
+            logger.warning("chat: connection error attempt %d: %s", attempt + 1, exc)
+    else:
+        logger.error("chat: all retries exhausted: %s", last_exc)
+        raise HTTPException(status_code=503, detail="Claude API unavailable after retries")
+
+    reply        = response.content[0].text
+    input_tokens = response.usage.input_tokens
+    output_tokens = response.usage.output_tokens
+    # Sonnet pricing: $3/1M input, $15/1M output
+    cost_usd     = round(input_tokens / 1_000_000 * 3.0 + output_tokens / 1_000_000 * 15.0, 6)
+
+    return {
+        "reply":         reply,
+        "input_tokens":  input_tokens,
+        "output_tokens": output_tokens,
+        "cost_usd":      cost_usd,
+        "session_id":    session_id,
+    }
 
 
 # ── GET /api/system/status ────────────────────────────────────────────────────

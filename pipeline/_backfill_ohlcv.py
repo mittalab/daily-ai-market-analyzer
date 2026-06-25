@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 from database.queries import get_client, upsert_price_history
 from integrations.kite_oauth import get_authenticated_kite, validate_token
+from config.constants import SYMBOL_INDIA_VIX
 from integrations.kite_ohlcv import fetch_ohlcv, get_equity_token, ohlcv_to_price_rows
 from integrations.nse_bhavcopy import get_nifty50_symbols
 
@@ -39,7 +40,7 @@ def get_distinct_equity_symbols() -> list[str]:
     resp = client.table("price_history").select("symbol").execute()
     db_syms = {r["symbol"] for r in resp.data}
     # Exclude index symbols
-    equity_syms = {s for s in db_syms if not s.startswith("NIFTY_") and s != "INDIA_VIX"}
+    equity_syms = {s for s in db_syms if not s.startswith("NIFTY_") and s != SYMBOL_INDIA_VIX}
     # Union with Nifty50
     all_syms = sorted(set(nifty50) | equity_syms)
     return all_syms

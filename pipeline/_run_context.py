@@ -5,7 +5,7 @@ import logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s - %(message)s")
 
 from integrations.nse_bhavcopy import last_trading_day
-from pipeline.market_regime import run_market_regime
+from pipeline.market_regime import get_index_indicators
 from pipeline.context_builder import build_context_bundle
 
 analysis_date = last_trading_day()
@@ -13,8 +13,8 @@ session_id    = f"SESSION_{analysis_date.strftime('%Y%m%d')}"
 
 print(f"Building context bundle for {session_id} ({analysis_date})...")
 
-regime_result = run_market_regime(analysis_date)
-bundle        = build_context_bundle(analysis_date, session_id, regime_result=regime_result)
+# Pass regime_result=None as it is computed dynamically by Claude Turn 1
+bundle        = build_context_bundle(analysis_date, session_id, regime_result=None)
 
 rc = bundle.get("rollover_context")
 

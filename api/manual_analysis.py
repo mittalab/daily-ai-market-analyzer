@@ -40,7 +40,9 @@ from indicators.technical import (
     calculate_rsi,
     volume_ratio,
 )
-from integrations.nse_bhavcopy import get_nifty50_symbols, last_trading_day
+from new_data_ingestion.nse_bhavcopy import get_nifty50_symbols, last_trading_day
+
+from config.constants import SYMBOL_NIFTY_50, SYMBOL_INDIA_VIX, NIFTY_50_DAYS, INDIA_VIX_DAYS, FII_DII_DAYS
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -144,7 +146,7 @@ def _fetch_lot_size_from_kite(symbol: str) -> int | None:
     Returns None if Kite token is unavailable or symbol has no futures contract.
     """
     try:
-        from integrations.kite_oauth import get_authenticated_kite
+        from new_data_ingestion.kite_oauth import get_authenticated_kite
         kite = get_authenticated_kite()
         instruments = pd.DataFrame(kite.instruments("NFO"))
         fut = instruments[
@@ -170,8 +172,8 @@ def _fetch_ohlcv_on_demand(symbol: str) -> bool:
     Returns True if data was fetched and stored, False on any failure.
     """
     try:
-        from integrations.kite_oauth import get_authenticated_kite
-        from integrations.kite_ohlcv import fetch_ohlcv, get_equity_token, ohlcv_to_price_rows
+        from new_data_ingestion.kite_oauth import get_authenticated_kite
+        from new_data_ingestion.kite_ohlcv import fetch_ohlcv, get_equity_token, ohlcv_to_price_rows
         kite      = get_authenticated_kite()
         token     = get_equity_token(kite, symbol)
         to_date   = date.today()
@@ -369,20 +371,36 @@ def _build_stock_package(
 
 def _build_index_context(session_date: date) -> dict:
     """Nifty/VIX/FII-DII context block — same as Turn 1 inputs."""
-    nifty_rows = get_price_history("NIFTY_50",  days=35)
-    vix_rows   = get_price_history("INDIA_VIX", days=32)
-    fii_rows   = get_fii_dii_flows(days=30)
+    nifty_rows = get_price_history(SYMBOL_NIFTY_50,  days=NIFTY_50_DAYS)
+    vix_rows   = get_price_history(SYMBOL_INDIA_VIX, days=INDIA_VIX_DAYS)
+    fii_rows   = get_fii_dii_flows(days=FII_DII_DAYS)
 
-    from pipeline.market_regime import run_market_regime
-    regime = run_market_regime(session_date)
+    # Compute technical math indicators
+    from pipeline.market_regime import get_index_indicators
+    nifty_ind = get_index_indicators(session_date, SYMBOL_NIFTY_50)
+    vix_ind   = get_index_indicators(session_date, SYMBOL_INDIA_VIX)
+
+    # Check if a session exists to get the Claude-classified regime
+    session_id = f"SESSION_{session_date.strftime('%Y%m%d')}"
+    from database.queries import get_analysis_session
+    session = None
+    try:
+        session = get_analysis_session(session_id)
+    except Exception as exc:
+        logger.warning("Failed to fetch session %s: %s", session_id, exc)
+
+    if session and session.get("market_regime"):
+        regime_val = session["market_regime"]
+    else:
+        regime_val = "UNKNOWN"
 
     return {
-        "regime":       regime["regime"],
-        "nifty_close":  regime["nifty_close"],
-        "vix":          regime["vix"],
-        "ema20":        regime["ema20"],
-        "ema50":        regime["ema50"],
-        "ret20d_pct":   regime["ret20d"],
+        "regime":       regime_val,
+        "nifty_close":  nifty_ind.get("close") or (nifty_rows[-1]["close"] if nifty_rows else 0.0),
+        "vix":          vix_ind.get("close") or (vix_rows[-1]["close"] if vix_rows else 0.0),
+        "ema20":        nifty_ind.get("ema20"),
+        "ema50":        nifty_ind.get("ema50"),
+        "ret20d_pct":   nifty_ind.get("ret20d"),
         "nifty_30d":    [{"date": r["date"], "close": r["close"]} for r in nifty_rows[-30:]],
         "vix_30d":      [{"date": r["date"], "close": r["close"]} for r in vix_rows[-30:]],
         "fii_dii_30d":  [{"date": r["date"], "fii_net_cr": r.get("fii_net_cr"),

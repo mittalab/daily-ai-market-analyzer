@@ -97,6 +97,20 @@ def build_system_prompt(bundle: dict) -> str:
     """
     regime_result   = bundle.get("regime") or {}
     regime          = regime_result.get("regime", "UNKNOWN")
+    trend           = regime_result.get("market_trend", "UNKNOWN")
+    volatility      = regime_result.get("market_volatility", "UNKNOWN")
+    structure       = regime_result.get("market_structure", "UNKNOWN")
+    execution_bias  = regime_result.get("execution_bias", "UNKNOWN")
+    fii_dii_stance  = regime_result.get("fii_dii_stance", "UNKNOWN")
+
+    sector_weights  = regime_result.get("sector_weights") or {}
+    leading_sectors = ", ".join(sector_weights.get("leading_sectors") or ["None"])
+    lagging_sectors = ", ".join(sector_weights.get("lagging_sectors") or ["None"])
+
+    guidance        = regime_result.get("guidance") or {"favour": "General analysis", "caution": "Elevated caution"}
+    favour_guidance = guidance.get("favour", "General analysis")
+    caution_guidance = guidance.get("caution", "Elevated caution")
+
     nifty_close     = regime_result.get("nifty_close") or 0.0
     vix             = regime_result.get("vix") or 0.0
     session_date    = bundle["session_date"]
@@ -116,10 +130,18 @@ specialising in Indian F&O markets (Nifty 50 stocks, 2-5 day holds, \
 stock options only — monthly Tuesday expiry).
 
 ━━━━━ TONIGHT'S SESSION CONTEXT ━━━━━
-Date          : {date_str}
-Market Regime : {regime}  (Nifty {nifty_close:.1f} | VIX {vix:.2f})
-Trade Slots   : {available_slots} of {max_slots} available
-Capital at Risk: ₹{open_risk:,.0f} ({open_risk_pct:.1f}%)
+Date             : {date_str}
+Market Regime    : {regime}  (Nifty {nifty_close:.1f} | VIX {vix:.2f})
+Trend            : {trend}
+Volatility       : {volatility}
+Structure        : {structure}
+Execution Bias   : {execution_bias}
+FII/DII Stance   : {fii_dii_stance}
+Leading Sectors  : {leading_sectors}
+Lagging Sectors  : {lagging_sectors}
+Guidance         : Favour: {favour_guidance} | Caution: {caution_guidance}
+Trade Slots      : {available_slots} of {max_slots} available
+Capital at Risk  : ₹{open_risk:,.0f} ({open_risk_pct:.1f}%)
 
 ━━━━━ ROLLOVER CONTEXT ━━━━━
 {_rollover_block(rollover_ctx)}
@@ -150,6 +172,7 @@ Min RR         : 1:2 (hard gate — reject below)
 Max setups     : {available_slots} Trade Ready tonight
 Min DTE        : 6 trading days
 Expiry         : Monthly Tuesday
+Option Strikes : Liquid Strikes only (near ATM or low spreads)
 Instruments    : Stock options ONLY
 Sector rule    : No two stocks from same sector + same direction
 Do NOT force setups — SKIP is always valid"""

@@ -12,17 +12,17 @@ logging.basicConfig(
 
 load_dotenv()
 
-from pipeline.data_ingestion import run_bhavcopy_job, run_snapshot_job
+from new_data_ingestion.ingestion_utils import ingest_today_bhavcopy, ingest_today_options
 
 today = date.today()
 print(f"--- Populating data for {today} ---")
 
 print("\n1. Running Bhavcopy Job (Equity, Indices, FII/DII)...")
-bhav_summary = run_bhavcopy_job(today)
+bhav_summary = ingest_today_bhavcopy(today)
 print(f"Bhavcopy Summary: {bhav_summary}")
 
 print("\n2. Running Snapshot Job (Options IV/OI/Premium)...")
-snap_summary = run_snapshot_job(today)
+snap_summary = ingest_today_options(today)
 print(f"Snapshot Summary: {snap_summary}")
 
 print("\n--- Population Complete ---")

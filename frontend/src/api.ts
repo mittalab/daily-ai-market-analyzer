@@ -53,3 +53,51 @@ export function fetchWatchlist(): Promise<{ watchlist: WatchlistEntry[]; count: 
 export function fetchSystemStatus(): Promise<SystemStatus> {
   return apiFetch('/api/system/status');
 }
+
+/** HEAD-only check — returns session date/id from headers without downloading the body. */
+export async function checkChatContext(): Promise<{ date: string; sessionId: string } | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/session/today/chat-context`, { method: 'HEAD' });
+    if (!res.ok) return null;
+    return {
+      date:      res.headers.get('X-Session-Date') ?? '',
+      sessionId: res.headers.get('X-Session-Id')   ?? '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface ChatMessage { role: 'user' | 'assistant'; content: string; }
+export interface ChatReply {
+  reply:         string;
+  cost_usd:      number;
+  input_tokens:  number;
+  output_tokens: number;
+  session_id:    string;
+}
+
+export function sendChatMessage(
+  messages:  ChatMessage[],
+  sessionId?: string,
+): Promise<ChatReply> {
+  return apiFetch<ChatReply>('/api/chat', {
+    method: 'POST',
+    body:   JSON.stringify({ messages, session_id: sessionId ?? null }),
+  });
+}
+
+/** GET — returns the full plain-text analysis context. */
+export async function fetchChatContextText(): Promise<string> {
+  const res = await fetch(`${API_URL}/api/session/today/chat-context`);
+  if (res.status === 404) {
+    const body = await res.json().catch(() => ({})) as Record<string, string>;
+    const err  = Object.assign(new Error(body['message'] ?? 'No session'), { code: 'no_session' });
+    throw err;
+  }
+  if (!res.ok) {
+    const err = Object.assign(new Error(`HTTP ${res.status}`), { code: 'server_error' });
+    throw err;
+  }
+  return res.text();
+}

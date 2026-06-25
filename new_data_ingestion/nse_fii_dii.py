@@ -8,42 +8,13 @@ Values are already in Crores — do NOT divide.
 import logging
 import time
 from datetime import date
+import random
 
 import requests
 
 logger = logging.getLogger(__name__)
 
 _API_URL = "https://www.nseindia.com/api/fiidiiTradeReact"
-
-_BROWSER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language":           "en-US,en;q=0.9",
-    "Accept-Encoding":           "gzip, deflate",   # NOT br
-    "Connection":                "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-}
-
-_API_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept":          "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate",
-    "Connection":      "keep-alive",
-    "Referer":         "https://www.nseindia.com/",
-    "X-Requested-With": "XMLHttpRequest",
-}
-
-
-import random
 
 _USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -60,12 +31,11 @@ def create_nse_session() -> requests.Session:
     session = requests.Session()
     ua = random.choice(_USER_AGENTS)
     
-    # Modern browser headers
     headers = {
         "User-Agent": ua,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
-        "Accept-Encoding": "gzip, deflate", # Removed 'br' as library not installed
+        "Accept-Encoding": "gzip, deflate",
         "Connection": "keep-alive",
         "Cache-Control": "max-age=0",
         "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
@@ -80,14 +50,10 @@ def create_nse_session() -> requests.Session:
     session.headers.update(headers)
 
     try:
-        # 1. Main entry (Wait 5 seconds)
         session.get("https://www.nseindia.com", timeout=15)
         time.sleep(5)
-
-        # 2. Specific landing page to trigger JS/Challenge cookies
         session.get("https://www.nseindia.com/market-data/option-chain", timeout=15)
         time.sleep(3)
-        
         logger.debug("NSE session baked. Cookies: %s", list(session.cookies.keys()))
     except requests.RequestException as exc:
         logger.warning("NSE session setup failed: %s", exc)
@@ -98,16 +64,6 @@ def create_nse_session() -> requests.Session:
 def fetch_fii_dii(session: requests.Session) -> dict:
     """
     Fetch FII and DII net buy/sell for the most recent trading day.
-
-    Returns:
-    {
-        "date": "22-May-2026",
-        "FII": {"buyValue": 45234.56, "sellValue": 49674.32, "netValue": -4439.76},
-        "DII": {"buyValue": 52341.10, "sellValue": 46338.20, "netValue": 6002.90},
-    }
-
-    Raises ConnectionError on network failure.
-    Raises ValueError on unexpected API structure.
     """
     try:
         r = session.get(_API_URL, timeout=20)
@@ -134,7 +90,7 @@ def fetch_fii_dii(session: requests.Session) -> dict:
         result[cat] = {
             "buyValue":  _to_float(record.get("buyValue")),
             "sellValue": _to_float(record.get("sellValue")),
-            "netValue":  _to_float(record.get("netValue")),   # PRIMARY — not netPurchasesSales
+            "netValue":  _to_float(record.get("netValue")),
         }
 
     logger.info(
@@ -171,3 +127,11 @@ def _to_float(value) -> float | None:
         return float(str(value).replace(",", "").strip())
     except ValueError:
         return None
+
+def main():
+    session = create_nse_session()
+    print(fetch_fii_dii(session))
+
+
+if __name__ == "__main__":
+    main()

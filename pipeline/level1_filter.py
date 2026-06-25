@@ -29,13 +29,13 @@ from database.queries import (
     get_price_history,
 )
 from indicators.technical import atr_pct as calc_atr_pct
-from integrations.nse_bhavcopy import get_holiday_dates, last_trading_day
+from new_data_ingestion.nse_bhavcopy import get_holiday_dates, last_trading_day
 
 logger = logging.getLogger(__name__)
 
 # ── Constants (spec Section 6) ────────────────────────────────────────────────
 _EARNINGS_WINDOW_DAYS = 5          # trading days forward
-_ATR_DEAD_THRESHOLD   = 0.8        # % — below this = dead zone
+_ATR_DEAD_THRESHOLD   = 0.5        # % — below this = dead zone - for Nifty 50
 _ATM_OI_MINIMUM       = 10_000     # combined ATM CE+PE OI
 _ATR_HISTORY_ROWS     = 25         # need 14 for ATR + a few extra
 
@@ -99,7 +99,7 @@ def fetch_nse_earnings_window(analysis_date: date) -> dict[str, str]:
     Called once per pipeline run, result passed into run_level1_filter.
     Returns empty dict on failure (earnings filter skipped gracefully).
     """
-    from integrations.nse_fii_dii import create_nse_session
+    from new_data_ingestion.nse_fii_dii import create_nse_session
 
     window = set(_next_n_trading_days(analysis_date, _EARNINGS_WINDOW_DAYS))
 
@@ -125,6 +125,7 @@ def fetch_nse_earnings_window(analysis_date: date) -> dict[str, str]:
 
         if not sym or not raw_dt:
             continue
+        #AI: There are strings like "Financial Results/Other business matters", so we need to check contains
         if not any(kw in purpose for kw in _EARNINGS_KEYWORDS):
             continue
 
@@ -154,9 +155,9 @@ def _filter_atr_dead(symbol: str) -> tuple[bool, float]:
     Loads last 25 rows from price_history. Requires at least 15 to compute ATR(14).
     """
     rows = get_price_history(symbol, days=_ATR_HISTORY_ROWS)
-    if len(rows) < 15:
+    if not rows or len(rows) < 15:
         logger.warning("%s: only %d price rows — ATR filter skipped", symbol, len(rows))
-        return False, 0.0
+        return True, 0.0 # Data is missing
 
     df = pd.DataFrame(rows)
     df = df.rename(columns={"date": "trade_date"})
@@ -164,7 +165,17 @@ def _filter_atr_dead(symbol: str) -> tuple[bool, float]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df = df.dropna(subset=["high", "low", "close"])
 
+    # CRITICAL FIX: Re-verify data length post-cleaning
+    if len(df) < 15:
+        logger.warning("%s: Insufficient valid price rows (%d) after dropna — Eliminating stock", symbol, len(df))
+        return True, 0.0
+
     atr_series = calc_atr_pct(df)
+
+    if atr_series.empty or pd.isna(atr_series.iloc[-1]):
+        logger.error("%s: ATR calculation returned NaN or empty series — Eliminating stock", symbol)
+        return True, 0.0
+
     current_atr_pct = float(atr_series.iloc[-1])
 
     eliminate = current_atr_pct < _ATR_DEAD_THRESHOLD
@@ -308,16 +319,16 @@ def run_level1_filter(
                 continue
 
             # ── Filter 3: F&O Liquidity ───────────────────────────────────
-            elim, atm_oi, skipped = _filter_fno_liquidity(symbol, analysis_date, current_price)
-            if skipped:
-                if not liquidity_skipped_globally:
-                    liquidity_skipped_globally = True
-                    logger.info("Liquidity filter skipped — no snapshot available")
-            elif elim:
-                eliminated.append({"symbol": symbol, "reason": "FNO_ILLIQUID", "atm_oi": atm_oi})
-                logger.info("ELIMINATED %s — FNO_ILLIQUID (ATM OI=%d)", symbol, atm_oi)
-                _record_shadow_track(symbol, "FNO_ILLIQUID", current_price, 0.0, analysis_date)
-                continue
+            # elim, atm_oi, skipped = _filter_fno_liquidity(symbol, analysis_date, current_price)
+            # if skipped:
+            #     if not liquidity_skipped_globally:
+            #         liquidity_skipped_globally = True
+            #         logger.info("Liquidity filter skipped — no snapshot available")
+            # elif elim:
+            #     eliminated.append({"symbol": symbol, "reason": "FNO_ILLIQUID", "atm_oi": atm_oi})
+            #     logger.info("ELIMINATED %s — FNO_ILLIQUID (ATM OI=%d)", symbol, atm_oi)
+            #     _record_shadow_track(symbol, "FNO_ILLIQUID", current_price, 0.0, analysis_date)
+            #     continue
 
             passed.append(symbol)
 

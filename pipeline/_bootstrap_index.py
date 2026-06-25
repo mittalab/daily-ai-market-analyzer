@@ -9,6 +9,7 @@ from datetime import date, timedelta
 import pandas as pd
 from integrations.kite_oauth import get_authenticated_kite
 from database.queries import upsert_price_history
+from config.constants import SYMBOL_NIFTY_50, SYMBOL_INDIA_VIX
 
 kite = get_authenticated_kite()
 
@@ -32,7 +33,7 @@ to_date   = date.today()
 from_date = to_date - timedelta(days=200)
 
 stored = 0
-for symbol_key, row_df in [("NIFTY_50", nifty_row), ("INDIA_VIX", vix_row)]:
+for symbol_key, row_df in [(SYMBOL_NIFTY_50, nifty_row), (SYMBOL_INDIA_VIX, vix_row)]:
     if row_df.empty:
         print(f"{symbol_key}: NOT FOUND in instruments — skipping")
         continue
