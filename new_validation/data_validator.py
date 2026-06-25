@@ -1,10 +1,14 @@
 """
-Modular validation checks for system state and data completeness.
-Exposes 8 standalone validation check functions.
+Data presence validators for the self-healing validation loop.
+
+Design principle: bulk range queries per symbol, not per-date round-trips.
+Indices used:
+  price_history       → idx_price_history_validation   (symbol, date DESC)
+  futures_snapshots   → idx_futures_snapshots_validation (symbol, expiry_date, snapshot_date)
+  options_snapshots   → idx_options_snapshots_validation  (symbol, expiry_date, snapshot_date)
 """
 import logging
-from datetime import date, datetime, timedelta
-import pandas as pd
+from datetime import date, timedelta
 
 from database.queries import get_client, get_kite_token
 from new_data_ingestion.kite_oauth import get_authenticated_kite
@@ -12,111 +16,186 @@ from new_data_ingestion.kite_oauth import get_authenticated_kite
 logger = logging.getLogger(__name__)
 
 
+# ── Infrastructure checks ──────────────────────────────────────────────────────
+
 def validate_kite_token() -> tuple[bool, str]:
-    """1. Validate Kite session is active via profile API check."""
+    """Validate Kite session is active via profile API."""
     try:
         token_row = get_kite_token()
         if not token_row:
             return False, "Kite access token missing in database"
-        
         kite = get_authenticated_kite()
         profile = kite.profile()
-        user_id = profile.get("user_id", "Unknown")
-        return True, f"Kite token valid (User: {user_id})"
+        return True, f"Kite token valid (User: {profile.get('user_id', 'Unknown')})"
     except Exception as exc:
         return False, f"Kite token validation failed: {exc}"
 
 
 def validate_db_connectivity() -> tuple[bool, str]:
-    """2. Validate DB client connectivity to Supabase."""
+    """Validate DB client connectivity to Supabase."""
     try:
-        client = get_client()
-        # Query a simple small table or count config
-        resp = client.table("system_config").select("key").limit(1).execute()
+        get_client().table("system_config").select("key").limit(1).execute()
         return True, "Database connectivity OK"
     except Exception as exc:
         return False, f"Database connectivity failed: {exc}"
 
 
-def validate_stock_ohlcv(symbol: str, check_date: date, days: int = 180) -> tuple[bool, str]:
-    """3. Check stock has >= 180 trading days of OHLCV history ending on check_date."""
+# ── "Already ran" sentinels ────────────────────────────────────────────────────
+# These prevent re-downloading a bhavcopy that was already ingested for a date.
+# If ANY row exists for that date in the table, the download already happened.
+
+def equity_bhavcopy_ran(check_date: date) -> bool:
+    """True if equity bhavcopy was already ingested for this date (any symbol in price_history)."""
     try:
-        client = get_client()
-        # Query row count for symbol up to check_date
         resp = (
-            client.table("price_history")
+            get_client()
+            .table("price_history")
             .select("date")
-            .eq("symbol", symbol)
-            .lte("date", str(check_date))
-            .order("date", desc=True)
-            .limit(days)
+            .eq("date", str(check_date))
+            .neq("symbol", "INDIA_VIX")   # VIX is separate, not an equity bhavcopy symbol
+            .limit(1)
             .execute()
         )
-        count = len(resp.data)
-        if count >= days:
-            return True, f"Stock OHLCV OK: Found {count}/{days} rows ending on {check_date}"
-        
-        # Check if the stock has today's record specifically
-        has_today = any(r["date"] == str(check_date) for r in resp.data)
-        today_msg = "present" if has_today else "MISSING"
-        return False, f"Stock OHLCV Insufficient: Found {count}/{days} rows ending on {check_date} (Target date: {today_msg})"
-    except Exception as exc:
-        return False, f"Stock OHLCV check failed for {symbol}: {exc}"
+        return bool(resp.data)
+    except Exception:
+        return False
 
 
-def validate_stock_options(symbol: str, expiry: date, check_date: date, days: int = 30) -> tuple[bool, str]:
-    """4. Check stock options snapshot is present on check_date and has sufficient history."""
+def fo_bhavcopy_ran(check_date: date) -> bool:
+    """True if F&O bhavcopy was already ingested for this date (any row in options_snapshots)."""
     try:
-        client = get_client()
-        
-        # Verify the snapshot for check_date itself exists and get a sample strike to query history efficiently
-        today_resp = (
-            client.table("options_snapshots")
-            .select("strike")
+        resp = (
+            get_client()
+            .table("options_snapshots")
+            .select("snapshot_date")
+            .eq("snapshot_date", str(check_date))
+            .limit(1)
+            .execute()
+        )
+        return bool(resp.data)
+    except Exception:
+        return False
+
+
+# ── Bulk range cache ───────────────────────────────────────────────────────────
+
+class SymbolDataCache:
+    """
+    Pre-fetches data presence for a symbol over a date range in 3 bulk queries.
+    All per-date checks then run as O(1) set lookups.
+    """
+
+    def __init__(self, symbol: str, ohlcv_start: date, fo_start: date, end: date):
+        self.symbol = symbol
+        self.end = end
+
+        # price_history: set of dates where the symbol has data
+        self.ohlcv_dates: set[date] = self._fetch_ohlcv_dates(ohlcv_start, end)
+
+        # futures_snapshots: {expiry_date → set[snapshot_date]}
+        self.futures: dict[date, set[date]] = self._fetch_fo_dates(
+            "futures_snapshots", "snapshot_date", fo_start, end
+        )
+
+        # options_snapshots: {expiry_date → set[snapshot_date]}
+        self.options: dict[date, set[date]] = self._fetch_fo_dates(
+            "options_snapshots", "snapshot_date", fo_start, end
+        )
+
+    # ── Loaders ───────────────────────────────────────────────────────────────
+
+    def _fetch_ohlcv_dates(self, start: date, end: date) -> set[date]:
+        try:
+            resp = (
+                get_client()
+                .table("price_history")
+                .select("date")
+                .eq("symbol", self.symbol)
+                .gte("date", str(start))
+                .lte("date", str(end))
+                .execute()
+            )
+            return {date.fromisoformat(r["date"]) for r in resp.data}
+        except Exception as exc:
+            logger.warning("OHLCV bulk fetch failed for %s: %s", self.symbol, exc)
+            return set()
+
+    def _fetch_fo_dates(self, table: str, date_col: str, start: date, end: date) -> dict[date, set[date]]:
+        """Single query for all expiries in range → {expiry: set[snapshot_dates]}."""
+        try:
+            resp = (
+                get_client()
+                .table(table)
+                .select(f"{date_col},expiry_date")
+                .eq("symbol", self.symbol)
+                .gte(date_col, str(start))
+                .lte(date_col, str(end))
+                .execute()
+            )
+            result: dict[date, set[date]] = {}
+            for r in resp.data:
+                exp  = date.fromisoformat(r["expiry_date"])
+                snap = date.fromisoformat(r[date_col])
+                result.setdefault(exp, set()).add(snap)
+            return result
+        except Exception as exc:
+            logger.warning("%s bulk fetch failed for %s: %s", table, self.symbol, exc)
+            return {}
+
+    # ── Targeted refresh after healing ────────────────────────────────────────
+    # After ingesting data for one date, add it to the in-memory cache rather
+    # than re-querying the whole range.
+
+    def mark_ohlcv_present(self, d: date) -> None:
+        self.ohlcv_dates.add(d)
+
+    def mark_futures_present(self, expiry: date, d: date) -> None:
+        self.futures.setdefault(expiry, set()).add(d)
+
+    def mark_options_present(self, expiry: date, d: date) -> None:
+        self.options.setdefault(expiry, set()).add(d)
+
+
+# ── Targeted point-in-time checks (used after healing to re-verify) ───────────
+
+def point_check_ohlcv(symbol: str, check_date: date) -> bool:
+    try:
+        resp = (
+            get_client()
+            .table("price_history")
+            .select("date")
+            .eq("symbol", symbol)
+            .eq("date", str(check_date))
+            .limit(1)
+            .execute()
+        )
+        return bool(resp.data)
+    except Exception:
+        return False
+
+
+def point_check_futures(symbol: str, expiry: date, check_date: date) -> bool:
+    try:
+        resp = (
+            get_client()
+            .table("futures_snapshots")
+            .select("snapshot_date")
             .eq("symbol", symbol)
             .eq("expiry_date", str(expiry))
             .eq("snapshot_date", str(check_date))
             .limit(1)
             .execute()
         )
-        if not today_resp.data:
-            return False, f"Stock Options snapshot MISSING for {symbol} on {check_date} (Expiry: {expiry})"
-            
-        target_strike = today_resp.data[0]["strike"]
-        
-        # Verify history depth using the sample strike and CE option type to retrieve exactly 1 row per date
-        hist_resp = (
-            client.table("options_snapshots")
-            .select("snapshot_date")
-            .eq("symbol", symbol)
-            .eq("expiry_date", str(expiry))
-            .eq("strike", target_strike)
-            .eq("option_type", "CE")
-            .lte("snapshot_date", str(check_date))
-            .execute()
-        )
-        # Unique dates
-        unique_dates = {r["snapshot_date"] for r in hist_resp.data}
-        count = len(unique_dates)
-        
-        if count >= days:
-            return True, f"Stock Options OK: Found {count}/{days} option snapshots ending on {check_date}"
-        else:
-            # Best effort check: if count > 0 and it has today's snapshot, we pass, but warn
-            return True, f"Stock Options Pass (Best Effort): Found {count}/{days} option snapshots ending on {check_date}"
-            
-    except Exception as exc:
-        return False, f"Stock Options check failed for {symbol}: {exc}"
+        return bool(resp.data)
+    except Exception:
+        return False
 
 
-def validate_stock_futures(symbol: str, expiry: date, check_date: date, days: int = 30) -> tuple[bool, str]:
-    """5. Check stock futures snapshot is present on check_date and has sufficient history."""
+def point_check_options(symbol: str, expiry: date, check_date: date) -> bool:
     try:
-        client = get_client()
-        
-        # Verify futures snapshot for check_date exists
-        today_resp = (
-            client.table("futures_snapshots")
+        resp = (
+            get_client()
+            .table("options_snapshots")
             .select("snapshot_date")
             .eq("symbol", symbol)
             .eq("expiry_date", str(expiry))
@@ -124,79 +203,57 @@ def validate_stock_futures(symbol: str, expiry: date, check_date: date, days: in
             .limit(1)
             .execute()
         )
-        if not today_resp.data:
-            return False, f"Stock Futures snapshot MISSING for {symbol} on {check_date} (Expiry: {expiry})"
-            
-        # Verify history depth
-        hist_resp = (
-            client.table("futures_snapshots")
-            .select("snapshot_date")
-            .eq("symbol", symbol)
-            .eq("expiry_date", str(expiry))
-            .lte("snapshot_date", str(check_date))
-            .order("snapshot_date", desc=True)
-            .limit(days)
-            .execute()
-        )
-        count = len(hist_resp.data)
-        if count >= days:
-            return True, f"Stock Futures OK: Found {count}/{days} futures snapshots ending on {check_date}"
-        else:
-            return True, f"Stock Futures Pass (Best Effort): Found {count}/{days} futures snapshots ending on {check_date}"
-            
-    except Exception as exc:
-        return False, f"Stock Futures check failed for {symbol}: {exc}"
+        return bool(resp.data)
+    except Exception:
+        return False
 
 
-def validate_index_ohlcv(index_symbol: str, check_date: date, days: int = 180) -> tuple[bool, str]:
-    """6. Check index has >= 180 trading days of price history."""
-    try:
-        client = get_client()
-        resp = (
-            client.table("price_history")
-            .select("date")
-            .eq("symbol", index_symbol)
-            .lte("date", str(check_date))
-            .order("date", desc=True)
-            .limit(days)
-            .execute()
-        )
-        count = len(resp.data)
-        if count >= days:
-            return True, f"Index OHLCV OK: Found {count}/{days} rows ending on {check_date} for {index_symbol}"
-        
-        has_today = any(r["date"] == str(check_date) for r in resp.data)
-        today_msg = "present" if has_today else "MISSING"
-        return False, f"Index OHLCV Insufficient: Found {count}/{days} rows ending on {check_date} for {index_symbol} (Target date: {today_msg})"
-    except Exception as exc:
-        return False, f"Index OHLCV check failed for {index_symbol}: {exc}"
+# ── Per-date check functions (use cache for O(1) lookups) ─────────────────────
+
+def check_ohlcv(
+    symbol: str,
+    check_date: date,
+    cache: SymbolDataCache,
+    required_days: int,
+) -> tuple[bool, str]:
+    """Check OHLCV presence on check_date and depth of history up to that date."""
+    if check_date not in cache.ohlcv_dates:
+        return False, f"OHLCV missing for {symbol} on {check_date}"
+    depth = sum(1 for d in cache.ohlcv_dates if d <= check_date)
+    if depth < required_days:
+        return False, f"OHLCV depth {depth}/{required_days} for {symbol} on {check_date}"
+    return True, f"OHLCV OK ({depth} rows ≤ {check_date})"
 
 
-def validate_index_options(expiry: date, check_date: date, days: int = 30) -> tuple[bool, str]:
-    """7. Validate NIFTY 50 index options snapshot on check_date."""
-    # Nifty options symbol in database is NIFTY
-    return validate_stock_options("NIFTY", expiry, check_date, days)
+def check_futures(
+    symbol: str,
+    check_date: date,
+    expiry: date,
+    cache: SymbolDataCache,
+    required_days: int,
+) -> tuple[bool, str]:
+    """Check futures snapshot presence and depth for a specific expiry."""
+    expiry_dates = cache.futures.get(expiry, set())
+    if check_date not in expiry_dates:
+        return False, f"Futures missing for {symbol} expiry={expiry} on {check_date}"
+    depth = sum(1 for d in expiry_dates if d <= check_date)
+    if depth < required_days:
+        return False, f"Futures depth {depth}/{required_days} for {symbol} expiry={expiry} on {check_date}"
+    return True, f"Futures OK ({depth} rows)"
 
 
-def validate_india_vix(check_date: date, days: int = 30) -> tuple[bool, str]:
-    """8. Confirm India VIX index history contains data."""
-    try:
-        client = get_client()
-        resp = (
-            client.table("price_history")
-            .select("date")
-            .eq("symbol", "INDIA_VIX")
-            .lte("date", str(check_date))
-            .order("date", desc=True)
-            .limit(days)
-            .execute()
-        )
-        count = len(resp.data)
-        if count >= days:
-            return True, f"India VIX OK: Found {count}/{days} rows ending on {check_date}"
-        
-        has_today = any(r["date"] == str(check_date) for r in resp.data)
-        today_msg = "present" if has_today else "MISSING"
-        return False, f"India VIX Insufficient: Found {count}/{days} rows ending on {check_date} (Target date: {today_msg})"
-    except Exception as exc:
-        return False, f"India VIX check failed: {exc}"
+def check_options(
+    symbol: str,
+    check_date: date,
+    expiry: date,
+    cache: SymbolDataCache,
+    required_days: int,
+) -> tuple[bool, str]:
+    """Check options snapshot presence and depth for a specific expiry."""
+    expiry_dates = cache.options.get(expiry, set())
+    if check_date not in expiry_dates:
+        return False, f"Options missing for {symbol} expiry={expiry} on {check_date}"
+    depth = sum(1 for d in expiry_dates if d <= check_date)
+    if depth < required_days:
+        return False, f"Options depth {depth}/{required_days} for {symbol} expiry={expiry} on {check_date}"
+    return True, f"Options OK ({depth} rows)"

@@ -42,12 +42,12 @@ def ingest_today_bhavcopy(for_date: date | None = None) -> dict:
     summary: dict = {"ok": True, "errors": [], "trade_date": None, "equity_rows": 0, "index_rows": 0, "fii_ok": False}
     target_date = last_trading_day(for_date)
     summary["trade_date"] = str(target_date)
-    symbols = get_stock_list_for_analysis()
+    #symbols = get_stock_list_for_analysis()
 
     # 1. Equity Bhavcopy
     try:
         eq_df, trade_date = fetch_equity_bhavcopy(target_date)
-        eq_df = eq_df[eq_df["SYMBOL"].isin(symbols)]
+        #eq_df = eq_df[eq_df["SYMBOL"].isin(symbols)]
         eq_rows = equity_bhavcopy_to_price_rows(eq_df, trade_date)
         n_upserted = upsert_price_history(eq_rows)
         summary["equity_rows"] = n_upserted
@@ -102,59 +102,59 @@ def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] |
     summary: dict = {"ok": False, "rows_stored": 0, "source": "NONE", "failed_symbols": [], "errors": []}
     target_symbols = symbols or get_stock_list_for_analysis()
 
-    # A. Kite Quotes (Primary)
-    kite_rows = []
-    try:
-        token_row = get_kite_token()
-        if token_row:
-            kite = get_kite(token_row["access_token"])
-            for symbol in target_symbols:
-                try:
-                    instruments = get_option_symbols(kite, symbol)
-                    if instruments.empty:
-                        continue
-                    quotes = fetch_option_quotes(kite, instruments)
-                    for tk, q in quotes.items():
-                        try:
-                            tsym = tk.split(":")[-1]
-                            matches = instruments[instruments["tradingsymbol"] == tsym]
-                            if matches.empty:
-                                continue
-                            inst = matches.iloc[0]
-                            expiry = inst["expiry"]
-                            if hasattr(expiry, "date"):
-                                expiry = expiry.date()
-                            oi_high = q.get("oi_day_high") or 0
-                            oi_low  = q.get("oi_day_low")  or 0
-                            kite_rows.append({
-                                "symbol":        symbol,
-                                "snapshot_date": str(snap_date),
-                                "expiry_date":   str(expiry),
-                                "strike":        float(inst["strike"]),
-                                "option_type":   inst["instrument_type"],
-                                "oi":            int(q.get("oi") or 0),
-                                "oi_change":     int(oi_high - oi_low),
-                                "volume":        int(q.get("volume") or 0),
-                                "iv":            None,
-                                "premium_close": float(q.get("last_price") or 0),
-                            })
-                        except Exception:
-                            continue
-                    time.sleep(0.1)
-                except Exception as sym_exc:
-                    logger.warning("Kite option skip %s: %s", symbol, sym_exc)
-            
-            if kite_rows:
-                n = upsert_options_snapshots(kite_rows)
-                summary.update({"ok": True, "rows_stored": n, "source": "KITE"})
-                logger.info("Kite options snapshot stored: %d rows", n)
-        else:
-            summary["errors"].append("Kite token not found in DB")
-    except Exception as exc:
-        logger.error("Kite option snapshot failed: %s", exc)
-        summary["errors"].append(f"kite_options: {exc}")
-
-    # B. NSE Scrape (Secondary/Enrichment for IVs)
+    # # A. Kite Quotes (Primary)
+    # kite_rows = []
+    # try:
+    #     token_row = get_kite_token()
+    #     if token_row:
+    #         kite = get_kite(token_row["access_token"])
+    #         for symbol in target_symbols:
+    #             try:
+    #                 instruments = get_option_symbols(kite, symbol)
+    #                 if instruments.empty:
+    #                     continue
+    #                 quotes = fetch_option_quotes(kite, instruments)
+    #                 for tk, q in quotes.items():
+    #                     try:
+    #                         tsym = tk.split(":")[-1]
+    #                         matches = instruments[instruments["tradingsymbol"] == tsym]
+    #                         if matches.empty:
+    #                             continue
+    #                         inst = matches.iloc[0]
+    #                         expiry = inst["expiry"]
+    #                         if hasattr(expiry, "date"):
+    #                             expiry = expiry.date()
+    #                         oi_high = q.get("oi_day_high") or 0
+    #                         oi_low  = q.get("oi_day_low")  or 0
+    #                         kite_rows.append({
+    #                             "symbol":        symbol,
+    #                             "snapshot_date": str(snap_date),
+    #                             "expiry_date":   str(expiry),
+    #                             "strike":        float(inst["strike"]),
+    #                             "option_type":   inst["instrument_type"],
+    #                             "oi":            int(q.get("oi") or 0),
+    #                             "oi_change":     int(oi_high - oi_low),
+    #                             "volume":        int(q.get("volume") or 0),
+    #                             "iv":            None,
+    #                             "premium_close": float(q.get("last_price") or 0),
+    #                         })
+    #                     except Exception:
+    #                         continue
+    #                 time.sleep(0.1)
+    #             except Exception as sym_exc:
+    #                 logger.warning("Kite option skip %s: %s", symbol, sym_exc)
+    #
+    #         if kite_rows:
+    #             n = upsert_options_snapshots(kite_rows)
+    #             summary.update({"ok": True, "rows_stored": n, "source": "KITE"})
+    #             logger.info("Kite options snapshot stored: %d rows", n)
+    #     else:
+    #         summary["errors"].append("Kite token not found in DB")
+    # except Exception as exc:
+    #     logger.error("Kite option snapshot failed: %s", exc)
+    #     summary["errors"].append(f"kite_options: {exc}")
+    #
+    # # B. NSE Scrape (Secondary/Enrichment for IVs)
     try:
         nse_session = make_nse_session()
         nse_rows, failed = run_snapshot_batch(nse_session, target_symbols, snap_date)
@@ -162,7 +162,7 @@ def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] |
             n = upsert_options_snapshots(nse_rows)
             summary["ok"] = True
             summary["rows_stored"] = max(summary["rows_stored"], n)
-            summary["source"] = "KITE+NSE" if kite_rows else "NSE"
+            summary["source"] = "NSE"
             summary["failed_symbols"] = failed
             logger.info("NSE options snapshot stored/enriched: %d rows (source: %s)", n, summary["source"])
     except Exception as exc:
@@ -257,13 +257,5 @@ def backfill_historical_date(target_date: date, symbol: str | None = None) -> di
         logger.error("F&O bhavcopy backfill failed for %s: %s", target_date, exc)
         summary["errors"].append(f"fo_bhavcopy: {exc}")
         summary["ok"] = False
-
-    # 3. India VIX Backfill
-    try:
-        vix_summary = run_vix_backfill(target_date, target_date)
-        summary["vix"] = vix_summary
-    except Exception as exc:
-        logger.error("VIX backfill failed for %s: %s", target_date, exc)
-        summary["errors"].append(f"vix: {exc}")
 
     return summary

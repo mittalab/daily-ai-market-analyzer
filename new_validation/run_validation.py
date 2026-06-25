@@ -1,20 +1,32 @@
 """
-CLI runner for data validation and self-healing.
-Supports daily checks and manual symbol backfill routing with optimized global backfills.
+Validation & self-healing runner.
+
+Flow per symbol:
+  1. Determine date range: (last_passed_date + 1) → today
+  2. Pre-fetch data presence for the entire range in 3 bulk queries (OHLCV, futures, options)
+  3. For each date in range:
+     a. Run checks against the in-memory cache (O(1) lookups)
+     b. On failure → heal that date → point-check DB → update cache
+     c. Record PASSED / FAILED per date in validation_state table
+  4. Stop processing a symbol on the first date that cannot be healed
+
+Healing rule for historical dates:
+  - Check if bhavcopy already ran for that date (data exists for other symbols)
+  - If yes → skip re-download (symbol simply wasn't in bhavcopy)
+  - If no  → run backfill (downloads all symbols for that date)
 """
 import argparse
+import json
 import logging
 import sys
-import json
-from pathlib import Path
 from datetime import date, datetime, timedelta
+from pathlib import Path
+
 import pytz
 
 from database.queries import (
-    get_validation_state,
     get_last_passed_validation_date,
     upsert_validation_state,
-    get_client,
     upsert_fii_dii_flow,
     get_latest_fii_dii,
 )
@@ -30,110 +42,52 @@ from new_data_ingestion.nse_fii_dii import create_nse_session, fetch_fii_dii, fi
 from new_validation.data_validator import (
     validate_kite_token,
     validate_db_connectivity,
-    validate_stock_ohlcv,
-    validate_stock_options,
-    validate_stock_futures,
+    SymbolDataCache,
+    check_ohlcv,
+    check_futures,
+    check_options,
+    equity_bhavcopy_ran,
+    fo_bhavcopy_ran,
+    point_check_ohlcv,
+    point_check_futures,
+    point_check_options,
 )
 from new_notifications.telegram import (
-    send_preflight_check_failed,
     send_preflight_failed,
     send_token_reminder,
-    send_silent,
-    send_loud,
 )
 from new_utils.stock_list import get_stock_list_for_analysis
 
 logger = logging.getLogger(__name__)
 
+# ── Validation depth constants ─────────────────────────────────────────────────
+_OHLCV_DAYS         = 180   # stocks + NIFTY + all other sector indices
+_OHLCV_DAYS_VIX     = 30    # India VIX only
+_FO_DAYS            = 30    # stock options + futures
+_NIFTY_OPT_DAYS     = 15    # NIFTY weekly options
+_STOCK_NEAR_EXPIRY  = 5     # trading days threshold → add next monthly expiry
+_NIFTY_NEAR_EXPIRY  = 2     # trading days threshold → add next weekly expiry
+
+# Calendar days to look back for initial validation (180 trading days ≈ 270 cal days)
+_OHLCV_CAL_BUFFER   = 270
+
+
+# ── Date / trading-day helpers ─────────────────────────────────────────────────
 
 def get_validation_end_date(holidays: set[date]) -> date:
-    """
-    Return the validation end date:
-    Consider end date as today only if today is a trading day and current time
-    in IST is >= 15:40 (3:40 PM). Otherwise, consider last trading day.
-    """
+    """Today if trading day and IST time >= 15:40, otherwise last trading day."""
     IST = pytz.timezone("Asia/Kolkata")
-    now_ist = datetime.now(IST)
-    today_ist = now_ist.date()
-    now_time_ist = now_ist.time()
-    
-    is_today_trading = (today_ist.weekday() < 5) and (today_ist not in holidays)
-    market_close_time = datetime.strptime("15:40", "%H:%M").time()
-    
-    if is_today_trading and now_time_ist >= market_close_time:
-        return today_ist
-    else:
-        return last_trading_day(today_ist - timedelta(days=1))
-
-
-def _last_tuesday_of_month(ref: date) -> date:
-    """Return the last Tuesday of ref's month (standard F&O stock options expiry day)."""
-    if ref.month == 12:
-        last_day = date(ref.year + 1, 1, 1) - timedelta(days=1)
-    else:
-        last_day = date(ref.year, ref.month + 1, 1) - timedelta(days=1)
-    delta = (last_day.weekday() - 1) % 7  # days back to Tuesday (weekday=1)
-    return last_day - timedelta(days=delta)
-
-
-def get_stock_expiries(ref_date: date, holidays: set[date]) -> list[date]:
-    """
-    Resolve near (+ next if close) monthly stock expiries.
-    If remaining trading days to near expiry <= 5, return [near, next], else [near].
-    """
-    near = _last_tuesday_of_month(ref_date)
-    # Adjust near if it falls on holiday (walk back)
-    while near in holidays or near.weekday() >= 5:
-        near -= timedelta(days=1)
-        
-    if ref_date >= near:
-        # Near has already passed, near becomes next month
-        next_month = date(ref_date.year, ref_date.month % 12 + 1, 1) if ref_date.month < 12 else date(ref_date.year + 1, 1, 1)
-        near = _last_tuesday_of_month(next_month)
-        while near in holidays or near.weekday() >= 5:
-            near -= timedelta(days=1)
-
-    # Calculate days remaining to near expiry
-    days_remaining = count_trading_days(ref_date, near, holidays)
-    
-    if days_remaining <= 5:
-        # Resolve next month
-        next_month_ref = date(near.year, near.month % 12 + 1, 1) if near.month < 12 else date(near.year + 1, 1, 1)
-        nxt = _last_tuesday_of_month(next_month_ref)
-        while nxt in holidays or nxt.weekday() >= 5:
-            nxt -= timedelta(days=1)
-        return [near, nxt]
-    return [near]
-
-
-def get_index_expiries(ref_date: date, holidays: set[date]) -> list[date]:
-    """
-    Resolve NIFTY weekly expiries (every Tuesday, weekday=1).
-    If remaining trading days to Tuesday <= 2, return [near, next], else [near].
-    """
-    # Find Tuesday of current week
-    near = ref_date + timedelta(days=(1 - ref_date.weekday()) % 7)
-    
-    if ref_date >= near:
-        near = near + timedelta(days=7)
-        
-    while near in holidays or near.weekday() >= 5:
-        near -= timedelta(days=1)
-        
-    days_remaining = count_trading_days(ref_date, near, holidays)
-    
-    if days_remaining <= 2:
-        nxt = near + timedelta(days=7)
-        while nxt in holidays or nxt.weekday() >= 5:
-            nxt -= timedelta(days=1)
-        return [near, nxt]
-    return [near]
+    now = datetime.now(IST)
+    today = now.date()
+    cutoff = datetime.strptime("15:40", "%H:%M").time()
+    if today.weekday() < 5 and today not in holidays and now.time() >= cutoff:
+        return today
+    return last_trading_day(today - timedelta(days=1))
 
 
 def count_trading_days(start: date, end: date, holidays: set[date]) -> int:
-    """Count number of trading days in [start, end) excluding weekends and holidays."""
-    count = 0
-    curr = start
+    """Count trading days in [start, end) — start inclusive, end exclusive."""
+    count, curr = 0, start
     while curr < end:
         if curr.weekday() < 5 and curr not in holidays:
             count += 1
@@ -141,325 +95,450 @@ def count_trading_days(start: date, end: date, holidays: set[date]) -> int:
     return count
 
 
-def get_trading_day_gaps(start_date: date, end_date: date, holidays: set[date]) -> list[date]:
-    """Return all trading days in (start_date, end_date] inclusive."""
-    gaps = []
-    curr = start_date + timedelta(days=1)
-    while curr <= end_date:
+def get_trading_days_in_range(start: date, end: date, holidays: set[date]) -> list[date]:
+    """Return all trading days in (start, end] — start exclusive, end inclusive."""
+    days, curr = [], start + timedelta(days=1)
+    while curr <= end:
         if curr.weekday() < 5 and curr not in holidays:
-            gaps.append(curr)
+            days.append(curr)
         curr += timedelta(days=1)
-    return gaps
+    return days
 
 
-def get_other_indices() -> list[str]:
-    """Parse other unique indices from config/sector_map.json."""
-    path = Path(__file__).parent.parent / "config" / "sector_map.json"
+# ── Expiry helpers ─────────────────────────────────────────────────────────────
+
+def _last_tuesday_of_month(ref: date) -> date:
+    """Last Tuesday of ref's calendar month (monthly stock F&O expiry)."""
+    if ref.month == 12:
+        last_day = date(ref.year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = date(ref.year, ref.month + 1, 1) - timedelta(days=1)
+    return last_day - timedelta(days=(last_day.weekday() - 1) % 7)
+
+
+def _adjust_for_holiday(d: date, holidays: set[date]) -> date:
+    """Walk backwards past weekends and holidays."""
+    while d.weekday() >= 5 or d in holidays:
+        d -= timedelta(days=1)
+    return d
+
+
+def get_stock_expiries(ref_date: date, holidays: set[date]) -> list[date]:
+    """Near monthly expiry, plus next if <= _STOCK_NEAR_EXPIRY trading days remain.
+
+    On expiry day itself (days_left == 0): near stays as today — the contract still
+    trades and its data must be present. 0 <= threshold, so next month is also added.
+    Only roll near forward when the expiry is strictly in the past (ref_date > near).
+    """
+    near = _adjust_for_holiday(_last_tuesday_of_month(ref_date), holidays)
+
+    if ref_date > near:
+        # Expiry already passed — roll near to next month
+        next_month = date(near.year, near.month % 12 + 1, 1) if near.month < 12 else date(near.year + 1, 1, 1)
+        near = _adjust_for_holiday(_last_tuesday_of_month(next_month), holidays)
+
+    # days_left == 0 when today IS expiry day; 0 <= threshold so next is always added
+    days_left = count_trading_days(ref_date, near, holidays)
+    if days_left <= _STOCK_NEAR_EXPIRY:
+        nxt_month = date(near.year, near.month % 12 + 1, 1) if near.month < 12 else date(near.year + 1, 1, 1)
+        nxt = _adjust_for_holiday(_last_tuesday_of_month(nxt_month), holidays)
+        return [near, nxt]
+    return [near]
+
+
+def get_nifty_expiries(ref_date: date, holidays: set[date]) -> list[date]:
+    """Near weekly Tuesday expiry, plus next if <= _NIFTY_NEAR_EXPIRY trading days remain.
+
+    On expiry Tuesday itself: days_ahead == 0, so near = ref_date (today).
+    days_left == 0 <= threshold, so next week is also added.
+    The old `days_ahead if days_ahead else 7` pattern skipped today's expiry — fixed.
+    """
+    days_ahead = (1 - ref_date.weekday()) % 7
+    # days_ahead == 0 means today is Tuesday (expiry day) — near is today, not next week
+    near = _adjust_for_holiday(ref_date + timedelta(days=days_ahead), holidays)
+
+    # days_left == 0 when today IS expiry day; 0 <= threshold so next is always added
+    days_left = count_trading_days(ref_date, near, holidays)
+    if days_left <= _NIFTY_NEAR_EXPIRY:
+        nxt = near + timedelta(days=7)
+        nxt = _adjust_for_holiday(nxt, holidays)
+        return [near, nxt]
+    return [near]
+
+
+def get_other_indices(sector_map_path: Path | None = None) -> list[str]:
+    """Unique sector indices from sector_map.json, excluding NIFTY / NIFTY_50."""
+    path = sector_map_path or Path(__file__).parent.parent / "config" / "sector_map.json"
     try:
         data = json.loads(path.read_text())
-        stocks = data.get("stocks", {})
-        indices = {v["index"] for v in stocks.values() if v.get("index")}
+        indices = {v["index"] for v in data.get("stocks", {}).values() if v.get("index")}
         indices.discard("NIFTY")
         indices.discard("NIFTY_50")
-        return sorted(list(indices))
+        return sorted(indices)
     except Exception as exc:
-        logger.warning("Failed to load other indices from sector_map: %s", exc)
+        logger.warning("Failed to load other indices: %s", exc)
         return []
 
 
-def run_checks_for_symbol(symbol: str, target_date: date, holidays: set[date], other_indices: list[str]) -> tuple[bool, dict]:
-    """Run validation checks specific to the symbol type on target_date."""
-    results = {}
+# ── Per-date check: symbol type dispatch ──────────────────────────────────────
+
+def check_symbol_on_date(
+    symbol: str,
+    check_date: date,
+    cache: SymbolDataCache,
+    holidays: set[date],
+    other_indices: list[str],
+    check_depth: bool = False,
+) -> tuple[bool, dict]:
+    """
+    Run all applicable checks for symbol on check_date using the pre-loaded cache.
+
+    check_depth:
+      True  — initial validation (no previous PASSED date): verify required_days depth.
+              Cache covers full history so the count is meaningful.
+      False — incremental validation (continuing from a PASSED date): presence only.
+              Depth is already proven by the previous PASSED validation; re-counting
+              against a short-range cache would always fail.
+
+    Returns (all_passed, {check_name: {"ok": bool, "msg": str}}).
+    """
+    results: dict = {}
     passed = True
 
-    if symbol == "NIFTY":
-        # NIFTY Index Checks
-        # OHLCV: 180 trading sessions
-        ohlcv_ok, ohlcv_msg = validate_stock_ohlcv("NIFTY", target_date, days=180)
-        results["nifty_ohlcv"] = {"ok": ohlcv_ok, "msg": ohlcv_msg}
-        if not ohlcv_ok:
-            passed = False
-            
-        # Options: 15 days, near + next weekly if <= 2 trading days from Tuesday
-        idx_expiries = get_index_expiries(target_date, holidays)
-        results["nifty_options"] = []
-        for exp in idx_expiries:
-            opt_ok, opt_msg = validate_stock_options("NIFTY", exp, target_date, days=15)
-            results["nifty_options"].append({"expiry": str(exp), "ok": opt_ok, "msg": opt_msg})
-            if not opt_ok:
-                passed = False
-                
-        # Futures: 30 days, near monthly expiry contract
-        stock_expiries = get_stock_expiries(target_date, holidays)
-        results["nifty_futures"] = []
-        if stock_expiries:
-            near_exp = stock_expiries[0]
-            fut_ok, fut_msg = validate_stock_futures("NIFTY", near_exp, target_date, days=30)
-            results["nifty_futures"].append({"expiry": str(near_exp), "ok": fut_ok, "msg": fut_msg})
-            if not fut_ok:
-                passed = False
+    def _fail(key, msg):
+        nonlocal passed
+        results[key] = {"ok": False, "msg": msg}
+        passed = False
 
-    elif symbol == "INDIA_VIX":
-        # India VIX: 30 trading days OHLCV
-        ohlcv_ok, ohlcv_msg = validate_stock_ohlcv("INDIA_VIX", target_date, days=30)
-        results["vix_ohlcv"] = {"ok": ohlcv_ok, "msg": ohlcv_msg}
-        if not ohlcv_ok:
-            passed = False
+    def _ok(key, msg):
+        results[key] = {"ok": True, "msg": msg}
+
+    def _chk_ohlcv(sym, key, days):
+        if check_depth:
+            ok, msg = check_ohlcv(sym, check_date, cache, days)
+        else:
+            ok = check_date in cache.ohlcv_dates
+            msg = f"OHLCV {'present' if ok else 'missing'} for {sym} on {check_date}"
+        (_ok if ok else _fail)(key, msg)
+
+    def _chk_futures(sym, expiry, key, days):
+        if check_depth:
+            ok, msg = check_futures(sym, check_date, expiry, cache, days)
+        else:
+            ok = check_date in cache.futures.get(expiry, set())
+            msg = f"Futures {'present' if ok else 'missing'} for {sym} expiry={expiry} on {check_date}"
+        (_ok if ok else _fail)(key, msg)
+
+    def _chk_options(sym, expiry, key, days):
+        if check_depth:
+            ok, msg = check_options(sym, check_date, expiry, cache, days)
+        else:
+            ok = check_date in cache.options.get(expiry, set())
+            msg = f"Options {'present' if ok else 'missing'} for {sym} expiry={expiry} on {check_date}"
+        (_ok if ok else _fail)(key, msg)
+
+    if symbol == "INDIA_VIX":
+        _chk_ohlcv(symbol, "vix_ohlcv", _OHLCV_DAYS_VIX)
 
     elif symbol in other_indices:
-        # Other Sector Indices: 120 trading days OHLCV
-        ohlcv_ok, ohlcv_msg = validate_stock_ohlcv(symbol, target_date, days=120)
-        results["index_ohlcv"] = {"ok": ohlcv_ok, "msg": ohlcv_msg}
-        if not ohlcv_ok:
-            passed = False
+        _chk_ohlcv(symbol, "index_ohlcv", _OHLCV_DAYS)
+
+    elif symbol in ("NIFTY_50", "NIFTY"):
+        _chk_ohlcv("NIFTY_50", "nifty_ohlcv", _OHLCV_DAYS)
+
+        for exp in get_nifty_expiries(check_date, holidays):
+            _chk_options("NIFTY_50", exp, f"nifty_options_{exp}", _NIFTY_OPT_DAYS)
 
     else:
-        # Regular Stock Symbol Checks
-        # OHLCV: 180 trading sessions
-        ohlcv_ok, ohlcv_msg = validate_stock_ohlcv(symbol, target_date, days=180)
-        results["stock_ohlcv"] = {"ok": ohlcv_ok, "msg": ohlcv_msg}
-        if not ohlcv_ok:
-            passed = False
-            
-        # Options & Futures: 30 days, near + next monthly if <= 5 trading days from last Tuesday
-        stock_expiries = get_stock_expiries(target_date, holidays)
-        results["stock_options"] = []
-        results["stock_futures"] = []
-        for exp in stock_expiries:
-            opt_ok, opt_msg = validate_stock_options(symbol, exp, target_date, days=30)
-            results["stock_options"].append({"expiry": str(exp), "ok": opt_ok, "msg": opt_msg})
-            if not opt_ok:
-                passed = False
-                
-            fut_ok, fut_msg = validate_stock_futures(symbol, exp, target_date, days=30)
-            results["stock_futures"].append({"expiry": str(exp), "ok": fut_ok, "msg": fut_msg})
-            if not fut_ok:
-                passed = False
+        _chk_ohlcv(symbol, "stock_ohlcv", _OHLCV_DAYS)
+
+        for exp in get_stock_expiries(check_date, holidays):
+            _chk_futures(symbol, exp, f"stock_futures_{exp}", _FO_DAYS)
+            _chk_options(symbol, exp, f"stock_options_{exp}", _FO_DAYS)
 
     return passed, results
 
 
-def  validate_and_heal(symbol: str, target_date: date, holidays: set[date], other_indices: list[str], force: bool = False) -> bool:
-    """Validate data status, run chronological historical backfills for gaps, and heal today if needed."""
-    logger.info("Starting validation for %s on %s", symbol, target_date)
-    
-    # 1. Cache lookup
-    if not force:
-        cached = get_validation_state(symbol, target_date)
-        if cached and cached.get("status") == "PASSED":
-            logger.info("Validation already cached as PASSED for %s on %s", symbol, target_date)
-            return True
+# ── Healing ───────────────────────────────────────────────────────────────────
 
-    # 2. Retrieve last successful validation date
-    last_passed_date = get_last_passed_validation_date(symbol)
-    
-    # Resolve the chronological dates to backfill
-    today = get_validation_end_date(holidays)
-
-    if last_passed_date is None:
-        last_passed_date = date.today() - timedelta(days=250)
-
-    # Find all trading days between last_passed_date + 1 and target_date - 1
-    gap_dates = get_trading_day_gaps(last_passed_date, target_date - timedelta(days=1), holidays)
-
-    # 3. Gap chronological backfill
-    if gap_dates and symbol == "INDIA_VIX":
-        run_vix_backfill(last_passed_date, today)
-    elif gap_dates:
-        logger.info("%s: Found %d gap trading day(s) since last successful validation (%s). Starting gap backfills.", symbol, len(gap_dates), last_passed_date)
-        for gap in gap_dates:
-            logger.info("%s: Backfilling gap date: %s", symbol, gap)
-            try:
-                if symbol in other_indices:
-                    ingest_today_bhavcopy(gap)  # Index bhavcopy fetcher handles gap
-                elif symbol == "NIFTY":
-                    backfill_historical_date(gap)
-                else:
-                    backfill_historical_date(gap, symbol)
-            except Exception as e:
-                logger.error("%s: Failed to backfill gap date %s: %s", symbol, gap, e)
-
-    # 4. Run validation checks for today (target_date)
-    passed, results = run_checks_for_symbol(symbol, target_date, holidays, other_indices)
-    if passed:
-        logger.info("All validation checks PASSED for %s on %s", symbol, target_date)
-        upsert_validation_state(symbol, target_date, "daily", "PASSED", results)
-        return True
-
-    logger.warning("Validation FAILED initially for %s on %s. Triggering healing.", symbol, target_date)
-
-    # 5. Target-specific healing
-    failed_checks = []
-    if symbol == "NIFTY":
-        if not results.get("nifty_ohlcv", {}).get("ok"): failed_checks.append("nifty_ohlcv")
-        if any(not o["ok"] for o in results.get("nifty_options", [])): failed_checks.append("nifty_options")
-        if any(not f["ok"] for f in results.get("nifty_futures", [])): failed_checks.append("nifty_futures")
-    elif symbol == "INDIA_VIX":
-        if not results.get("vix_ohlcv", {}).get("ok"): failed_checks.append("vix_ohlcv")
-    elif symbol in other_indices:
-        if not results.get("index_ohlcv", {}).get("ok"): failed_checks.append("index_ohlcv")
-    else:
-        if not results.get("stock_ohlcv", {}).get("ok"): failed_checks.append("stock_ohlcv")
-        if any(not o["ok"] for o in results.get("stock_options", [])): failed_checks.append("stock_options")
-        if any(not f["ok"] for f in results.get("stock_futures", [])): failed_checks.append("stock_futures")
-
-    # Healing logic depending on whether target_date is today or historical
-    for check in failed_checks:
-        logger.info("%s: Healing failed check '%s' for date %s", symbol, check, target_date)
-        try:
-            if target_date == today:
-                # Live fetch for today's missing data
-                if check in ("stock_ohlcv", "nifty_ohlcv", "stock_futures", "nifty_futures"):
-                    ingest_today_kite_data(target_date, [symbol])
-                    if symbol == "NIFTY":
-                        ingest_today_bhavcopy(target_date)
-                elif check in ("stock_options", "nifty_options"):
-                    ingest_today_options(target_date, [symbol])
-                elif check == "index_ohlcv":
-                    ingest_today_bhavcopy(target_date)
-                elif check == "vix_ohlcv":
-                    run_vix_backfill(target_date, target_date)
-            else:
-                # Historical backfill for past dates
-                if symbol == "INDIA_VIX":
-                    run_vix_backfill(target_date, target_date)
-                elif symbol in other_indices:
-                    ingest_today_bhavcopy(target_date)
-                elif symbol == "NIFTY":
-                    backfill_historical_date(target_date)
-                else:
-                    backfill_historical_date(target_date, symbol)
-        except Exception as exc:
-            logger.error("%s: Failed to heal check '%s': %s", symbol, check, exc)
-
-    # Re-run checks after healing
-    passed, results = run_checks_for_symbol(symbol, target_date, holidays, other_indices)
-    if passed:
-        logger.info("Validation checks PASSED for %s on %s after healing", symbol, target_date)
-        upsert_validation_state(symbol, target_date, "daily", "PASSED", results)
-        return True
-
-    # Marks as FAILED
-    logger.error("Validation failed to resolve for %s on %s", symbol, target_date)
-    upsert_validation_state(symbol, target_date, "daily", "FAILED", results, "Validation checks failed after healing retry.")
-    return False
+def _needs(results: dict, *prefixes: str) -> bool:
+    return any(
+        k.startswith(p) and not v["ok"]
+        for p in prefixes
+        for k, v in results.items()
+    )
 
 
-def run_daily_validation(target_date: date, force: bool = False) -> bool:
+def heal_and_recheck(
+    symbol: str,
+    check_date: date,
+    results: dict,
+    cache: SymbolDataCache,
+    today: date,
+    holidays: set[date],
+    other_indices: list[str],
+) -> tuple[bool, dict]:
     """
-    Run the complete validation & self-healing process for all symbols
-    (Nifty 50 stocks, NIFTY index, INDIA_VIX, other sector indices) on the target_date.
-    Also handles FII/DII flows ingestion and pre-flight checks.
-    
-    Returns True if all symbols pass successfully, False otherwise.
+    Trigger ingestion for failed checks, then re-check using point queries.
+    Updates cache in-place for any data that lands successfully.
+    Returns (passed_after_healing, updated_results).
+    """
+    is_today = (check_date == today)
+
+    needs_ohlcv    = _needs(results, "stock_ohlcv", "nifty_ohlcv", "index_ohlcv", "vix_ohlcv")
+    needs_futures  = _needs(results, "stock_futures", "nifty_futures")
+    needs_options  = _needs(results, "stock_options", "nifty_options")
+
+    # ── Heal ──────────────────────────────────────────────────────────────────
+    if is_today:
+        if symbol == "INDIA_VIX" and needs_ohlcv:
+            _safe(lambda: run_vix_backfill(check_date, check_date), "VIX live backfill")
+
+        elif symbol in other_indices and needs_ohlcv:
+            _safe(lambda: ingest_today_bhavcopy(check_date), "index bhavcopy")
+
+        else:
+            if needs_ohlcv or needs_futures:
+                _safe(lambda: ingest_today_kite_data(check_date, [symbol]), "Kite live OHLCV+futures")
+            if needs_options:
+                _safe(lambda: ingest_today_options(check_date, [symbol]), "live options")
+
+    else:
+        # Historical — use bhavcopy only if it hasn't already been run for this date
+        if symbol == "INDIA_VIX" and needs_ohlcv:
+            _safe(lambda: run_vix_backfill(check_date, check_date), "VIX historical backfill")
+
+        elif needs_ohlcv and needs_futures or needs_options:
+            _safe(lambda: backfill_historical_date(check_date), f"equity bhavcopy {check_date}")
+
+        # If bhavcopy already ran, the symbol simply isn't in it — no point re-downloading
+
+    # ── Re-check via point queries ────────────────────────────────────────────
+    for key, val in results.items():
+        if val["ok"]:
+            continue   # already passed, skip
+
+        if "ohlcv" in key or "vix" in key:
+            db_sym = "NIFTY_50" if symbol in ("NIFTY", "NIFTY_50") else symbol
+            if point_check_ohlcv(db_sym, check_date):
+                cache.mark_ohlcv_present(check_date)
+                results[key] = {"ok": True, "msg": f"OHLCV healed for {symbol} on {check_date}"}
+
+        elif "futures" in key:
+            # Extract expiry from key suffix  e.g. stock_futures_2026-07-29
+            expiry = _expiry_from_key(key)
+            db_sym = "NIFTY_50" if symbol in ("NIFTY", "NIFTY_50") else symbol
+            if expiry and point_check_futures(db_sym, expiry, check_date):
+                cache.mark_futures_present(expiry, check_date)
+                results[key] = {"ok": True, "msg": f"Futures healed for {symbol} expiry={expiry} on {check_date}"}
+
+        elif "options" in key:
+            expiry = _expiry_from_key(key)
+            db_sym = "NIFTY_50" if symbol in ("NIFTY", "NIFTY_50") else symbol
+            if expiry and point_check_options(db_sym, expiry, check_date):
+                cache.mark_options_present(expiry, check_date)
+                results[key] = {"ok": True, "msg": f"Options healed for {symbol} expiry={expiry} on {check_date}"}
+
+    all_passed = all(v["ok"] for v in results.values())
+    return all_passed, results
+
+
+def _safe(fn, label: str) -> None:
+    try:
+        fn()
+    except Exception as exc:
+        logger.error("Heal step '%s' failed: %s", label, exc)
+
+
+def _expiry_from_key(key: str) -> date | None:
+    """Extract date from keys like 'stock_futures_2026-07-29'."""
+    parts = key.rsplit("_", 3)
+    try:
+        return date.fromisoformat(parts[-1])
+    except (ValueError, IndexError):
+        return None
+
+
+# ── Per-symbol orchestrator ───────────────────────────────────────────────────
+
+def validate_and_heal(
+    symbol: str,
+    today: date,
+    holidays: set[date],
+    other_indices: list[str],
+) -> bool:
+    """
+    Validate and self-heal a symbol across all gap dates up to today.
+    Returns True only if every date in the range passes validation.
+    """
+    raw_last_passed = get_last_passed_validation_date(symbol)
+    is_initial      = raw_last_passed is None
+
+    # Initial validation: go back far enough to cover the full required depth.
+    # For incremental: start from the day after the last PASSED date — no lookback needed
+    # because depth is already proven by the previous PASSED validation.
+    last_passed = raw_last_passed or (today - timedelta(days=_OHLCV_CAL_BUFFER))
+
+    dates_to_check = get_trading_days_in_range(last_passed, today, holidays)
+
+    if not dates_to_check:
+        logger.info("%s: already up to date (last passed: %s)", symbol, last_passed)
+        return True
+
+    logger.info(
+        "%s: %s validation — %d date(s) %s → %s",
+        symbol,
+        "initial" if is_initial else "incremental",
+        len(dates_to_check),
+        dates_to_check[0],
+        dates_to_check[-1],
+    )
+
+    # Cache covers exactly the gap — no prior-history lookback.
+    # For initial runs, the gap itself spans _OHLCV_CAL_BUFFER days, so the cache
+    # contains all the historical rows needed for the depth check.
+    fo_start  = dates_to_check[0]
+    fo_end = dates_to_check[-1]
+    db_symbol = "NIFTY_50" if symbol in ("NIFTY", "NIFTY_50") else symbol
+    cache     = SymbolDataCache(db_symbol, fo_start, fo_end, today)
+
+    all_passed = True
+
+    for check_date in dates_to_check:
+        passed, results = check_symbol_on_date(
+            symbol, check_date, cache, holidays, other_indices,
+            check_depth=is_initial,
+        )
+
+        if not passed:
+            logger.warning("%s: checks failed on %s — healing...", symbol, check_date)
+            passed, results = heal_and_recheck(
+                symbol, check_date, results, cache, today, holidays, other_indices
+            )
+
+        status = "PASSED" if passed else "FAILED"
+        upsert_validation_state(symbol, check_date, "daily", status, results)
+
+        if passed:
+            logger.debug("%s: %s PASSED", symbol, check_date)
+        else:
+            failed_checks = [k for k, v in results.items() if not v["ok"]]
+            logger.error(
+                "%s: %s FAILED after healing — %s",
+                symbol, check_date, failed_checks,
+            )
+            all_passed = False
+            # Continue to next date rather than aborting — log all gaps
+
+    return all_passed
+
+
+# ── Daily run ─────────────────────────────────────────────────────────────────
+
+def run_daily_validation(target_date: date) -> bool:
+    """
+    Full daily validation for all symbols (stocks + NIFTY + VIX + sector indices).
+    Runs pre-flight checks, FII/DII ingestion, then per-symbol validation.
     """
     holidays = get_holiday_dates()
-    
-    # 1. Pre-flight infrastructure validation
+
+    # Pre-flight
     db_ok, db_msg = validate_db_connectivity()
     if not db_ok:
-        logger.critical("Database connectivity failed: %s. Aborting validation.", db_msg)
+        logger.critical("DB connectivity failed: %s — aborting.", db_msg)
         send_preflight_failed(f"DB Connectivity: {db_msg}", str(target_date))
         return False
-        
+
     kite_ok, kite_msg = validate_kite_token()
     if not kite_ok:
         logger.warning("Kite token check failed: %s", kite_msg)
         send_token_reminder()
 
-    # 2. Ingest FII/DII flows for target_date as first step
-    logger.info("Fetching FII/DII flows for date: %s", target_date)
+    # FII/DII
+    logger.info("Fetching FII/DII flows for %s", target_date)
     try:
         session = create_nse_session()
         fii_data = fetch_fii_dii(session)
-        db_row = fii_dii_to_db_row(fii_data, target_date)
-        upsert_fii_dii_flow(db_row)
-        logger.info("FII/DII flows successfully stored for %s", target_date)
+        upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
+        logger.info("FII/DII flows stored for %s", target_date)
     except Exception as exc:
-        logger.warning("FII/DII flows ingestion failed: %s. Attempting fallback to cache.", exc)
+        logger.warning("FII/DII ingestion failed (%s) — using cached value", exc)
         try:
             cached = get_latest_fii_dii()
             if cached:
-                cached_row = dict(cached)
-                cached_row.pop("id", None)
-                cached_row.pop("created_at", None)
-                cached_row["source"] = "CACHED"
-                cached_row["date"] = str(target_date)
-                upsert_fii_dii_flow(cached_row)
-                logger.info("FII/DII using cached value from %s", cached.get("date"))
+                row = {**dict(cached), "source": "CACHED", "date": str(target_date)}
+                row.pop("id", None)
+                row.pop("created_at", None)
+                upsert_fii_dii_flow(row)
         except Exception as cache_exc:
-            logger.error("FII/DII fallback to cache failed: %s", cache_exc)
+            logger.error("FII/DII cache fallback also failed: %s", cache_exc)
 
-    # 3. Resolve symbols universe
-    other_indices = get_other_indices()
-    stocks_dict = get_stock_list_for_analysis(include_kite_trades=True)
-    stock_symbols = list(stocks_dict.keys())
-    
-    symbols_universe = sorted(list(set(stock_symbols) | {"NIFTY", "INDIA_VIX"} | set(other_indices)))
-    logger.info("Running daily validation checks for %d symbols on %s", len(symbols_universe), target_date)
+    # Symbol universe
+    other_indices  = get_other_indices()
+    stocks_dict    = get_stock_list_for_analysis(include_kite_trades=True)
+    universe = sorted(
+        set(stocks_dict.keys()) | {"NIFTY_50", "INDIA_VIX"} | set(other_indices)
+    )
+    logger.info("Validating %d symbols for %s", len(universe), target_date)
 
-    success_count = 0
-    failed_symbols = []
-    
-    for idx, symbol in enumerate(symbols_universe):
-        logger.info("[%d/%d] Validating %s", idx + 1, len(symbols_universe), symbol)
+    passed_count, failed_symbols = 0, []
+
+    for idx, symbol in enumerate(universe, 1):
+        logger.info("[%d/%d] %s", idx, len(universe), symbol)
         try:
-            ok = validate_and_heal(symbol, target_date, holidays, other_indices, force=force)
+            ok = validate_and_heal(symbol, target_date, holidays, other_indices)
             if ok:
-                success_count += 1
+                passed_count += 1
             else:
                 failed_symbols.append(symbol)
-        except Exception as e:
-            logger.error("Exception during validation of %s: %s", symbol, e)
+        except Exception as exc:
+            logger.error("Unhandled error validating %s: %s", symbol, exc)
             failed_symbols.append(symbol)
 
-    logger.info("Daily validation run finished. Passed: %d/%d. Failed: %s", success_count, len(symbols_universe), failed_symbols)
-    if failed_symbols:
-        logger.warning("Validation failed for some symbols. Self-healing was unable to resolve: %s", failed_symbols)
-        return False
-        
-    logger.info("All active symbols validation passed!")
-    return True
+    logger.info(
+        "Validation complete: %d/%d passed. Failed: %s",
+        passed_count, len(universe), failed_symbols or "none",
+    )
+    return not failed_symbols
 
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="System Validation & Self-Healing Utility")
-    parser.add_argument("--mode", choices=["daily", "manual"], required=True, help="daily validates all watchlist+indices; manual validates one symbol")
-    parser.add_argument("--symbol", help="Target symbol (required for manual mode)")
-    parser.add_argument("--date", help="Target date YYYY-MM-DD (defaults to last trading day)")
-    parser.add_argument("--force", action="store_true", help="Bypass cache and force check execution")
+    parser = argparse.ArgumentParser(description="Validation & self-healing runner")
+    parser.add_argument("--mode", choices=["daily", "manual"], required=True)
+    parser.add_argument("--symbol", help="Symbol for manual mode")
+    parser.add_argument("--date",   help="Target date YYYY-MM-DD (default: last trading day)")
     args = parser.parse_args()
 
-    # Load holidays
     holidays = get_holiday_dates()
-    
-    # Resolve target date
-    if args.date:
-        target_date = date.fromisoformat(args.date)
-    else:
-        target_date = get_validation_end_date(holidays)
+    target_date = (
+        date.fromisoformat(args.date)
+        if args.date
+        else get_validation_end_date(holidays)
+    )
 
     if args.mode == "manual":
-        # Pre-flight infrastructure validation
         db_ok, db_msg = validate_db_connectivity()
         if not db_ok:
-            logger.critical("Database connectivity failed: %s. Aborting validation.", db_msg)
+            logger.critical("DB connectivity failed: %s", db_msg)
             sys.exit(1)
-            
-        other_indices = get_other_indices()
         if not args.symbol:
-            logger.error("Error: --symbol is required in manual mode")
+            logger.error("--symbol required in manual mode")
             sys.exit(1)
-        success = validate_and_heal(args.symbol.upper(), target_date, holidays, other_indices, force=args.force)
-        if not success:
-            sys.exit(1)
+        other_indices = get_other_indices()
+        ok = validate_and_heal(
+            args.symbol.upper(), target_date, holidays, other_indices
+        )
+        sys.exit(0 if ok else 1)
     else:
-        # Daily mode: use the new utility function
-        success = run_daily_validation(target_date, force=args.force)
-        if not success:
-            sys.exit(1)
+        ok = run_daily_validation(target_date)
+        sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
+    )
     main()
