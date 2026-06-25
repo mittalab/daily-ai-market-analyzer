@@ -502,6 +502,45 @@ def run_daily_validation(target_date: date) -> bool:
 
 # ── Convenience entry-point ───────────────────────────────────────────────────
 
+_LOG_DIR = Path(__file__).parent.parent / "logs"
+
+
+def _ensure_file_logging() -> Path:
+    """
+    Attach a RotatingFileHandler to the root logger the first time this runs.
+    Safe to call multiple times — only one handler is ever added.
+    Returns the log file path so callers can print it.
+    """
+    import logging.handlers
+
+    _LOG_DIR.mkdir(exist_ok=True)
+    log_file = _LOG_DIR / "validation.log"
+
+    root = logging.getLogger()
+    # Guard: don't add a second handler if one is already writing to this file
+    already = any(
+        isinstance(h, logging.handlers.RotatingFileHandler)
+        and getattr(h, "baseFilename", "") == str(log_file)
+        for h in root.handlers
+    )
+    if not already:
+        fh = logging.handlers.RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10 MB per file
+            backupCount=5,
+            encoding="utf-8",
+        )
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(logging.Formatter(
+            "%(asctime)s  %(levelname)-8s  %(name)s — %(message)s"
+        ))
+        root.addHandler(fh)
+        if root.level == logging.NOTSET:
+            root.setLevel(logging.INFO)
+
+    return log_file
+
+
 def run_validation_now() -> bool:
     """
     Determine the correct validation target date and run full validation.
@@ -512,17 +551,23 @@ def run_validation_now() -> bool:
       - Otherwise → most recent trading day before today
         (walks backwards from yesterday skipping weekends and holidays)
 
+    Logs are written to  logs/validation.log  (rotating, max 10 MB × 5 files)
+    in addition to any console handler already configured by the caller.
+
     Returns True if all symbols passed, False otherwise.
     """
+    log_file = _ensure_file_logging()
+
     IST = pytz.timezone("Asia/Kolkata")
     holidays = get_holiday_dates()
     target_date = get_validation_end_date(holidays)
 
     now_ist = datetime.now(IST)
     logger.info(
-        "run_validation_now called at %s IST — target_date resolved to %s",
+        "run_validation_now called at %s IST — target_date=%s  log=%s",
         now_ist.strftime("%Y-%m-%d %H:%M:%S"),
         target_date,
+        log_file,
     )
     return run_daily_validation(target_date)
 
@@ -563,7 +608,7 @@ def main():
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
     run_validation_now()
