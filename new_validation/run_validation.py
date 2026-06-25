@@ -500,6 +500,33 @@ def run_daily_validation(target_date: date) -> bool:
     return not failed_symbols
 
 
+# ── Convenience entry-point ───────────────────────────────────────────────────
+
+def run_validation_now() -> bool:
+    """
+    Determine the correct validation target date and run full validation.
+
+    Target date selection (IST):
+      - If it is a trading day AND current time >= 15:40 → today
+        (market has closed, today's data is available via Kite API)
+      - Otherwise → most recent trading day before today
+        (walks backwards from yesterday skipping weekends and holidays)
+
+    Returns True if all symbols passed, False otherwise.
+    """
+    IST = pytz.timezone("Asia/Kolkata")
+    holidays = get_holiday_dates()
+    target_date = get_validation_end_date(holidays)
+
+    now_ist = datetime.now(IST)
+    logger.info(
+        "run_validation_now called at %s IST — target_date resolved to %s",
+        now_ist.strftime("%Y-%m-%d %H:%M:%S"),
+        target_date,
+    )
+    return run_daily_validation(target_date)
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -539,4 +566,5 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
-    main()
+    run_validation_now()
+    #main()
