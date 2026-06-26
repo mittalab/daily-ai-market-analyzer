@@ -433,10 +433,18 @@ def validate_and_heal(
 
 # ── Daily run ─────────────────────────────────────────────────────────────────
 
-def run_daily_validation(target_date: date) -> bool:
+def run_daily_validation(
+    target_date: date,
+    symbol: str | None = None,
+    include_indexes: bool = False,
+) -> bool:
     """
-    Full daily validation for all symbols (stocks + NIFTY + VIX + sector indices).
-    Runs pre-flight checks, FII/DII ingestion, then per-symbol validation.
+    Validate symbols with pre-flight checks and (on full runs) FII/DII ingestion.
+
+    symbol=None  → full run: all stocks + NIFTY_50 + INDIA_VIX + sector indices
+                   FII/DII ingestion is performed.
+    symbol=<str> → targeted run: just that symbol, or symbol + all indexes when
+                   include_indexes=True. FII/DII ingestion is skipped.
     """
     holidays = get_holiday_dates()
 
@@ -452,46 +460,54 @@ def run_daily_validation(target_date: date) -> bool:
         logger.warning("Kite token check failed: %s", kite_msg)
         send_token_reminder()
 
-    # FII/DII
-    logger.info("Fetching FII/DII flows for %s", target_date)
-    try:
-        session = create_nse_session()
-        fii_data = fetch_fii_dii(session)
-        upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
-        logger.info("FII/DII flows stored for %s", target_date)
-    except Exception as exc:
-        logger.warning("FII/DII ingestion failed (%s) — using cached value", exc)
+    other_indices = get_other_indices()
+
+    # FII/DII — full runs only
+    if symbol is None:
+        logger.info("Fetching FII/DII flows for %s", target_date)
         try:
-            cached = get_latest_fii_dii()
-            if cached:
-                row = {**dict(cached), "source": "CACHED", "date": str(target_date)}
-                row.pop("id", None)
-                row.pop("created_at", None)
-                upsert_fii_dii_flow(row)
-        except Exception as cache_exc:
-            logger.error("FII/DII cache fallback also failed: %s", cache_exc)
+            session = create_nse_session()
+            fii_data = fetch_fii_dii(session)
+            upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
+            logger.info("FII/DII flows stored for %s", target_date)
+        except Exception as exc:
+            logger.warning("FII/DII ingestion failed (%s) — using cached value", exc)
+            try:
+                cached = get_latest_fii_dii()
+                if cached:
+                    row = {**dict(cached), "source": "CACHED", "date": str(target_date)}
+                    row.pop("id", None)
+                    row.pop("created_at", None)
+                    upsert_fii_dii_flow(row)
+            except Exception as cache_exc:
+                logger.error("FII/DII cache fallback also failed: %s", cache_exc)
 
     # Symbol universe
-    other_indices  = get_other_indices()
-    stocks_dict    = get_stock_list_for_analysis(include_kite_trades=True)
-    universe = sorted(
-        set(stocks_dict.keys()) | {"NIFTY_50", "INDIA_VIX"} | set(other_indices)
-    )
-    logger.info("Validating %d symbols for %s", len(universe), target_date)
+    if symbol is None:
+        stocks_dict = get_stock_list_for_analysis(include_kite_trades=True)
+        universe = sorted(
+            set(stocks_dict.keys()) | {"NIFTY_50", "INDIA_VIX"} | set(other_indices)
+        )
+    elif include_indexes:
+        universe = sorted({symbol, "NIFTY_50", "INDIA_VIX"} | set(other_indices))
+    else:
+        universe = [symbol]
+
+    logger.info("Validating %d symbol(s) for %s", len(universe), target_date)
 
     passed_count, failed_symbols = 0, []
 
-    for idx, symbol in enumerate(universe, 1):
-        logger.info("[%d/%d] %s", idx, len(universe), symbol)
+    for idx, sym in enumerate(universe, 1):
+        logger.info("[%d/%d] %s", idx, len(universe), sym)
         try:
-            ok = validate_and_heal(symbol, target_date, holidays, other_indices)
+            ok = validate_and_heal(sym, target_date, holidays, other_indices)
             if ok:
                 passed_count += 1
             else:
-                failed_symbols.append(symbol)
+                failed_symbols.append(sym)
         except Exception as exc:
-            logger.error("Unhandled error validating %s: %s", symbol, exc)
-            failed_symbols.append(symbol)
+            logger.error("Unhandled error validating %s: %s", sym, exc)
+            failed_symbols.append(sym)
 
     logger.info(
         "Validation complete: %d/%d passed. Failed: %s",
@@ -540,7 +556,6 @@ def _ensure_file_logging() -> Path:
 
     return log_file
 
-
 def run_validation_now() -> bool:
     """
     Determine the correct validation target date and run full validation.
@@ -570,6 +585,32 @@ def run_validation_now() -> bool:
         log_file,
     )
     return run_daily_validation(target_date)
+
+
+def run_validation_now_for_symbol(symbol: str, include_indexes: bool) -> bool:
+    """
+    Validate a single symbol, optionally including all indexes.
+
+    Delegates to run_daily_validation with the correct target date.
+    Universe:
+      include_indexes=True  → symbol + NIFTY_50 + INDIA_VIX + all sector indices
+      include_indexes=False → symbol only
+    """
+    log_file = _ensure_file_logging()
+
+    IST = pytz.timezone("Asia/Kolkata")
+    holidays = get_holiday_dates()
+    target_date = get_validation_end_date(holidays)
+
+    now_ist = datetime.now(IST)
+    logger.info(
+        "run_validation_now_for_symbol(%s, include_indexes=%s) at %s IST — target_date=%s  log=%s",
+        symbol, include_indexes,
+        now_ist.strftime("%Y-%m-%d %H:%M:%S"),
+        target_date,
+        log_file,
+    )
+    return run_daily_validation(target_date, symbol=symbol.upper(), include_indexes=include_indexes)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

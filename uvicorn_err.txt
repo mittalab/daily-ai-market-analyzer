@@ -12756,3 +12756,93 @@ httpx.ConnectError: [Errno 11001] getaddrinfo failed
 2026-06-26 03:52:52 INFO httpx — HTTP Request: POST https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens "HTTP/2 200 OK"
 2026-06-26 03:52:52 INFO integrations.kite_oauth — Kite token exchanged and stored. User: NOK061. Expires: 2026-06-27 00:00 IST
 2026-06-26 03:52:52 INFO main — Kite OAuth: token stored successfully
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key&limit=1 "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/kite_tokens?select=%2A&user_id=eq.primary "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/system_config?select=key%2Cvalue "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=input_tokens%2Coutput_tokens&completed_at=gte.2026-06-01 "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/watchlist_staging?select=%2A&order=days_in_stage.desc "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/lot_sizes?select=symbol%2Clot_size "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/trade_setups?select=%2A&setup_date=eq.2026-06-25&order=conviction_score.desc "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/analysis_sessions?select=%2A&order=created_at.desc&limit=1 "HTTP/2 200 OK"
+2026-06-26 04:38:39 INFO httpx — HTTP Request: GET https://ytlsqyzwoivtmvznojzb.supabase.co/rest/v1/session_claude_turns?select=turn_number%2Cturn_type%2Csymbol%2Coutput_text%2Ccompleted_at&session_id=eq.SESSION_20260625&turn_type=in.%28market_context%2Cdeep_analysis%29&order=turn_number.asc "HTTP/2 200 OK"
+2026-06-26 06:00:23 INFO apscheduler.executors.default — Running job "Supabase keepalive (trigger: cron[hour='6', minute='0'], next run at: 2026-06-27 06:00:00 IST)" (scheduled at 2026-06-26 06:00:00+05:30)
+2026-06-26 06:00:23 ERROR database.queries — Keepalive failed: [Errno 11001] getaddrinfo failed
+2026-06-26 06:00:23 WARNING scheduler — Keepalive: Supabase ping failed
+2026-06-26 06:00:23 INFO apscheduler.executors.default — Job "Supabase keepalive (trigger: cron[hour='6', minute='0'], next run at: 2026-06-27 06:00:00 IST)" executed successfully
+2026-06-26 07:00:19 INFO apscheduler.executors.default — Running job "Morning brief (recurring) (trigger: cron[day_of_week='mon-fri', hour='7', minute='0'], next run at: 2026-06-29 07:00:00 IST)" (scheduled at 2026-06-26 07:00:00+05:30)
+2026-06-26 07:00:19 INFO scheduler — Morning brief (recurring) triggered: finding latest session
+2026-06-26 07:00:19 ERROR apscheduler.executors.default — Job "Morning brief (recurring) (trigger: cron[day_of_week='mon-fri', hour='7', minute='0'], next run at: 2026-06-29 07:00:00 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_transports\default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpcore\_sync\connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpcore\_sync\connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+        pool_request.request
+    )
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpcore\_sync\connection.py", line 101, in handle_request
+    raise exc
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpcore\_sync\connection.py", line 78, in handle_request
+    stream = self._connect(request)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpcore\_sync\connection.py", line 124, in _connect
+    stream = self._network_backend.connect_tcp(**kwargs)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpcore\_backends\sync.py", line 207, in connect_tcp
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: [Errno 11001] getaddrinfo failed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\scheduler.py", line 325, in job_morning_brief
+    ref_date = date.fromisoformat(session_date_str)
+             ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\database\queries.py", line 427, in get_latest_session
+    contracts_sorted = sorted(contracts, key=lambda x: x["expiry_date"])
+     ^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\postgrest\_sync\request_builder.py", line 57, in execute
+    r = self.session.request(
+        self.http_method,
+    ...<3 lines>...
+        headers=self.headers,
+    )
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_client.py", line 914, in send
+    response = self._send_handling_auth(
+        request,
+    ...<2 lines>...
+        history=[],
+    )
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+        request,
+        follow_redirects=follow_redirects,
+        history=history,
+    )
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_transports\default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\29abh\AppData\Local\Programs\Python\Python314\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\29abh\Projects\Trading\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: [Errno 11001] getaddrinfo failed
