@@ -18,9 +18,12 @@ htmlcov/
 venv/
 .venv/
 env/
+uvicorn_err.txt
+uvicorn_out.txt
+implementation_plan.md
 
 # Logs — keep directory, ignore content
-logs/*.log
+logs/
 !logs/.gitkeep
 
 # IDE
