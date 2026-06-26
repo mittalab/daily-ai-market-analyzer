@@ -123,15 +123,31 @@ class SymbolDataCache:
     def _fetch_fo_dates(self, table: str, date_col: str, start: date, end: date) -> dict[date, set[date]]:
         """Single query for all expiries in range → {expiry: set[snapshot_dates]}."""
         try:
-            resp = (
+            q = (
                 get_client()
                 .table(table)
                 .select(f"{date_col},expiry_date")
                 .eq("symbol", self.symbol)
                 .gte(date_col, str(start))
                 .lte(date_col, str(end))
-                .execute()
             )
+            if table == "options_snapshots":
+                # Find a sample strike price for this symbol to limit returned rows and prevent pagination limits
+                sample = (
+                    get_client()
+                    .table("options_snapshots")
+                    .select("strike")
+                    .eq("symbol", self.symbol)
+                    .limit(1)
+                    .execute()
+                )
+                if sample.data:
+                    strike_val = sample.data[0]["strike"]
+                    q = q.eq("strike", strike_val).eq("option_type", "CE")
+                else:
+                    return {}
+
+            resp = q.execute()
             result: dict[date, set[date]] = {}
             for r in resp.data:
                 exp  = date.fromisoformat(r["expiry_date"])

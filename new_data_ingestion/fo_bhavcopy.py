@@ -42,7 +42,12 @@ _LEGACY_URL = (
 )
 
 _UDIFF_BASE    = "https://www.nseindia.com"
-_UDIFF_ARCHIVE = "FO_BhavCopy"
+_UDIFF_ARCHIVE = json.dumps([{
+    "name":     "F&O - UDiFF Common Bhavcopy Final (zip)",
+    "type":     "archives",
+    "category": "derivatives",
+    "section":  "equity",
+}])
 
 # July 8, 2024 is the official start of UDiFF formats for FO bhavcopy
 _UDIFF_CUTOFF = date(2024, 7, 8)
@@ -225,6 +230,10 @@ def _download_udiff(session: requests.Session, d: date) -> pd.DataFrame | None:
     if r.status_code != 200 or len(r.content) < 500:
         logger.warning("%s: UDiFF unexpected HTTP %d (size %d)", d, r.status_code, len(r.content))
         return None
+
+    cd = r.headers.get("Content-Disposition", "")
+    fo_filename = cd.split('filename=')[-1].strip('"') if "filename=" in cd else "unknown"
+    logger.info("Found F&O bhavcopy from NSE: %s (%d bytes)", fo_filename, len(r.content))
 
     try:
         with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
