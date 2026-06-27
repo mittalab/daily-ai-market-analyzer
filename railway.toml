@@ -2,4 +2,4 @@
 restartPolicyType = "always"
 
 [build]
-builder = "nixpacks"
+builder = "railpack"
