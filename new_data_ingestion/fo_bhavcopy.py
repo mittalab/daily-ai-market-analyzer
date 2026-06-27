@@ -44,7 +44,7 @@ _LEGACY_URL = (
 import os as _os, tempfile as _tempfile
 _TMP_DIR = (
     Path(_tempfile.gettempdir()) / "swing_trading_tmp"
-    if _os.getenv("RAILWAY_ENVIRONMENT")
+    if _os.getenv("RAILWAY_ENVIRONMENT_NAME")
     else Path(__file__).parent.parent / "tmp"
 )
 _TMP_DIR.mkdir(parents=True, exist_ok=True)
