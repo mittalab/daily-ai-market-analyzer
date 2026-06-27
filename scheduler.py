@@ -72,7 +72,7 @@ def job_morning_bhavcopy() -> None:
     target_date = last_trading_day(today - timedelta(days=1))
     logger.info("Morning bhavcopy: fetching equity + FO data for %s", target_date)
 
-    send_validation_start(str(target_date))
+    send_validation_start(str(target_date), label="F&O Universe")
 
     # Equity + indices bhavcopy — no_overwrite preserves yesterday's Kite data
     try:
@@ -103,10 +103,10 @@ def job_morning_bhavcopy() -> None:
     try:
         from new_validation.run_validation import run_fo_stocks_validation
         passed, total, failed = run_fo_stocks_validation(target_date)
-        send_validation_complete(str(target_date), passed, total, failed)
+        send_validation_complete(str(target_date), passed, total, failed, label="F&O Universe")
     except Exception as exc:
         logger.error("Morning FO stocks validation failed: %s", exc)
-        send_validation_complete(str(target_date), 0, 0, [f"ERROR: {str(exc)[:100]}"])
+        send_validation_complete(str(target_date), 0, 0, [f"ERROR: {str(exc)[:100]}"], label="F&O Universe")
 
 
 # ── Job 3: Morning brief + Kite token check ────────────────────────────────────
@@ -241,7 +241,7 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         job_morning_bhavcopy,
         CronTrigger(day_of_week="mon-fri", hour=6, minute=30, **ist),
         id="morning_bhavcopy",
-        name="Morning bhavcopy (equity + FO)",
+        name="Morning FO bhavcopy",
         replace_existing=True,
         misfire_grace_time=1800,
     )
@@ -261,7 +261,7 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         job_kite_check,
         CronTrigger(day_of_week="mon-fri", hour=9, minute=0, **ist),
         id="kite_check_9am",
-        name="Kite token check 9 AM",
+        name="Kite Check",
         replace_existing=True,
         misfire_grace_time=600,
     )
@@ -271,7 +271,7 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         job_kite_check,
         CronTrigger(day_of_week="mon-fri", hour=13, minute=0, **ist),
         id="kite_check_1pm",
-        name="Kite token check 1 PM",
+        name="Kite Check",
         replace_existing=True,
         misfire_grace_time=600,
     )
@@ -281,7 +281,7 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         job_analysis_pipeline,
         CronTrigger(day_of_week="mon-fri", hour=16, minute=0, **ist),
         id="analysis_pipeline",
-        name="Validation + Claude analysis pipeline",
+        name="Claude analysis",
         replace_existing=True,
         misfire_grace_time=1800,
     )

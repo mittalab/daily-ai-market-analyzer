@@ -274,10 +274,11 @@ def send_preflight_failed(reason: str, trade_date: str) -> int | None:
     return send_loud(text)
 
 
-def send_validation_start(trade_date: str) -> int | None:
+def send_validation_start(trade_date: str, label: str = "Key Stocks") -> int | None:
     text = (
         f"🔍 <b>Validation Started — {trade_date}</b>\n"
-        f"Running data checks and self-healing for all symbols..."
+        f"Scope: <b>{label}</b>\n"
+        f"Running data checks and self-healing..."
     )
     return send_silent(text)
 
@@ -287,6 +288,7 @@ def send_validation_complete(
     passed: int,
     total: int,
     failed_symbols: list,
+    label: str = "Key Stocks",
 ) -> int | None:
     if failed_symbols:
         cap = failed_symbols[:20]
@@ -294,13 +296,14 @@ def send_validation_complete(
         more = f" (+{len(failed_symbols) - 20} more)" if len(failed_symbols) > 20 else ""
         text = (
             f"⚠️ <b>Validation Complete — {trade_date}</b>\n"
+            f"Scope: <b>{label}</b>\n"
             f"Passed: <code>{passed}/{total}</code>\n"
             f"Failed: {syms}{more}"
         )
     else:
         text = (
             f"✅ <b>Validation Complete — {trade_date}</b>\n"
-            f"All <code>{total}</code> symbols passed."
+            f"Scope: <b>{label}</b> — all <code>{total}</code> symbols passed."
         )
     return send_silent(text)
 
