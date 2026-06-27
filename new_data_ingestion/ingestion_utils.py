@@ -15,6 +15,7 @@ from database.queries import (
     upsert_options_snapshots,
     upsert_futures_snapshots,
     get_kite_token,
+    get_client,
 )
 from new_data_ingestion.nse_bhavcopy import (
     fetch_equity_bhavcopy,
@@ -239,6 +240,85 @@ def ingest_today_kite_data(for_date: date | None = None, symbols: list[str] | No
     return summary
 
 
+def _check_backfill_coverage(target_date: date) -> None:
+    """
+    After a full backfill, log which expected symbols are missing in each table.
+    Three bulk queries: price_history (equity + indices), futures_snapshots, options_snapshots.
+    """
+    expected_stocks  = sorted(get_stock_list_for_analysis().keys())
+    expected_indices = ["INDIA_VIX", "NIFTY_50"]
+    all_equity       = expected_stocks + expected_indices
+
+    # ── OHLCV (equity + indices) ──────────────────────────────────────────────
+    try:
+        resp = (
+            get_client()
+            .table("price_history")
+            .select("symbol")
+            .eq("date", str(target_date))
+            .in_("symbol", all_equity)
+            .limit(len(all_equity) + 10)
+            .execute()
+        )
+        present = {r["symbol"] for r in resp.data}
+        missing_stocks  = [s for s in expected_stocks  if s not in present]
+        missing_indices = [s for s in expected_indices if s not in present]
+        logger.info(
+            "Backfill coverage [OHLCV]   %s: %d/%d stocks, %d/%d indices%s%s",
+            target_date,
+            len(expected_stocks)  - len(missing_stocks),  len(expected_stocks),
+            len(expected_indices) - len(missing_indices), len(expected_indices),
+            f" | stocks missing: {missing_stocks}"   if missing_stocks  else "",
+            f" | indices missing: {missing_indices}" if missing_indices else "",
+        )
+    except Exception as exc:
+        logger.error("OHLCV coverage check failed for %s: %s", target_date, exc)
+
+    # ── Futures ───────────────────────────────────────────────────────────────
+    try:
+        resp = (
+            get_client()
+            .table("futures_snapshots")
+            .select("symbol")
+            .eq("snapshot_date", str(target_date))
+            .in_("symbol", expected_stocks)
+            .limit(len(expected_stocks) * 3)   # up to 2 expiries per stock + buffer
+            .execute()
+        )
+        present = {r["symbol"] for r in resp.data}
+        missing = [s for s in expected_stocks if s not in present]
+        logger.info(
+            "Backfill coverage [Futures] %s: %d/%d stocks%s",
+            target_date,
+            len(expected_stocks) - len(missing), len(expected_stocks),
+            f" | missing: {missing}" if missing else "",
+        )
+    except Exception as exc:
+        logger.error("Futures coverage check failed for %s: %s", target_date, exc)
+
+    # ── Options ───────────────────────────────────────────────────────────────
+    try:
+        resp = (
+            get_client()
+            .table("options_snapshots")
+            .select("symbol")
+            .eq("snapshot_date", str(target_date))
+            .in_("symbol", expected_stocks)
+            .limit(10000)   # many strikes per symbol; dedup in Python
+            .execute()
+        )
+        present = {r["symbol"] for r in resp.data}
+        missing = [s for s in expected_stocks if s not in present]
+        logger.info(
+            "Backfill coverage [Options] %s: %d/%d stocks%s",
+            target_date,
+            len(expected_stocks) - len(missing), len(expected_stocks),
+            f" | missing: {missing}" if missing else "",
+        )
+    except Exception as exc:
+        logger.error("Options coverage check failed for %s: %s", target_date, exc)
+
+
 def backfill_historical_date(target_date: date, symbol: str | None = None) -> dict:
     """
     Backfill past historical data for a specific date:
@@ -270,5 +350,8 @@ def backfill_historical_date(target_date: date, symbol: str | None = None) -> di
         logger.error("F&O bhavcopy backfill failed for %s: %s", target_date, exc)
         summary["errors"].append(f"fo_bhavcopy: {exc}")
         summary["ok"] = False
+
+    # # 3. Coverage validation — log which symbols landed in each table
+    # _check_backfill_coverage(target_date)
 
     return summary
