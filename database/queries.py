@@ -155,16 +155,17 @@ def get_fii_dii_flows(days: int = 30) -> list[dict]:
     return list(reversed(resp.data))
 
 
-def get_latest_fii_dii() -> dict | None:
-    """Return the most recent FII/DII row. Used as fallback when today's fetch fails."""
-    resp = (
-        get_client()
-        .table("fii_dii_flows")
-        .select("*")
-        .order("date", desc=True)
-        .limit(1)
-        .execute()
-    )
+def get_latest_fii_dii(target_date: date | None = None) -> dict[str, Any] | None:
+    """Return the FII/DII row for a specific date, or the most recent row if no date is passed."""
+    query = get_client().table("fii_dii_flows").select("*")
+
+    if target_date:
+        # If a specific date is provided, look for an exact match
+        resp = query.eq("date", str(target_date)).execute()
+    else:
+        # Fallback: get the most recent record
+        resp = query.order("date", desc=True).limit(1).execute()
+
     return resp.data[0] if resp.data else None
 
 
@@ -222,7 +223,10 @@ def upsert_options_snapshots(rows: list[dict], batch_size: int = 2000) -> int:
     for i in range(0, len(rows), batch_size):
         get_client().table("options_snapshots").upsert(
             rows[i : i + batch_size],
+            # This instructs Postgres to use 'ON CONFLICT DO NOTHING'
+            # against your table's primary/unique keys automatically
             on_conflict="symbol,snapshot_date,expiry_date,strike,option_type",
+            ignore_duplicates=True
         ).execute()
     return len(rows)
 
@@ -315,6 +319,7 @@ def upsert_futures_snapshots(rows: list[dict], batch_size: int = 2000) -> int:
         get_client().table("futures_snapshots").upsert(
             rows[i : i + batch_size],
             on_conflict="symbol,snapshot_date,expiry_date",
+            ignore_duplicates=True
         ).execute()
     return len(rows)
 

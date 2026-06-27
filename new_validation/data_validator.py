@@ -8,7 +8,7 @@ Indices used:
   options_snapshots   → idx_options_snapshots_validation  (symbol, expiry_date, snapshot_date)
 """
 import logging
-from datetime import date, timedelta
+from datetime import date, timedelta, time
 
 from database.queries import get_client, get_kite_token
 from new_data_ingestion.kite_oauth import get_authenticated_kite
@@ -94,69 +94,78 @@ class SymbolDataCache:
 
         # futures_snapshots: {expiry_date → set[snapshot_date]}
         self.futures: dict[date, set[date]] = self._fetch_fo_dates(
-            "futures_snapshots", "snapshot_date", fo_start, end
+            "futures_snapshots", fo_start, end
         )
 
         # options_snapshots: {expiry_date → set[snapshot_date]}
         self.options: dict[date, set[date]] = self._fetch_fo_dates(
-            "options_snapshots", "snapshot_date", fo_start, end
+            "options_snapshots", fo_start, end
         )
 
     # ── Loaders ───────────────────────────────────────────────────────────────
 
     def _fetch_ohlcv_dates(self, start: date, end: date) -> set[date]:
-        try:
-            resp = (
-                get_client()
-                .table("price_history")
-                .select("date")
-                .eq("symbol", self.symbol)
-                .gte("date", str(start))
-                .lte("date", str(end))
-                .execute()
-            )
-            return {date.fromisoformat(r["date"]) for r in resp.data}
-        except Exception as exc:
-            logger.warning("OHLCV bulk fetch failed for %s: %s", self.symbol, exc)
-            return set()
-
-    def _fetch_fo_dates(self, table: str, date_col: str, start: date, end: date) -> dict[date, set[date]]:
-        """Single query for all expiries in range → {expiry: set[snapshot_dates]}."""
-        try:
-            q = (
-                get_client()
-                .table(table)
-                .select(f"{date_col},expiry_date")
-                .eq("symbol", self.symbol)
-                .gte(date_col, str(start))
-                .lte(date_col, str(end))
-            )
-            if table == "options_snapshots":
-                # Find a sample strike price for this symbol to limit returned rows and prevent pagination limits
-                sample = (
+        import time
+        for attempt in range(3):
+            try:
+                resp = (
                     get_client()
-                    .table("options_snapshots")
-                    .select("strike")
+                    .table("price_history")
+                    .select("date")
                     .eq("symbol", self.symbol)
-                    .limit(1)
+                    .gte("date", str(start))
+                    .lte("date", str(end))
                     .execute()
                 )
-                if sample.data:
-                    strike_val = sample.data[0]["strike"]
-                    q = q.eq("strike", strike_val).eq("option_type", "CE")
+                return {date.fromisoformat(r["date"]) for r in resp.data}
+            except Exception as exc:
+                if attempt < 2:
+                    logger.warning("OHLCV bulk fetch failed for %s (attempt %d/3), retrying in 2s: %s", self.symbol, attempt + 1, exc)
+                    time.sleep(2)
                 else:
-                    return {}
+                    logger.error("OHLCV bulk fetch failed for %s after 3 attempts: %s", self.symbol, exc)
+                    return set()
+        return set()
 
-            resp = q.execute()
-            result: dict[date, set[date]] = {}
-            for r in resp.data:
-                exp  = date.fromisoformat(r["expiry_date"])
-                snap = date.fromisoformat(r[date_col])
-                result.setdefault(exp, set()).add(snap)
-            return result
-        except Exception as exc:
-            logger.warning("%s bulk fetch failed for %s: %s", table, self.symbol, exc)
-            return {}
+    def _fetch_fo_dates(self, table: str, start: date, end: date) -> dict[date, set[date]]:
+        """Single query for all unique snapshot and expiry dates in range.
+
+        Returns: {snapshot_date: set([expiry_dates])}
+        """
+        # 1. Route to the optimized view for options to avoid fetching redundant strike data
+        target_table = "v_options_unique_dates" if table == "options_snapshots" else table
+
+        for attempt in range(3):
+            try:
+                resp = (
+                    get_client()
+                    .table(target_table)
+                    .select("snapshot_date, expiry_date")
+                    .eq("symbol", self.symbol)
+                    .gte("snapshot_date", str(start))
+                    .lte("snapshot_date", str(end))
+                    .execute()
+                )
+
+                # Map: snapshot_date -> set of expiry_dates
+                result: dict[date, set[date]] = {}
+                for r in resp.data:
+                    snap = date.fromisoformat(r["snapshot_date"])
+                    exp  = date.fromisoformat(r["expiry_date"])
+                    result.setdefault(snap, set()).add(exp)
+
+                return result
+
+            except Exception as exc:
+                if attempt < 2:
+                    logger.warning("%s bulk fetch failed for %s (attempt %d/3), retrying in 2s: %s",
+                                   table, self.symbol, attempt + 1, exc)
+                    time.sleep(2)
+                else:
+                    logger.error("%s bulk fetch failed for %s after 3 attempts: %s", table, self.symbol, exc)
+                    return {}
+        return {}
+
 
     # ── Targeted refresh after healing ────────────────────────────────────────
     # After ingesting data for one date, add it to the in-memory cache rather
@@ -239,37 +248,3 @@ def check_ohlcv(
     if depth < required_days:
         return False, f"OHLCV depth {depth}/{required_days} for {symbol} on {check_date}"
     return True, f"OHLCV OK ({depth} rows ≤ {check_date})"
-
-
-def check_futures(
-    symbol: str,
-    check_date: date,
-    expiry: date,
-    cache: SymbolDataCache,
-    required_days: int,
-) -> tuple[bool, str]:
-    """Check futures snapshot presence and depth for a specific expiry."""
-    expiry_dates = cache.futures.get(expiry, set())
-    if check_date not in expiry_dates:
-        return False, f"Futures missing for {symbol} expiry={expiry} on {check_date}"
-    depth = sum(1 for d in expiry_dates if d <= check_date)
-    if depth < required_days:
-        return False, f"Futures depth {depth}/{required_days} for {symbol} expiry={expiry} on {check_date}"
-    return True, f"Futures OK ({depth} rows)"
-
-
-def check_options(
-    symbol: str,
-    check_date: date,
-    expiry: date,
-    cache: SymbolDataCache,
-    required_days: int,
-) -> tuple[bool, str]:
-    """Check options snapshot presence and depth for a specific expiry."""
-    expiry_dates = cache.options.get(expiry, set())
-    if check_date not in expiry_dates:
-        return False, f"Options missing for {symbol} expiry={expiry} on {check_date}"
-    depth = sum(1 for d in expiry_dates if d <= check_date)
-    if depth < required_days:
-        return False, f"Options depth {depth}/{required_days} for {symbol} expiry={expiry} on {check_date}"
-    return True, f"Options OK ({depth} rows)"

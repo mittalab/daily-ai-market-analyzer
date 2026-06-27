@@ -74,7 +74,7 @@ _UDIFF_OPTION_TYPES  = {"STO", "IDO"}  # Stock Option, Index Option
 _UDIFF_FUTURES_TYPES = {"STF", "IDF"}  # Stock Future, Index Future
 
 # Symbol mappings from NSE bhavcopy values to standard DB keys
-_SYMBOL_REMAP = {}
+_SYMBOL_REMAP = {"NIFTY": "NIFTY_50"}
 
 _SECTOR_MAP_PATH = Path(__file__).parent.parent / "config" / "sector_map.json"
 
@@ -181,7 +181,7 @@ def _parse_legacy(df: pd.DataFrame, snapshot_date: date) -> list[dict]:
         volume    = row.get("CONTRACTS")
         raw_symbol = str(row["SYMBOL"]).strip()
         rows.append({
-            "symbol":        _SYMBOL_REMAP.get(raw_symbol, raw_symbol),
+            "symbol":        _SYMBOL_REMAP.get(raw_symbol.upper(), raw_symbol),
             "snapshot_date": str(snapshot_date),
             "expiry_date":   row["expiry_date"],
             "strike":        strike,
@@ -280,7 +280,7 @@ def _parse_udiff(df: pd.DataFrame, snapshot_date: date) -> list[dict]:
         volume    = row.get("TtlTradgVol")
         raw_symbol = str(row["TckrSymb"]).strip()
         rows.append({
-            "symbol":        _SYMBOL_REMAP.get(raw_symbol, raw_symbol),
+            "symbol":        _SYMBOL_REMAP.get(raw_symbol.upper(), raw_symbol),
             "snapshot_date": str(snapshot_date),
             "expiry_date":   str(row["XpryDt"]).strip(),
             "strike":        strike,
@@ -320,7 +320,7 @@ def _parse_legacy_futures(df: pd.DataFrame, snapshot_date: date) -> list[dict]:
         close  = float(row.get("CLOSE", 0) or 0)
         raw_symbol = str(row["SYMBOL"]).strip()
         rows.append({
-            "symbol":           _SYMBOL_REMAP.get(raw_symbol, raw_symbol),
+            "symbol":           _SYMBOL_REMAP.get(raw_symbol.upper(), raw_symbol),
             "snapshot_date":    str(snapshot_date),
             "expiry_date":      row["expiry_date"],
             "open_price":       float(row["OPEN"]) if pd.notna(row.get("OPEN")) else None,
@@ -350,7 +350,7 @@ def _parse_udiff_futures(df: pd.DataFrame, snapshot_date: date) -> list[dict]:
         close  = float(row.get("ClsPric", 0) or 0)
         raw_symbol = str(row["TckrSymb"]).strip()
         rows.append({
-            "symbol":           _SYMBOL_REMAP.get(raw_symbol, raw_symbol),
+            "symbol":           _SYMBOL_REMAP.get(raw_symbol.upper(), raw_symbol),
             "snapshot_date":    str(snapshot_date),
             "expiry_date":      str(row["XpryDt"]).strip(),
             "open_price":       float(row["OpnPric"]) if pd.notna(row.get("OpnPric")) else None,

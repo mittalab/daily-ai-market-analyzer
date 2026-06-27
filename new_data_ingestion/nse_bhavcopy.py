@@ -28,6 +28,9 @@ from config.constants import (
     SYMBOL_NIFTY_ENERGY,
     SYMBOL_NIFTY_FIN_SERVICE,
     SYMBOL_INDIA_VIX,
+    SYMBOL_NIFTY_MEDIA,
+    SYMBOL_NIFTY_INFRA,
+    SYMBOL_NIFTY_CONSUMPTION
 )
 
 logger = logging.getLogger(__name__)
@@ -49,7 +52,7 @@ _HEADERS = {
 }
 
 # Indices whose closing values we track in price_history
-# Names are EXACTLY as they appear in the NSE ind_close_all CSV (title case)
+# Names as they appear in the NSE CSV (title case) — uppercased at read time for matching
 _TRACKED_INDICES = [
     "Nifty 50",
     "Nifty Bank",
@@ -67,18 +70,19 @@ _TRACKED_INDICES = [
 
 # Normalised symbol names stored in price_history (spaces → underscores)
 _INDEX_SYMBOL_MAP = {
-    "Nifty 50":                 SYMBOL_NIFTY_50,
-    "Nifty Bank":               SYMBOL_NIFTY_BANK,
-    "Nifty IT":                 SYMBOL_NIFTY_IT,
-    "Nifty Auto":               SYMBOL_NIFTY_AUTO,
-    "Nifty Pharma":             SYMBOL_NIFTY_PHARMA,
-    "Nifty FMCG":               SYMBOL_NIFTY_FMCG,
-    "Nifty Metal":              SYMBOL_NIFTY_METAL,
-    "Nifty Energy":             SYMBOL_NIFTY_ENERGY,
-    "Nifty Financial Services": SYMBOL_NIFTY_FIN_SERVICE,
-    "Nifty India Consumption":  "NIFTY_CONSUMPTION",
-    "Nifty Infrastructure":     "NIFTY_INFRA",
-    "Nifty Media":              "NIFTY_MEDIA",
+    "NIFTY":                    SYMBOL_NIFTY_50,
+    "NIFTY 50":                 SYMBOL_NIFTY_50,
+    "NIFTY BANK":               SYMBOL_NIFTY_BANK,
+    "NIFTY IT":                 SYMBOL_NIFTY_IT,
+    "NIFTY AUTO":               SYMBOL_NIFTY_AUTO,
+    "NIFTY PHARMA":             SYMBOL_NIFTY_PHARMA,
+    "NIFTY FMCG":               SYMBOL_NIFTY_FMCG,
+    "NIFTY METAL":              SYMBOL_NIFTY_METAL,
+    "NIFTY ENERGY":             SYMBOL_NIFTY_ENERGY,
+    "NIFTY FINANCIAL SERVICES": SYMBOL_NIFTY_FIN_SERVICE,
+    "NIFTY INDIA CONSUMPTION":  SYMBOL_NIFTY_CONSUMPTION,
+    "NIFTY INFRASTRUCTURE":     SYMBOL_NIFTY_INFRA,
+    "NIFTY MEDIA":              SYMBOL_NIFTY_MEDIA,
 }
 
 _SECTOR_MAP_PATH = Path(__file__).parent.parent / "config" / "sector_map.json"
@@ -191,14 +195,14 @@ def equity_bhavcopy_to_price_rows(df: pd.DataFrame, trade_date: date) -> list[di
 
 # ── Indices bhavcopy ───────────────────────────────────────────────────────────
 
-def fetch_indices_bhavcopy(for_date: date | None = None) -> tuple[dict, date]:
+def fetch_indices_bhavcopy(for_date: date | None = None) -> tuple[dict[str, dict[str, float]], date]:
     """
-    Download NSE indices bhavcopy and return closing values for tracked indices.
+    Download NSE indices bhavcopy and return key OHLCV metrics for tracked indices.
 
-    Returns ({index_name: close_value, ...}, trade_date).
+    Returns ({index_name: {"open": ..., "high": ..., "low": ..., "close": ..., "volume": ...}, ...}, trade_date).
 
     India VIX: use CLOSING VALUE ONLY — Open/High/Low are unreliable (spec rule).
-    "India VIX" exact name (case-sensitive, one space) — strip() after read.
+    "INDIA VIX" exact name (case-sensitive, one space) — strip() and upper() after read.
     """
     target = last_trading_day(for_date)
 
@@ -233,13 +237,40 @@ def fetch_indices_bhavcopy(for_date: date | None = None) -> tuple[dict, date]:
 
         df = pd.read_csv(local_path)
         df.columns = df.columns.str.strip()          # spec: always strip
-        df["Index Name"] = df["Index Name"].str.strip()
+        df["Index Name"] = df["Index Name"].str.strip().str.upper()
         df = df.set_index("Index Name")
 
-        result: dict[str, float] = {}
-        for idx_name in _TRACKED_INDICES:
+        # Adjust tracking list format dynamically to uppercase to ensure a robust match
+        tracked_upper = [idx.strip().upper() for idx in _TRACKED_INDICES]
+
+        result: dict[str, dict[str, float]] = {}
+        for idx_name in tracked_upper:
             if idx_name in df.index:
-                result[idx_name] = float(df.loc[idx_name, "Closing Index Value"])
+                row = df.loc[idx_name]
+
+                # Handle cases where multiple identical index entries might exist (returns Series vs DataFrame)
+                if isinstance(row, pd.DataFrame):
+                    row = row.iloc[0]
+
+                close_val = float(row["Closing Index Value"])
+
+                # Handle Special Rule for INDIA VIX
+                if idx_name == "INDIA VIX":
+                    result[idx_name] = {
+                        "open": close_val,
+                        "high": close_val,
+                        "low": close_val,
+                        "close": close_val,
+                        "volume": 0.0
+                    }
+                else:
+                    result[idx_name] = {
+                        "open": float(row.get("Open Index Value", 0.0)),
+                        "high": float(row.get("High Index Value", 0.0)),
+                        "low": float(row.get("Low Index Value", 0.0)),
+                        "close": close_val,
+                        "volume": float(row.get("Volume", 0.0))
+                    }
             else:
                 logger.warning("Index '%s' not found in bhavcopy", idx_name)
 
@@ -248,24 +279,26 @@ def fetch_indices_bhavcopy(for_date: date | None = None) -> tuple[dict, date]:
     raise FileNotFoundError("Indices bhavcopy unavailable after all retries")
 
 
-def indices_to_price_rows(indices: dict, trade_date: date) -> list[dict]:
+def indices_to_price_rows(indices: dict[str, dict[str, float]], trade_date: date) -> list[dict]:
     """
-    Convert indices closing values to price_history rows.
+    Convert indices OHLCV values to price_history rows.
     Uses normalised symbol names (INDIA_VIX, NIFTY_50, etc.) so index history
     accumulates in price_history alongside equity data.
     """
     rows = []
-    for idx_name, close_val in indices.items():
+    for idx_name, metrics in indices.items():
         symbol = _INDEX_SYMBOL_MAP.get(idx_name)
         if not symbol:
             continue
+
         rows.append({
             "symbol": symbol,
             "date":   str(trade_date),
-            "open":   None,   # indices bhavcopy OHLC not reliable for VIX
-            "high":   None,
-            "low":    None,
-            "close":  close_val,
-            "volume": None,
+            "open":   metrics["open"],
+            "high":   metrics["high"],
+            "low":    metrics["low"],
+            "close":  metrics["close"],
+            "volume": int(metrics["volume"]) if metrics["volume"] is not None else None,
         })
+    #print(rows)
     return rows

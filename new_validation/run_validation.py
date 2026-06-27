@@ -47,10 +47,6 @@ from new_validation.data_validator import (
     validate_db_connectivity,
     SymbolDataCache,
     check_ohlcv,
-    check_futures,
-    check_options,
-    equity_bhavcopy_ran,
-    fo_bhavcopy_ran,
     point_check_ohlcv,
     point_check_futures,
     point_check_options,
@@ -191,6 +187,7 @@ def check_symbol_on_date(
     cache: SymbolDataCache,
     holidays: set[date],
     other_indices: list[str],
+    check_options: bool,
     check_depth: bool = False,
 ) -> tuple[bool, dict]:
     """
@@ -225,19 +222,13 @@ def check_symbol_on_date(
         (_ok if ok else _fail)(key, msg)
 
     def _chk_futures(sym, expiry, key, days):
-        if check_depth:
-            ok, msg = check_futures(sym, check_date, expiry, cache, days)
-        else:
-            ok = check_date in cache.futures.get(expiry, set())
-            msg = f"Futures {'present' if ok else 'missing'} for {sym} expiry={expiry} on {check_date}"
+        ok = expiry in cache.futures.get(check_date, set())
+        msg = f"Futures {'present' if ok else 'missing'} for {sym} expiry={expiry} on {check_date}"
         (_ok if ok else _fail)(key, msg)
 
     def _chk_options(sym, expiry, key, days):
-        if check_depth:
-            ok, msg = check_options(sym, check_date, expiry, cache, days)
-        else:
-            ok = check_date in cache.options.get(expiry, set())
-            msg = f"Options {'present' if ok else 'missing'} for {sym} expiry={expiry} on {check_date}"
+        ok = expiry in cache.options.get(check_date, set())
+        msg = f"Options {'present' if ok else 'missing'} for {sym} expiry={expiry} on {check_date}"
         (_ok if ok else _fail)(key, msg)
 
     if symbol == "INDIA_VIX":
@@ -249,15 +240,17 @@ def check_symbol_on_date(
     elif symbol in ("NIFTY_50", "NIFTY"):
         _chk_ohlcv("NIFTY_50", "nifty_ohlcv", _OHLCV_DAYS)
 
-        for exp in get_nifty_expiries(check_date, holidays):
-            _chk_options("NIFTY_50", exp, f"nifty_options_{exp}", _NIFTY_OPT_DAYS)
+        if check_options:
+            for exp in get_nifty_expiries(check_date, holidays):
+                _chk_options("NIFTY_50", exp, f"nifty_options_{exp}", _NIFTY_OPT_DAYS)
 
     else:
         _chk_ohlcv(symbol, "stock_ohlcv", _OHLCV_DAYS)
 
-        for exp in get_stock_expiries(check_date, holidays):
-            _chk_futures(symbol, exp, f"stock_futures_{exp}", _FO_DAYS)
-            _chk_options(symbol, exp, f"stock_options_{exp}", _FO_DAYS)
+        if check_options:
+            for exp in get_stock_expiries(check_date, holidays):
+                _chk_futures(symbol, exp, f"stock_futures_{exp}", _FO_DAYS)
+                _chk_options(symbol, exp, f"stock_options_{exp}", _FO_DAYS)
 
     return passed, results
 
@@ -280,6 +273,7 @@ def heal_and_recheck(
     today: date,
     holidays: set[date],
     other_indices: list[str],
+    options_to_heal: bool,
 ) -> tuple[bool, dict]:
     """
     Trigger ingestion for failed checks, then re-check using point queries.
@@ -290,7 +284,7 @@ def heal_and_recheck(
     is_today = (check_date == today)
 
     needs_ohlcv    = _needs(results, "stock_ohlcv", "nifty_ohlcv", "index_ohlcv", "vix_ohlcv")
-    needs_futures  = _needs(results, "stock_futures", "nifty_futures")
+    needs_futures  = _needs(results, "stock_futures")
     needs_options  = _needs(results, "stock_options", "nifty_options")
 
     # ── Heal ──────────────────────────────────────────────────────────────────
@@ -313,8 +307,8 @@ def heal_and_recheck(
                 logger.info("Historical backfill for %s already executed in this run. Skipping redundant ingestion.", check_date)
             else:
                 try:
-                    backfill_historical_date(check_date)
-                    _COMPLETED_BACKFILL_DATES.add(check_date)
+                    backfill_historical_date(check_date, options_to_heal=options_to_heal)
+                    #_COMPLETED_BACKFILL_DATES.add(check_date)
                 except Exception as exc:
                     logger.error("Historical backfill failed for %s: %s", check_date, exc)
 
@@ -325,14 +319,14 @@ def heal_and_recheck(
     # fo_bhavcopy_ran() returns True if ANY options row exists for this date, meaning
     # NSE did serve the bhavcopy. If False after a backfill attempt, the archive is
     # genuinely unavailable — permanently failing on unrecoverable data is wrong.
-    if not is_today and (needs_futures or needs_options) and not fo_bhavcopy_ran(check_date):
-        logger.warning(
-            "%s: F&O bhavcopy unavailable for %s (NSE archive limit) — accepting gap",
-            symbol, check_date,
-        )
-        for key, val in results.items():
-            if not val["ok"] and ("futures" in key or "options" in key):
-                results[key] = {"ok": True, "msg": f"F&O bhavcopy unavailable for {check_date} — NSE archive limit"}
+    # if not is_today and (needs_futures or needs_options) and not fo_bhavcopy_ran(check_date):
+    #     logger.warning(
+    #         "%s: F&O bhavcopy unavailable for %s (NSE archive limit) — accepting gap",
+    #         symbol, check_date,
+    #     )
+    #     for key, val in results.items():
+    #         if not val["ok"] and ("futures" in key or "options" in key):
+    #             results[key] = {"ok": True, "msg": f"F&O bhavcopy unavailable for {check_date} — NSE archive limit"}
 
     # ── Re-check via point queries ────────────────────────────────────────────
     t0 = time.time()
@@ -402,7 +396,7 @@ def validate_and_heal(
     
     t0 = time.time()
     raw_last_passed = get_last_passed_validation_date(symbol)
-    #TODO: Add log that that the last passed date for symbol
+    logger.info("%s: last passed date = %s", symbol, raw_last_passed or "None (initial run)")
 
     last_passed_time = time.time() - t0
     
@@ -425,10 +419,11 @@ def validate_and_heal(
     )
 
     t0 = time.time()
-    fo_start  = dates_to_check[0]
+    ohlcv_start  = dates_to_check[0]
     fo_end = dates_to_check[-1]
+    fo_start = max(ohlcv_start, fo_end - timedelta(days=_FO_DAYS))
     db_symbol = "NIFTY_50" if symbol in ("NIFTY", "NIFTY_50") else symbol
-    cache     = SymbolDataCache(db_symbol, fo_start, fo_start, fo_end)
+    cache     = SymbolDataCache(db_symbol, ohlcv_start, fo_start, fo_end)
     cache_time = time.time() - t0
 
     all_passed = True
@@ -438,18 +433,20 @@ def validate_and_heal(
 
     for check_date in dates_to_check:
         t_chk = time.time()
+        options_to_check: bool = (today - check_date).days <= _FO_DAYS
         passed, results = check_symbol_on_date(
             symbol, check_date, cache, holidays, other_indices,
-            check_depth=is_initial,
+            check_options=options_to_check, check_depth=False,
         )
         checks_time += time.time() - t_chk
 
         if not passed:
             failed_checks = [k for k, v in results.items() if not v["ok"]]
-            logger.warning("%s: checks failed on %s — healing... %s", symbol, check_date, failed_checks)
+            logger.warning("%s: checks failed on %s — healing... %s. Options to check: %s. Today %s", symbol,
+                           check_date, failed_checks, options_to_check, today)
             t_heal = time.time()
             passed, results = heal_and_recheck(
-                symbol, check_date, results, cache, today, holidays, other_indices
+                symbol, check_date, results, cache, today, holidays, other_indices, options_to_check
             )
             healing_time += time.time() - t_heal
 
@@ -504,7 +501,7 @@ def run_daily_validation(
         send_preflight_failed(f"DB Connectivity: {db_msg}", str(target_date))
         return False
 
-    #TODO: Add Log that db validity OK
+    logger.info("DB connectivity OK: %s", db_msg)
 
     kite_ok, kite_msg = validate_kite_token()
     if not kite_ok:
@@ -512,20 +509,22 @@ def run_daily_validation(
         send_token_reminder()
         return False
 
-    #TODO: Add validation that KITE validation done
+    logger.info("Kite token OK: %s", kite_msg)
 
     other_indices = get_other_indices()
 
-    # FII/DII — full runs only
-    if symbol is None:
+    # FII/DII — when we are running indexes
+    if include_indexes:
         logger.info("Fetching FII/DII flows for %s", target_date)
         try:
-            #TODO: First validate if FII DII data exists for the target date, if yes, add log that FII/DII sucessful
-            # and skip the fetching/upserting again.
-            session = create_nse_session()
-            fii_data = fetch_fii_dii(session)
-            upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
-            logger.info("FII/DII flows stored for %s", target_date)
+            cached_fii = get_latest_fii_dii(target_date)
+            if cached_fii:
+                logger.info("FII/DII flows already present for %s — skipping fetch", target_date)
+            else:
+                session = create_nse_session()
+                fii_data = fetch_fii_dii(session)
+                upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
+                logger.info("FII/DII flows stored for %s", target_date)
         except Exception as exc:
             logger.warning("FII/DII ingestion failed (%s) — using cached value", exc)
             try:
@@ -553,7 +552,9 @@ def run_daily_validation(
 
     passed_count, failed_symbols = 0, []
 
-    #TODO: Reorder universe such that NIFTY_50 and INDIA_VIX comes as first 2 elements to be iterated, whosoever exists.
+    universe_set = set(universe)
+    priority = [s for s in ("NIFTY_50", "INDIA_VIX") if s in universe_set]
+    universe = priority + [s for s in universe if s not in {"NIFTY_50", "INDIA_VIX"}]
 
     for idx, sym in enumerate(universe, 1):
         t_sym = time.time()
@@ -713,5 +714,5 @@ if __name__ == "__main__":
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
     #run_validation_now()
-    print(run_validation_now_for_symbol(symbol="ADANIENT", include_indexes=False))
+    print(run_validation_now_for_symbol(symbol="ADANIENT", include_indexes=True))
     #main()

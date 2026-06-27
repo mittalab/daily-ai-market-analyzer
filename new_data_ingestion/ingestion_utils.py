@@ -64,7 +64,7 @@ def ingest_today_bhavcopy(for_date: date | None = None) -> dict:
         index_rows = indices_to_price_rows(indices, target_date)
         n_upserted = upsert_price_history(index_rows)
         summary["index_rows"] = len(index_rows)
-        logger.info("Indices bhavcopy ingested: %d indices for %s", len(index_rows), target_date)
+        logger.info("Indices bhavcopy ingested: %d indices for %s", n_upserted, target_date)
     except Exception as exc:
         logger.error("Indices bhavcopy ingest FAILED: %s", exc)
         summary["errors"].append(f"indices_bhavcopy: {exc}")
@@ -319,7 +319,7 @@ def _check_backfill_coverage(target_date: date) -> None:
         logger.error("Options coverage check failed for %s: %s", target_date, exc)
 
 
-def backfill_historical_date(target_date: date, symbol: str | None = None) -> dict:
+def backfill_historical_date(target_date: date, symbol: str | None = None, options_to_heal : bool = True) -> dict:
     """
     Backfill past historical data for a specific date:
     - Equity & Indices bhavcopy -> price_history
@@ -340,16 +340,18 @@ def backfill_historical_date(target_date: date, symbol: str | None = None) -> di
         summary["errors"].append(f"bhavcopy: {exc}")
         summary["ok"] = False
 
+
     # 2. F&O Bhavcopy (Populates option snaps and futures snaps)
-    try:
-        fo_summary = run_fo_bhavcopy_backfill([target_date])
-        summary["fo_bhavcopy"] = fo_summary
-        if target_date in fo_summary.get("failed", []):
+    if options_to_heal:
+        try:
+            fo_summary = run_fo_bhavcopy_backfill([target_date])
+            summary["fo_bhavcopy"] = fo_summary
+            if target_date in fo_summary.get("failed", []):
+                summary["ok"] = False
+        except Exception as exc:
+            logger.error("F&O bhavcopy backfill failed for %s: %s", target_date, exc)
+            summary["errors"].append(f"fo_bhavcopy: {exc}")
             summary["ok"] = False
-    except Exception as exc:
-        logger.error("F&O bhavcopy backfill failed for %s: %s", target_date, exc)
-        summary["errors"].append(f"fo_bhavcopy: {exc}")
-        summary["ok"] = False
 
     # # 3. Coverage validation — log which symbols landed in each table
     # _check_backfill_coverage(target_date)
