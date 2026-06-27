@@ -62,9 +62,9 @@ def job_morning_bhavcopy() -> None:
       2. Validation complete + fails (send_validation_complete)
     """
     today = date.today()
-    if not is_trading_day(today):
-        logger.info("Morning bhavcopy skipped — %s is not a trading day", today)
-        return
+    # if not is_trading_day(today):
+    #     logger.info("Morning bhavcopy skipped — %s is not a trading day", today)
+    #     return
 
     from new_data_ingestion.nse_bhavcopy import last_trading_day
     from new_notifications.telegram import send_validation_start, send_validation_complete
@@ -239,7 +239,7 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     # 06:30 Mon-Fri — morning bhavcopy (no overwrite)
     scheduler.add_job(
         job_morning_bhavcopy,
-        CronTrigger(day_of_week="mon-fri", hour=6, minute=30, **ist),
+        CronTrigger(hour=6, minute=30, **ist),
         id="morning_bhavcopy",
         name="Morning FO bhavcopy",
         replace_existing=True,
