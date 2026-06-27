@@ -81,6 +81,7 @@ def fetch_option_chain_v3(
 ) -> dict:
     """Query the unified option-chain-v3 API for a single expiry."""
     url = f"{BASE_URL}/api/option-chain-v3?type={chain_type}&symbol={symbol.upper()}&expiry={expiry}"
+    logger.info("GET %s", url)
     r = session.get(url, timeout=20)
     r.raise_for_status()
     return r.json()
@@ -99,8 +100,10 @@ def parse_snapshot_for_db(
         # handle case where raw json has data key at root
         chain = data.get("data", [])
 
+    logger.debug("%s (%s): chain has %d entries; top-level keys=%s", symbol, expiry_str, len(chain), list(data.keys()))
+
     rows = []
-    
+
     # Parse expiry format (e.g. '30-Jun-2026' -> YYYY-MM-DD)
     try:
         expiry_date = datetime.strptime(expiry_str.strip(), "%d-%b-%Y").date()
@@ -108,11 +111,17 @@ def parse_snapshot_for_db(
         logger.warning("Could not parse expiry date string: %s", expiry_str)
         return []
 
+    # The API is queried per-expiry so entries may not carry an expiryDate field.
+    # Only apply the guard when the field is actually present in the response.
+    has_expiry_field = any("expiryDate" in e for e in chain[:5])
+
+    expiry_matched = 0
+    iv_filtered = 0
     for entry in chain:
-        # Double check that we are parsing only rows for the target expiry
-        if entry.get("expiryDate") != expiry_str:
+        if has_expiry_field and entry.get("expiryDate") != expiry_str:
             continue
-            
+        expiry_matched += 1
+
         strike = entry.get("strikePrice")
         if strike is None:
             continue
@@ -124,6 +133,7 @@ def parse_snapshot_for_db(
 
             iv = side.get("impliedVolatility")
             if iv is None or float(iv) <= 0:
+                iv_filtered += 1
                 continue  # Filter out deep OTM zeroes
 
             rows.append({
@@ -138,6 +148,17 @@ def parse_snapshot_for_db(
                 "iv":            float(iv),
                 "premium_close": float(side.get("lastPrice") or 0),
             })
+
+    logger.debug(
+        "%s (%s): %d chain entries, has_expiry_field=%s, expiry_matched=%d, rows=%d, iv_filtered=%d",
+        symbol, expiry_str, len(chain), has_expiry_field, expiry_matched, len(rows), iv_filtered,
+    )
+    if not rows:
+        all_expiries = sorted({e.get("expiryDate") for e in chain})
+        logger.warning(
+            "%s (%s): 0 rows — chain=%d, has_expiry_field=%s, expiry_matched=%d, iv_filtered=%d, all expiryDates in response=%s",
+            symbol, expiry_str, len(chain), has_expiry_field, expiry_matched, iv_filtered, all_expiries,
+        )
 
     return rows
 

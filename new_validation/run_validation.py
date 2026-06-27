@@ -538,23 +538,26 @@ def run_daily_validation(
                 logger.error("FII/DII cache fallback also failed: %s", cache_exc)
 
     # Symbol universe
+    # 1. Standardize core tracking indices into a fixed list
+    core_indices = ["INDIA_VIX", "NIFTY_50"] + list(other_indices)
+
     if symbol is None:
         stocks_dict = get_stock_list_for_analysis(include_kite_trades=True)
-        universe = sorted(
-            set(stocks_dict.keys()) | {"NIFTY_50", "INDIA_VIX"} | set(other_indices)
-        )
+        # Get a unique, alphabetized list of stocks
+        sorted_stocks = sorted(set(stocks_dict.keys()))
+        universe = core_indices + sorted_stocks
+
     elif include_indexes:
-        universe = sorted({symbol, "NIFTY_50", "INDIA_VIX"} | set(other_indices))
+        sorted_stocks = sorted({symbol})
+        universe = core_indices + sorted_stocks
+
     else:
-        universe = [symbol]
+        # No indices requested: just a sorted list of the symbols passed
+        universe = sorted({symbol})
 
     logger.info("Validating %d symbol(s) for %s", len(universe), target_date)
 
     passed_count, failed_symbols = 0, []
-
-    universe_set = set(universe)
-    priority = [s for s in ("NIFTY_50", "INDIA_VIX") if s in universe_set]
-    universe = priority + [s for s in universe if s not in {"NIFTY_50", "INDIA_VIX"}]
 
     for idx, sym in enumerate(universe, 1):
         t_sym = time.time()
@@ -713,6 +716,6 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
-    #run_validation_now()
-    print(run_validation_now_for_symbol(symbol="ADANIENT", include_indexes=True))
+    run_validation_now()
+    #print(run_validation_now_for_symbol(symbol="ADANIENT", include_indexes=True))
     #main()
