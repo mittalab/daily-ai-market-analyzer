@@ -23,7 +23,11 @@ from database.queries import (
     update_analysis_session,
     update_watchlist_staging,
 )
-from new_notifications.telegram import send_pipeline_complete, send_pipeline_start
+from new_notifications.telegram import (
+    send_pipeline_complete,
+    send_validation_start,
+    send_validation_complete,
+)
 from new_utils.stock_list import get_stock_list_for_analysis
 from pipeline.claude_session import run_claude_session
 from pipeline.context_builder import build_context_bundle
@@ -49,7 +53,11 @@ def run_pipeline(session_date: date) -> dict:
     # Resolve target symbols (Nifty 50 + active watchlist)
     symbols = get_stock_list_for_analysis()
 
-    logger.info("Pipeline start: %s | %d symbols", session_id, len(symbols))
+    all_symbol_count = len(symbols)
+    logger.info("Pipeline start: %s | %d symbols", session_id, all_symbol_count)
+
+    # ── Validation start notification ─────────────────────────────────────────
+    send_validation_start(str(session_date))
 
     # ── Run Data Validation & Self-Healing first ──────────────────────────────
     from new_validation.run_validation import run_daily_validation
@@ -70,14 +78,18 @@ def run_pipeline(session_date: date) -> dict:
             logger.error("Error checking validation state for %s: %s", symbol, e)
             failed_validation.append(symbol)
 
+    symbols = [s for s in symbols if s not in failed_validation]
+
+    # ── Validation complete notification ──────────────────────────────────────
+    send_validation_complete(str(session_date), len(symbols), all_symbol_count, failed_validation)
+
     if failed_validation:
         logger.warning("Validation failed (and could not be healed) for symbols: %s", failed_validation)
-        # Filter out failed symbols
-        symbols = [s for s in symbols if s not in failed_validation]
-        if not symbols:
-            logger.error("All target symbols failed validation. Aborting pipeline.")
-            update_analysis_session(session_id, {"status": "ABORTED"})
-            return {"error": "All target symbols failed validation", "session_id": session_id}
+
+    if not symbols:
+        logger.error("All target symbols failed validation. Aborting pipeline.")
+        update_analysis_session(session_id, {"status": "ABORTED"})
+        return {"error": "All target symbols failed validation", "session_id": session_id}
 
     # ── Create / reuse session record ─────────────────────────────────────────
     try:
@@ -101,14 +113,6 @@ def run_pipeline(session_date: date) -> dict:
     except Exception as exc:
         logger.warning("Kite token unavailable: %s", exc)
         token_ok = False
-
-    #AI: Check what is snapshot_ok and bhavcopy_ok mean and why it is send as TRUE here, as it is not validated yet?
-    send_pipeline_start(
-        trade_date=str(session_date),
-        token_ok=token_ok,
-        snapshot_ok=True,
-        bhavcopy_ok=True,
-    )
 
     # ── Stage 2.5: OI Series Builder ─────────────────────────────────────────
     logger.info("Stage 2.5: OI Continuous Series Builder...")

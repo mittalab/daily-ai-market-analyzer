@@ -131,7 +131,7 @@ class StockListBuilder:
                     result[sym]["sources"].append(source)
 
 
-# ── Convenience module-level function ─────────────────────────────────────────
+# ── Convenience module-level functions ────────────────────────────────────────
 
 def get_stock_list_for_analysis(include_kite_trades: bool = True) -> dict[str, dict]:
     """Module-level shortcut — delegates to StockListBuilder."""
@@ -140,48 +140,112 @@ def get_stock_list_for_analysis(include_kite_trades: bool = True) -> dict[str, d
     )
 
 
+def fetch_kite_fo_stocks() -> list[str]:
+    """
+    Fetch the list of all equity stock symbols that have active F&O contracts.
+
+    Excludes indices (e.g. NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, NIFTYNXT50) by
+    cross-referencing the NFO instruments list against the active NSE equity cash market instruments.
+
+    Returns:
+        Sorted list of stock symbols.
+    """
+    try:
+        from database.queries import get_kite_token
+        from new_data_ingestion.kite_ohlcv import get_kite
+
+        token_row = get_kite_token()
+        if not token_row:
+            raise RuntimeError("No Kite access token in DB — run OAuth flow first")
+
+        kite = get_kite(token_row["access_token"])
+
+        logger.info("Fetching instruments from Kite to identify F&O stocks...")
+        nse_instruments = kite.instruments("NSE")
+        nfo_instruments = kite.instruments("NFO")
+
+        # Get active equity symbols on NSE (segment == "NSE", instrument_type == "EQ")
+        nse_stocks = {
+            inst["tradingsymbol"]
+            for inst in nse_instruments
+            if inst.get("segment") == "NSE" and inst.get("instrument_type") == "EQ"
+        }
+
+        # Get unique F&O underlying names
+        nfo_underlyings = {
+            inst.get("name")
+            for inst in nfo_instruments
+            if inst.get("name")
+        }
+
+        # Keep only underlying names that are listed as active NSE equities
+        fo_stocks = sorted(list(nfo_underlyings.intersection(nse_stocks)))
+        logger.info("Found %d F&O stocks", len(fo_stocks))
+        return fo_stocks
+
+    except Exception as exc:
+        logger.error("Could not fetch Kite F&O stocks: %s", exc)
+        return []
+
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import json
-    import sys
-    import argparse
-    import logging as _logging
-
-    _logging.basicConfig(
-        level=_logging.INFO,
-        format="%(asctime)s  %(levelname)-8s %(message)s",
-        datefmt="%H:%M:%S",
-    )
-
-    parser = argparse.ArgumentParser(description="Print the daily analysis stock universe")
-    parser.add_argument("--no-kite", action="store_true", help="Skip Kite positions call")
-    parser.add_argument("--mandate-only", action="store_true", help="Print only mandated symbols")
-    parser.add_argument("--json", action="store_true", help="Output raw JSON")
-    args = parser.parse_args()
-
-    universe = get_stock_list_for_analysis(include_kite_trades=not args.no_kite)
-
-    if args.mandate_only:
-        universe = {k: v for k, v in universe.items() if v["mandate"]}
-
-    if args.json:
-        print(json.dumps(universe, indent=2))
-    else:
-        mandated = [v for v in universe.values() if v["mandate"]]
-        others   = [v for v in universe.values() if not v["mandate"]]
-
-        print(f"\n{'='*60}")
-        print(f"  Analysis Universe — {len(universe)} symbols")
-        print(f"{'='*60}")
-
-        if mandated:
-            print(f"\n  MANDATED ({len(mandated)}) — deep analysis required")
-            for v in sorted(mandated, key=lambda x: x["symbol"]):
-                print(f"    {v['symbol']:<20} [{', '.join(v['sources'])}]")
-
-        print(f"\n  STANDARD ({len(others)})")
-        for v in sorted(others, key=lambda x: x["symbol"]):
-            print(f"    {v['symbol']:<20} [{', '.join(v['sources'])}]")
-
-        print(f"\n{'='*60}\n")
+    print(fetch_kite_fo_stocks())
+    # import json
+    # import sys
+    # import argparse
+    # import logging as _logging
+    #
+    # _logging.basicConfig(
+    #     level=_logging.INFO,
+    #     format="%(asctime)s  %(levelname)-8s %(message)s",
+    #     datefmt="%H:%M:%S",
+    # )
+    #
+    # parser = argparse.ArgumentParser(description="Print the daily analysis stock universe")
+    # parser.add_argument("--no-kite", action="store_true", help="Skip Kite positions call")
+    # parser.add_argument("--mandate-only", action="store_true", help="Print only mandated symbols")
+    # parser.add_argument("--fo-stocks-only", action="store_true", help="Print only symbols having F&O contracts")
+    # parser.add_argument("--json", action="store_true", help="Output raw JSON")
+    # args = parser.parse_args()
+    #
+    # if args.fo_stocks_only:
+    #     fo_stocks = fetch_kite_fo_stocks()
+    #     if args.json:
+    #         print(json.dumps(fo_stocks, indent=2))
+    #     else:
+    #         print(f"\n{'='*60}")
+    #         print(f"  F&O Stocks Universe — {len(fo_stocks)} symbols")
+    #         print(f"{'='*60}")
+    #         for sym in fo_stocks:
+    #             print(f"    {sym}")
+    #         print(f"\n{'='*60}\n")
+    #     sys.exit(0)
+    #
+    # universe = get_stock_list_for_analysis(include_kite_trades=not args.no_kite)
+    #
+    # if args.mandate_only:
+    #     universe = {k: v for k, v in universe.items() if v["mandate"]}
+    #
+    # if args.json:
+    #     print(json.dumps(universe, indent=2))
+    # else:
+    #     mandated = [v for v in universe.values() if v["mandate"]]
+    #     others   = [v for v in universe.values() if not v["mandate"]]
+    #
+    #     print(f"\n{'='*60}")
+    #     print(f"  Analysis Universe — {len(universe)} symbols")
+    #     print(f"{'='*60}")
+    #
+    #     if mandated:
+    #         print(f"\n  MANDATED ({len(mandated)}) — deep analysis required")
+    #         for v in sorted(mandated, key=lambda x: x["symbol"]):
+    #             print(f"    {v['symbol']:<20} [{', '.join(v['sources'])}]")
+    #
+    #     print(f"\n  STANDARD ({len(others)})")
+    #     for v in sorted(others, key=lambda x: x["symbol"]):
+    #         print(f"    {v['symbol']:<20} [{', '.join(v['sources'])}]")
+    #
+    #     print(f"\n{'='*60}\n")

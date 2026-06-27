@@ -59,3 +59,64 @@ nifty_legs = nfo.get("NIFTY_50", [])     # list of NIFTY position dicts
 ### Auth
 
 Reads `KITE_API_KEY` from `.env` and the access token from the `kite_tokens` table in Supabase. Run the OAuth flow (`new_data_ingestion/kite_oauth.py`) if the token is missing or expired.
+
+---
+
+## kite_holdings.py
+
+Fetches open equity holdings from Zerodha Kite. It automatically calculates total quantities by summing up free/tradeable quantities, T1 (unsettled) quantities, and collateral (pledged) quantities.
+
+### Output shape
+
+```json
+{
+  "NSE": {
+    "HINDALCO": [
+      {
+        "symbol": "HINDALCO",
+        "qty": 700,
+        "free_qty": 0,
+        "t1_qty": 0,
+        "collateral_qty": 700,
+        "collateral_type": "pledge",
+        "avg": 1032.1479,
+        "ltp": 953.20,
+        "close": 953.20,
+        "pnl": -55263.50,
+        "current_value": 667240.00,
+        "investment_value": 722503.50,
+        "day_change": 0.0,
+        "day_change_pct": 0.0,
+        "isin": "INE038A01020",
+        "product": "CNC",
+        "exchange": "NSE"
+      }
+    ]
+  },
+  "BSE": { ... }
+}
+```
+
+- Top-level keys are exchanges (`NSE`, `BSE`). Both keys are always present even when empty.
+- Second-level keys are symbols (e.g. `HINDALCO`).
+- Only holdings with non-zero total quantity (free + T1 + collateral + MTF) are included.
+
+### CLI usage
+
+```bash
+# Formatted table
+py -m new_integration.kite_holdings
+
+# Raw JSON
+py -m new_integration.kite_holdings --json
+```
+
+### Programmatic usage
+
+```python
+from new_integration.kite_holdings import fetch_holdings
+
+holdings = fetch_holdings()
+nse_holdings = holdings["NSE"]
+hindalco_legs = nse_holdings.get("HINDALCO", [])
+```

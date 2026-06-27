@@ -99,6 +99,19 @@ def upsert_price_history(rows: list[dict]) -> int:
     return len(rows)
 
 
+def upsert_price_history_new_only(rows: list[dict]) -> int:
+    """
+    Insert OHLCV rows only for (symbol, date) pairs not already present.
+    ON CONFLICT DO NOTHING — existing rows (e.g. from Kite analysis) are preserved.
+    """
+    if not rows:
+        return 0
+    get_client().table("price_history").upsert(
+        rows, on_conflict="symbol,date", ignore_duplicates=True
+    ).execute()
+    return len(rows)
+
+
 def get_price_history(symbol: str, days: int = 180) -> list[dict]:
     """Fetch the most recent N rows of OHLCV for a symbol, ordered ascending."""
     resp = (

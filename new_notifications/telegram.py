@@ -274,6 +274,71 @@ def send_preflight_failed(reason: str, trade_date: str) -> int | None:
     return send_loud(text)
 
 
+def send_validation_start(trade_date: str) -> int | None:
+    text = (
+        f"🔍 <b>Validation Started — {trade_date}</b>\n"
+        f"Running data checks and self-healing for all symbols..."
+    )
+    return send_silent(text)
+
+
+def send_validation_complete(
+    trade_date: str,
+    passed: int,
+    total: int,
+    failed_symbols: list,
+) -> int | None:
+    if failed_symbols:
+        cap = failed_symbols[:20]
+        syms = ", ".join(f"<code>{s}</code>" for s in cap)
+        more = f" (+{len(failed_symbols) - 20} more)" if len(failed_symbols) > 20 else ""
+        text = (
+            f"⚠️ <b>Validation Complete — {trade_date}</b>\n"
+            f"Passed: <code>{passed}/{total}</code>\n"
+            f"Failed: {syms}{more}"
+        )
+    else:
+        text = (
+            f"✅ <b>Validation Complete — {trade_date}</b>\n"
+            f"All <code>{total}</code> symbols passed."
+        )
+    return send_silent(text)
+
+
+def send_phase1_complete(trade_date: str, regime: str, execution_bias: str) -> int | None:
+    text = (
+        f"📊 <b>Phase 1 Complete — {trade_date}</b>\n"
+        f"Regime: <code>{regime}</code>\n"
+        f"Bias: <code>{execution_bias}</code>"
+    )
+    return send_silent(text)
+
+
+def send_prescan_complete(trade_date: str, forwarded: int, total: int) -> int | None:
+    text = (
+        f"🔎 <b>Pre-scan Complete — {trade_date}</b>\n"
+        f"Forwarded to deep analysis: <code>{forwarded}</code> / <code>{total}</code> stocks"
+    )
+    return send_silent(text)
+
+
+def send_deep_analysis_complete(
+    trade_date: str,
+    trade_ready: int,
+    watch: int,
+    on_radar: int,
+    skipped: int,
+) -> int | None:
+    text = (
+        f"🧠 <b>Deep Analysis Complete — {trade_date}</b>\n"
+        f"🟢 Trade Ready: <code>{trade_ready}</code>  "
+        f"🟡 Watch: <code>{watch}</code>  "
+        f"🔵 On Radar: <code>{on_radar}</code>  "
+        f"⚪ Skipped: <code>{skipped}</code>"
+    )
+    return send_silent(text)
+
+
 def verify_bot() -> dict:
     """Confirm bot token is valid. Returns bot info dict."""
     r = requests.get(f"{_base_url()}/getMe", timeout=10)

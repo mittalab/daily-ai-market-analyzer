@@ -860,6 +860,16 @@ def run_claude_session(
     total_input = t1_cost["input_tokens"]
     total_output = t1_cost["output_tokens"]
 
+    try:
+        from new_notifications.telegram import send_phase1_complete
+        send_phase1_complete(
+            str(session_date),
+            regime_result.get("regime", "UNKNOWN"),
+            regime_result.get("execution_bias", "UNKNOWN"),
+        )
+    except Exception as _exc:
+        logger.warning("Phase 1 notification failed: %s", _exc)
+
     # Re-build system prompt using the dynamically generated regime context
     context_bundle["regime"] = regime_result
     system_text = build_system_prompt(context_bundle)
@@ -883,6 +893,12 @@ def run_claude_session(
     turn_costs.append(t2_cost)
     total_input += t2_cost["input_tokens"]
     total_output += t2_cost["output_tokens"]
+
+    try:
+        from new_notifications.telegram import send_prescan_complete
+        send_prescan_complete(str(session_date), len(forwarded_stocks), len(turn2_results))
+    except Exception as _exc:
+        logger.warning("Prescan notification failed: %s", _exc)
 
     # Truncation / empty safety check
     n = len(turn2_results)
@@ -976,6 +992,12 @@ def run_claude_session(
     on_radar    = sum(1 for d in deep_results if d.get("stage") == "ON_RADAR")
     skipped     = sum(1 for d in deep_results if d.get("stage") == "SKIP")
     prescan_fwd = sum(1 for s in turn2_results if s.get("forward_to_deep"))
+
+    try:
+        from new_notifications.telegram import send_deep_analysis_complete
+        send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped)
+    except Exception as _exc:
+        logger.warning("Deep analysis complete notification failed: %s", _exc)
 
     update_analysis_session(session_id, {
         "claude_tokens_input":  total_input,

@@ -10,6 +10,7 @@ import requests
 
 from database.queries import (
     upsert_price_history,
+    upsert_price_history_new_only,
     upsert_fii_dii_flow,
     get_latest_fii_dii,
     upsert_options_snapshots,
@@ -35,24 +36,26 @@ from new_utils.stock_list import get_stock_list_for_analysis
 logger = logging.getLogger(__name__)
 
 
-def ingest_today_bhavcopy(for_date: date | None = None) -> dict:
+def ingest_today_bhavcopy(for_date: date | None = None, no_overwrite: bool = False) -> dict:
     """
-    Download NSE bhavcopy (equity + indices) and FII/DII flows for a specific date (defaults to last trading day).
-    Stores results in Supabase `price_history` and `fii_dii_flows`.
+    Download NSE bhavcopy (equity + indices) for a specific date (defaults to last trading day).
+    Stores results in Supabase `price_history`.
+
+    no_overwrite=True uses INSERT ... ON CONFLICT DO NOTHING so existing rows
+    (e.g. from Kite analysis) are preserved.
     """
     summary: dict = {"ok": True, "errors": [], "trade_date": None, "equity_rows": 0, "index_rows": 0, "fii_ok": False}
     target_date = last_trading_day(for_date)
     summary["trade_date"] = str(target_date)
-    #symbols = get_stock_list_for_analysis()
+    _upsert = upsert_price_history_new_only if no_overwrite else upsert_price_history
 
     # 1. Equity Bhavcopy
     try:
         eq_df, trade_date = fetch_equity_bhavcopy(target_date)
-        #eq_df = eq_df[eq_df["SYMBOL"].isin(symbols)]
         eq_rows = equity_bhavcopy_to_price_rows(eq_df, trade_date)
-        n_upserted = upsert_price_history(eq_rows)
+        n_upserted = _upsert(eq_rows)
         summary["equity_rows"] = n_upserted
-        logger.info("Equity bhavcopy ingested: %d rows for %s", n_upserted, trade_date)
+        logger.info("Equity bhavcopy ingested: %d rows for %s (no_overwrite=%s)", n_upserted, trade_date, no_overwrite)
     except Exception as exc:
         logger.error("Equity bhavcopy ingest FAILED: %s", exc)
         summary["errors"].append(f"equity_bhavcopy: {exc}")
@@ -62,9 +65,9 @@ def ingest_today_bhavcopy(for_date: date | None = None) -> dict:
     try:
         indices, _ = fetch_indices_bhavcopy(target_date)
         index_rows = indices_to_price_rows(indices, target_date)
-        n_upserted = upsert_price_history(index_rows)
+        n_upserted = _upsert(index_rows)
         summary["index_rows"] = len(index_rows)
-        logger.info("Indices bhavcopy ingested: %d indices for %s", n_upserted, target_date)
+        logger.info("Indices bhavcopy ingested: %d indices for %s (no_overwrite=%s)", n_upserted, target_date, no_overwrite)
     except Exception as exc:
         logger.error("Indices bhavcopy ingest FAILED: %s", exc)
         summary["errors"].append(f"indices_bhavcopy: {exc}")
