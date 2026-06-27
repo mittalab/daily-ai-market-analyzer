@@ -56,6 +56,10 @@ def job_morning_bhavcopy() -> None:
     trading day without overwriting rows already written by the 4 PM Kite analysis.
     Purpose: persist data for ALL listed stocks, not just the Nifty 50 subset
     that gets analysed each day.
+
+    Telegram notifications (in order):
+      1. Validation started          (send_validation_start)
+      2. Validation complete + fails (send_validation_complete)
     """
     today = date.today()
     if not is_trading_day(today):
@@ -63,8 +67,12 @@ def job_morning_bhavcopy() -> None:
         return
 
     from new_data_ingestion.nse_bhavcopy import last_trading_day
+    from new_notifications.telegram import send_validation_start, send_validation_complete
+
     target_date = last_trading_day(today - timedelta(days=1))
     logger.info("Morning bhavcopy: fetching equity + FO data for %s", target_date)
+
+    send_validation_start(str(target_date))
 
     # Equity + indices bhavcopy — no_overwrite preserves yesterday's Kite data
     try:
@@ -90,6 +98,15 @@ def job_morning_bhavcopy() -> None:
             logger.info("Morning FO bhavcopy OK for %s", target_date)
     except Exception as exc:
         logger.error("Morning FO bhavcopy failed: %s", exc)
+
+    # Post-ingestion validation: confirm all F&O stocks landed correctly
+    try:
+        from new_validation.run_validation import run_fo_stocks_validation
+        passed, total, failed = run_fo_stocks_validation(target_date)
+        send_validation_complete(str(target_date), passed, total, failed)
+    except Exception as exc:
+        logger.error("Morning FO stocks validation failed: %s", exc)
+        send_validation_complete(str(target_date), 0, 0, [f"ERROR: {str(exc)[:100]}"])
 
 
 # ── Job 3: Morning brief + Kite token check ────────────────────────────────────

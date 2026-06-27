@@ -677,6 +677,53 @@ def run_validation_now_for_symbol(symbol: str, include_indexes: bool = True,) ->
     return run_daily_validation(target_date, symbol=symbol.upper(), include_indexes=include_indexes)
 
 
+# ── Morning bhavcopy validation ───────────────────────────────────────────────
+
+def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
+    """
+    Validate all Kite F&O stocks for target_date (OHLCV + futures + options).
+    Called from job_morning_bhavcopy after bhavcopy ingestion to confirm the
+    downloaded data landed correctly in the database.
+
+    Returns (passed_count, total_count, failed_symbols).
+    """
+    from new_utils.stock_list import fetch_kite_fo_stocks
+
+    holidays = get_holiday_dates()
+    other_indices = get_other_indices()
+
+    try:
+        symbols = fetch_kite_fo_stocks()
+    except Exception as exc:
+        logger.error("run_fo_stocks_validation: failed to fetch F&O stocks: %s", exc)
+        return 0, 0, []
+
+    if not symbols:
+        logger.warning("run_fo_stocks_validation: no F&O stocks returned")
+        return 0, 0, []
+
+    passed_count = 0
+    failed_symbols: list[str] = []
+
+    for idx, sym in enumerate(symbols, 1):
+        logger.info("[%d/%d] Morning FO validation: %s", idx, len(symbols), sym)
+        try:
+            ok = validate_and_heal(sym, target_date, holidays, other_indices)
+            if ok:
+                passed_count += 1
+            else:
+                failed_symbols.append(sym)
+        except Exception as exc:
+            logger.error("Morning FO validation error for %s: %s", sym, exc)
+            failed_symbols.append(sym)
+
+    logger.info(
+        "Morning FO validation complete: %d/%d passed. Failed: %s",
+        passed_count, len(symbols), failed_symbols or "none",
+    )
+    return passed_count, len(symbols), failed_symbols
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
