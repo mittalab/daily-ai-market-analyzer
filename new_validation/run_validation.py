@@ -402,6 +402,8 @@ def validate_and_heal(
     
     t0 = time.time()
     raw_last_passed = get_last_passed_validation_date(symbol)
+    #TODO: Add log that that the last passed date for symbol
+
     last_passed_time = time.time() - t0
     
     is_initial      = raw_last_passed is None
@@ -502,10 +504,15 @@ def run_daily_validation(
         send_preflight_failed(f"DB Connectivity: {db_msg}", str(target_date))
         return False
 
+    #TODO: Add Log that db validity OK
+
     kite_ok, kite_msg = validate_kite_token()
     if not kite_ok:
         logger.warning("Kite token check failed: %s", kite_msg)
         send_token_reminder()
+        return False
+
+    #TODO: Add validation that KITE validation done
 
     other_indices = get_other_indices()
 
@@ -513,6 +520,8 @@ def run_daily_validation(
     if symbol is None:
         logger.info("Fetching FII/DII flows for %s", target_date)
         try:
+            #TODO: First validate if FII DII data exists for the target date, if yes, add log that FII/DII sucessful
+            # and skip the fetching/upserting again.
             session = create_nse_session()
             fii_data = fetch_fii_dii(session)
             upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
@@ -543,6 +552,8 @@ def run_daily_validation(
     logger.info("Validating %d symbol(s) for %s", len(universe), target_date)
 
     passed_count, failed_symbols = 0, []
+
+    #TODO: Reorder universe such that NIFTY_50 and INDIA_VIX comes as first 2 elements to be iterated, whosoever exists.
 
     for idx, sym in enumerate(universe, 1):
         t_sym = time.time()
@@ -701,6 +712,6 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
-    run_validation_now()
-    #print(run_validation_now_for_symbol(symbol="ADANIENT"))
+    #run_validation_now()
+    print(run_validation_now_for_symbol(symbol="ADANIENT", include_indexes=False))
     #main()

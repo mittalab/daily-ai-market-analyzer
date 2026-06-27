@@ -34,7 +34,6 @@ def job_keepalive() -> None:
 def is_trading_day(for_date) -> bool:
     """
     Return True if for_date is an NSE trading day.
-    FIX 4: Uses holidays_2026 list from config/sector_map.json instead of DB lookup.
     Weekends always False. Holidays checked against sector_map. Fails open on read error.
     """
     if for_date.weekday() >= 5:  # Saturday / Sunday
@@ -45,7 +44,7 @@ def is_trading_day(for_date) -> bool:
         _map_path = _os.path.join(_os.path.dirname(__file__), "config", "sector_map.json")
         with open(_map_path, encoding="utf-8") as _f:
             _data = _json.load(_f)
-        holidays = set(_data.get("holidays_2026", []))
+        holidays = set(_data.get("holidays", []))
         return str(for_date) not in holidays
     except Exception:
         return True  # fail open

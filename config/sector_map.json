@@ -52,7 +52,7 @@
     "BHARTIARTL": {"sector": "TELECOM",       "index": "NIFTY_MEDIA"},
     "INDIGO":     {"sector": "TRANSPORT",     "index": "NIFTY_INFRA"}
   },
-  "holidays_2026": [
+  "holidays": [
     "2026-01-26",
     "2026-03-25",
     "2026-04-02",

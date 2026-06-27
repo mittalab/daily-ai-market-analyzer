@@ -418,7 +418,7 @@ def get_futures_series(symbol: str, days: int = 30) -> list[dict]:
     from pathlib import Path
     try:
         sector_map = json.loads(Path(r"C:\Users\29abh\Projects\Trading\daily-ai-market-analyzer\config\sector_map.json").read_text())
-        holidays = {datetime.strptime(d, "%Y-%m-%d").date() for d in sector_map.get("holidays_2026", [])}
+        holidays = {datetime.strptime(d, "%Y-%m-%d").date() for d in sector_map.get("holidays", [])}
     except Exception:
         holidays = set()
 

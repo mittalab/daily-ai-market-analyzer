@@ -101,7 +101,7 @@ def get_nifty50_symbols() -> set[str]:
 
 def get_holiday_dates() -> set[date]:
     """Return the 2026 market holiday set from config/sector_map.json."""
-    raw = _load_sector_map().get("holidays_2026", [])
+    raw = _load_sector_map().get("holidays", [])
     return {date.fromisoformat(d) for d in raw}
 
 
