@@ -41,7 +41,12 @@ _LEGACY_URL = (
     "/{yyyy}/{mmm}/fo{ddmmmyyyy}bhav.csv.zip"
 )
 
-_TMP_DIR = Path(__file__).parent.parent / "tmp"
+import os as _os, tempfile as _tempfile
+_TMP_DIR = (
+    Path(_tempfile.gettempdir()) / "swing_trading_tmp"
+    if _os.getenv("RAILWAY_ENVIRONMENT")
+    else Path(__file__).parent.parent / "tmp"
+)
 _TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 _UDIFF_BASE    = "https://www.nseindia.com"
