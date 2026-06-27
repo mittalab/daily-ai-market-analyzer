@@ -41,6 +41,9 @@ _LEGACY_URL = (
     "/{yyyy}/{mmm}/fo{ddmmmyyyy}bhav.csv.zip"
 )
 
+_TMP_DIR = Path(__file__).parent.parent / "tmp"
+_TMP_DIR.mkdir(parents=True, exist_ok=True)
+
 _UDIFF_BASE    = "https://www.nseindia.com"
 _UDIFF_ARCHIVE = json.dumps([{
     "name":     "F&O - UDiFF Common Bhavcopy Final (zip)",
@@ -211,32 +214,40 @@ def _make_udiff_session() -> requests.Session:
 
 
 def _download_udiff(session: requests.Session, d: date) -> pd.DataFrame | None:
-    params = {
-        "archives": _UDIFF_ARCHIVE,
-        "date":     d.strftime("%d-%b-%Y"),
-        "type":     "equity",
-        "mode":     "single",
-    }
-    logger.debug("UDiFF download for %s", d)
+    local_path = _TMP_DIR / f"fo_bhavcopy_{d.strftime('%d%m%Y')}.csv.zip"
+
+    if local_path.exists():
+        logger.info("Found F&O bhavcopy in tmp folder: %s", local_path)
+        zip_bytes = local_path.read_bytes()
+    else:
+        params = {
+            "archives": _UDIFF_ARCHIVE,
+            "date":     d.strftime("%d-%b-%Y"),
+            "type":     "equity",
+            "mode":     "single",
+        }
+        logger.debug("UDiFF download for %s", d)
+        try:
+            r = session.get(_UDIFF_BASE + "/api/reports", params=params, timeout=30)
+        except requests.RequestException as exc:
+            logger.error("Network error for %s: %s", d, exc)
+            return None
+
+        if r.status_code == 404:
+            logger.warning("%s: UDiFF bhavcopy not found (404) — possibly holiday", d)
+            return None
+        if r.status_code != 200 or len(r.content) < 500:
+            logger.warning("%s: UDiFF unexpected HTTP %d (size %d)", d, r.status_code, len(r.content))
+            return None
+
+        cd = r.headers.get("Content-Disposition", "")
+        fo_filename = cd.split('filename=')[-1].strip('"') if "filename=" in cd else "unknown"
+        logger.info("Found F&O bhavcopy from NSE: %s (%d bytes) — saving to tmp", fo_filename, len(r.content))
+        local_path.write_bytes(r.content)
+        zip_bytes = r.content
+
     try:
-        r = session.get(_UDIFF_BASE + "/api/reports", params=params, timeout=30)
-    except requests.RequestException as exc:
-        logger.error("Network error for %s: %s", d, exc)
-        return None
-
-    if r.status_code == 404:
-        logger.warning("%s: UDiFF bhavcopy not found (404) — possibly holiday", d)
-        return None
-    if r.status_code != 200 or len(r.content) < 500:
-        logger.warning("%s: UDiFF unexpected HTTP %d (size %d)", d, r.status_code, len(r.content))
-        return None
-
-    cd = r.headers.get("Content-Disposition", "")
-    fo_filename = cd.split('filename=')[-1].strip('"') if "filename=" in cd else "unknown"
-    logger.info("Found F&O bhavcopy from NSE: %s (%d bytes)", fo_filename, len(r.content))
-
-    try:
-        with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             with zf.open(zf.namelist()[0]) as f:
                 df = pd.read_csv(f)
     except Exception as exc:
