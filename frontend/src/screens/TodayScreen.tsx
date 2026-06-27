@@ -211,7 +211,7 @@ export default function TodayScreen() {
 
   return (
     <div className="pb-20">
-      <h1 className="text-xl font-semibold text-gray-900 px-4 pt-5 pb-3">Today's Action</h1>
+      <h1 className="text-xl font-semibold text-gray-900 px-4 pt-5 pb-3">Today's Action - v2</h1>
 
       {/* Stale banner */}
       {data?.stale && (
