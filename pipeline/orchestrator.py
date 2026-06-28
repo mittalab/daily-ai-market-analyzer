@@ -116,8 +116,7 @@ def run_pipeline(session_date: date) -> dict:
 
     # ── Stage 2.5: OI Series Builder ─────────────────────────────────────────
     logger.info("Stage 2.5: OI Continuous Series Builder...")
-    from new_validation.run_validation import get_other_indices
-    oi_series_symbols: list[str] = ["NIFTY_50"] + get_other_indices() + symbols
+    oi_series_symbols: list[str] = ["NIFTY_50"] + symbols
     oi_result = run_oi_series_builder(oi_series_symbols, session_date)
     logger.info(
         "OI builder: stored=%d no_futures=%d no_options=%d errors=%d",
@@ -282,10 +281,9 @@ def run_oi_series_for_indices() -> dict:
     Intended as a standalone utility — independent of the main analysis pipeline.
     """
     from new_data_ingestion.nse_bhavcopy import last_trading_day
-    from new_validation.run_validation import get_other_indices
 
     session_date = last_trading_day(date.today())
-    symbols: list[str] = ["NIFTY_50"] + get_other_indices()
+    symbols: list[str] = ["NIFTY_50"]
 
     logger.info(
         "OI series builder — %d indices, session_date=%s",

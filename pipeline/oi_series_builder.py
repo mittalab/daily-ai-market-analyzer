@@ -37,7 +37,7 @@ from database.queries import (
     update_futures_spot,
     upsert_continuous_oi,
 )
-from integrations.nse_bhavcopy import get_holiday_dates
+from new_data_ingestion.nse_bhavcopy import get_holiday_dates
 
 logger = logging.getLogger(__name__)
 
