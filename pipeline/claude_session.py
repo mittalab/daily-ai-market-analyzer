@@ -454,6 +454,17 @@ PCR interpretation (contrarian indicator):
         )
     sectors_text = "\n\n".join(sector_blocks)
 
+    # Pre-compute EMA comparisons for market_trend guidance (FIX 4)
+    price           = ind["current"]
+    ema20           = ind["ema20"]
+    ema50           = ind["ema50"]
+    ema180          = ind["ema180"]
+    price_vs_ema20  = "above" if price > ema20  else "below"
+    price_vs_ema50  = "above" if price > ema50  else "below"
+    price_vs_ema180 = ("above" if price > ema180 else "below") if ema180 is not None else "unavailable"
+    ema20_vs_ema50  = ">" if ema20 > ema50 else "<"
+    ema_arrangement = "bullish" if ema20 > ema50 else "bearish"
+
     prompt = f"""You are performing post-market analysis for {data['session_date']}. Market has closed for the day.
 All data below reflects today's final values.
 
@@ -548,29 +559,85 @@ Current expiry : {current_expiry}
 Next expiry    : {next_expiry}
 Rollover phase : {rollover_phase}
 
-Rollover phase guide:
-  NORMAL        : More than 6 trading days to expiry
-                  Normal analysis — no special constraints
-  ROLLOVER_WATCH: 5-6 trading days to expiry
-                  Begin watching for rollover signals
-                  Prefer setups with next expiry in mind
-  TRANSITION    : 3-4 trading days to expiry
-                  Near-month options losing time value fast
-                  Flag any near-month setups as higher risk
-  EXPIRY        : 1-2 trading days to expiry
-                  Extreme caution — avoid near-month entries
-                  Only next-month setups are valid tonight
+Rollover phase definitions (based on trading days
+remaining before expiry, excluding expiry day itself):
 
-Factor rollover phase into:
-  prescan_guidance.special_instructions
-  prescan_guidance.max_stocks_to_forward
-    (reduce by 20-30% if TRANSITION or EXPIRY)
-  risk_flags
-    (add expiry risk flag if TRANSITION or EXPIRY)
+  NORMAL        : More than 5 trading days remaining
+                  Normal analysis — no special constraints
+                  Full stock universe eligible for near month
+
+  ROLLOVER_WATCH: 3-5 trading days remaining
+                  Monitor rollover activity in futures OI
+                  Prefer setups that work on next expiry too
+                  Near-month setups still valid if DTE >= 6
+
+  TRANSITION    : Exactly 2 trading days remaining
+                  Near-month theta decay accelerating fast
+                  New near-month entries carry high time risk
+                  Prefer next-month expiry for all new setups
+
+  EXPIRY        : 0-1 trading days remaining or expiry day
+                  Do not recommend near-month entries at all
+                  Only next-month setups are valid tonight
+                  Existing near-month positions: manage only
+
+Tonight's phase is: {rollover_phase}
+
+Factor this into your output:
+  prescan_guidance.max_stocks_to_forward:
+    NORMAL or ROLLOVER_WATCH: use risk_level base
+    TRANSITION: reduce base by 20%
+    EXPIRY: reduce base by 30%
+
+  prescan_guidance.special_instructions:
+    NORMAL: null
+    ROLLOVER_WATCH: note preference for setups
+                    that work on next expiry too
+    TRANSITION: "All new setups must target next expiry
+                 ({next_expiry}). Near-month theta
+                 decay is severe — avoid new entries
+                 on {current_expiry} strikes."
+    EXPIRY: "Only next-month expiry ({next_expiry})
+             setups valid tonight. No near-month
+             entries under any circumstances."
+
+  prescan_guidance.expiry_note:
+    NORMAL or ROLLOVER_WATCH: null
+    TRANSITION or EXPIRY: specific warning string
+      citing current_expiry and days remaining
+
+  risk_flags:
+    Always add expiry risk flag if TRANSITION or EXPIRY:
+    "TRANSITION phase — X trading days to
+     {current_expiry} expiry — near-month theta risk
+     severe. All new setups must use {next_expiry}."
 
 ════════════════════════════════════════════════════
 REQUIRED OUTPUT
 ════════════════════════════════════════════════════
+
+SECTOR PICTURE INSTRUCTIONS:
+Provide a complete assessment for ALL 11 sectors.
+No shortcuts. No placeholders. No ellipsis.
+Every sector must have all 7 fields completed.
+
+Required sectors (all 11 mandatory):
+  BANKING, IT, AUTO, PHARMA, FMCG,
+  METAL, ENERGY, FINSERV, INFRA, CONSUMER, MEDIA
+
+Field value options:
+  trend    : UPTREND | DOWNTREND | SIDEWAYS
+  momentum : ACCELERATING | DECELERATING | STABLE
+  vs_nifty : OUTPERFORMING | UNDERPERFORMING | INLINE
+  stance   : TAILWIND | NEUTRAL | HEADWIND
+  strength : STRONG | MODERATE | WEAK
+  character: 1 sentence describing price action.
+             Cite actual price levels seen in data.
+             e.g. "Broke out from 54000 to 58177
+                   with consistent higher highs"
+  trading_note: 1 sentence on stock selection tonight.
+             e.g. "Favour LONG setups — strong sector
+                   tailwind from Banking outperformance"
 
 Produce the market intelligence JSON below.
 Every field is consumed by downstream stock analysis.
@@ -581,13 +648,32 @@ No text outside the JSON. No markdown fences.
   "session_narrative": "3-4 sentences: (1) Nifty trend and price structure, (2) VIX level and direction you read, (3) Institutional flow character, (4) Implication for tonight. Cite actual numbers.",
 
   "market_trend": "BULLISH | BEARISH | SIDEWAYS",
-  // BULLISH  : price > ema20 > ema50 > ema180
-  // BEARISH  : price < ema20 < ema50 < ema180
-  // SIDEWAYS : mixed or conflicting EMA signals
-  // Note: EMA180 is the long-term trend anchor.
-  //       EMA50 is the medium-term trend signal.
-  //       EMA20 is the short-term momentum signal.
-  //       All three must align for a clean trend call.
+  // Read EMA ARRANGEMENT not just price vs EMAs.
+  // Check if EMA20 is above or below EMA50 first.
+  // EMA20 > EMA50 = bullish short-term arrangement
+  // EMA20 < EMA50 = bearish short-term arrangement
+  //
+  // BULLISH  : price > ema20 > ema50
+  //            AND price > ema180
+  //            Long-term trend recovered and confirmed
+  //
+  // BEARISH  : price < ema20 < ema50
+  //            OR price < ema180 with ema20 < ema50
+  //            Trend broken at multiple timeframes
+  //
+  // SIDEWAYS : Any mixed arrangement including:
+  //            price above ema20/ema50 but below ema180
+  //            price above ema20 but ema20 < ema50
+  //            price between ema20 and ema50
+  //            Conflicting signals across timeframes
+  //
+  // Note: Tonight's values are:
+  //   Price  : {price}
+  //   EMA20  : {ema20} (price {price_vs_ema20})
+  //   EMA50  : {ema50} (price {price_vs_ema50})
+  //   EMA180 : {ema180_str} (price {price_vs_ema180})
+  //   EMA20 {ema20_vs_ema50} EMA50
+  //         ({ema_arrangement} arrangement)
 
   "market_volatility": "LOW | NORMAL | HIGH",
 
@@ -629,28 +715,6 @@ No text outside the JSON. No markdown fences.
   }},
 
   "sector_pictures": {{
-
-    IMPORTANT: You must provide a complete assessment
-    for ALL 11 sectors listed below.
-    Do not use shortcuts, ellipsis, or placeholders.
-    Each sector must have all 7 fields filled.
-    Required sectors: BANKING, IT, AUTO, PHARMA,
-    FMCG, METAL, ENERGY, FINSERV, INFRA, CONSUMER, MEDIA
-
-    Field definitions:
-      trend    : UPTREND | DOWNTREND | SIDEWAYS
-      momentum : ACCELERATING | DECELERATING | STABLE
-      vs_nifty : OUTPERFORMING | UNDERPERFORMING | INLINE
-      stance   : TAILWIND | NEUTRAL | HEADWIND
-      strength : STRONG | MODERATE | WEAK
-      character: 1 sentence on price action character
-                 Cite actual price levels or patterns.
-                 e.g. "Clean breakout from 54000 to 58000
-                       with consistent higher highs"
-      trading_note: 1 sentence on stock selection implication
-                 e.g. "Favour LONG setups in BFSI —
-                       strong sector tailwind tonight"
-
     "BANKING": {{
       "trend": "",
       "momentum": "",
@@ -760,8 +824,28 @@ No text outside the JSON. No markdown fences.
 
   "prescan_guidance": {{
     "max_stocks_to_forward": integer,
-    // Reduce by 20-30% if rollover_phase is
-    // TRANSITION or EXPIRY due to time decay risk
+    // Calculate as follows:
+    //
+    // Step 1 — Base from session_risk_level:
+    //   LOW     : 15 stocks
+    //   MEDIUM  : 12 stocks
+    //   HIGH    :  8 stocks
+    //   EXTREME :  5 stocks
+    //
+    // Step 2 — Apply rollover reduction:
+    //   NORMAL or ROLLOVER_WATCH : no reduction
+    //   TRANSITION               : multiply by 0.80
+    //   EXPIRY                   : multiply by 0.70
+    //   Round down to nearest integer
+    //
+    // Step 3 — Hard minimum: never below 3
+    //
+    // Example calculations:
+    //   MEDIUM risk + NORMAL phase   : 12
+    //   MEDIUM risk + TRANSITION     : floor(12×0.80) = 9
+    //   MEDIUM risk + EXPIRY         : floor(12×0.70) = 8
+    //   HIGH risk   + EXPIRY         : floor(8×0.70)  = 5
+    //   LOW risk    + TRANSITION     : floor(15×0.80) = 12
 
     "prefer_directions": [...],
 
