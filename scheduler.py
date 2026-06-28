@@ -74,30 +74,30 @@ def job_morning_bhavcopy() -> None:
 
     send_validation_start(str(target_date), label="F&O Universe")
 
-    # Equity + indices bhavcopy — no_overwrite preserves yesterday's Kite data
-    try:
-        from new_data_ingestion.ingestion_utils import ingest_today_bhavcopy
-        summary = ingest_today_bhavcopy(target_date, no_overwrite=True)
-        if summary["ok"]:
-            logger.info(
-                "Morning equity bhavcopy OK: equity=%d index=%d for %s",
-                summary["equity_rows"], summary["index_rows"], target_date,
-            )
-        else:
-            logger.warning("Morning equity bhavcopy partial errors: %s", summary.get("errors"))
-    except Exception as exc:
-        logger.error("Morning equity bhavcopy failed: %s", exc)
-
-    # FO bhavcopy (options + futures for all symbols) — overwrite is fine here
-    try:
-        from new_data_ingestion.fo_bhavcopy import run_backfill as run_fo_backfill
-        fo_summary = run_fo_backfill([target_date])
-        if target_date in fo_summary.get("failed", []):
-            logger.warning("Morning FO bhavcopy failed for %s", target_date)
-        else:
-            logger.info("Morning FO bhavcopy OK for %s", target_date)
-    except Exception as exc:
-        logger.error("Morning FO bhavcopy failed: %s", exc)
+    # # Equity + indices bhavcopy — no_overwrite preserves yesterday's Kite data
+    # try:
+    #     from new_data_ingestion.ingestion_utils import ingest_today_bhavcopy
+    #     summary = ingest_today_bhavcopy(target_date, no_overwrite=True)
+    #     if summary["ok"]:
+    #         logger.info(
+    #             "Morning equity bhavcopy OK: equity=%d index=%d for %s",
+    #             summary["equity_rows"], summary["index_rows"], target_date,
+    #         )
+    #     else:
+    #         logger.warning("Morning equity bhavcopy partial errors: %s", summary.get("errors"))
+    # except Exception as exc:
+    #     logger.error("Morning equity bhavcopy failed: %s", exc)
+    #
+    # # FO bhavcopy (options + futures for all symbols) — overwrite is fine here
+    # try:
+    #     from new_data_ingestion.fo_bhavcopy import run_backfill as run_fo_backfill
+    #     fo_summary = run_fo_backfill([target_date])
+    #     if target_date in fo_summary.get("failed", []):
+    #         logger.warning("Morning FO bhavcopy failed for %s", target_date)
+    #     else:
+    #         logger.info("Morning FO bhavcopy OK for %s", target_date)
+    # except Exception as exc:
+    #     logger.error("Morning FO bhavcopy failed: %s", exc)
 
     # Post-ingestion validation: confirm all F&O stocks landed correctly
     try:
@@ -290,3 +290,7 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         "Scheduler: 6 jobs registered "
         "(keepalive, morning_bhavcopy, morning_brief, kite_check×2, analysis_pipeline)"
     )
+
+
+if __name__ == "__main__":
+    job_morning_bhavcopy()

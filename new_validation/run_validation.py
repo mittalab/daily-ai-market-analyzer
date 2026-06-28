@@ -763,6 +763,6 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
-    run_validation_now()
-    #print(run_validation_now_for_symbol(symbol="ADANIENT", include_indexes=True))
+    #run_validation_now()
+    print(run_validation_now_for_symbol(symbol="JIOFIN", include_indexes=False))
     #main()
