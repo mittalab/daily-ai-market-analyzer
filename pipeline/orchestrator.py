@@ -91,104 +91,104 @@ def run_pipeline(session_date: date) -> dict:
         update_analysis_session(session_id, {"status": "ABORTED"})
         return {"error": "All target symbols failed validation", "session_id": session_id}
 
-    return {}
-    # # ── Create / reuse session record ─────────────────────────────────────────
-    # try:
-    #     create_analysis_session(session_id, session_date)
-    #     logger.info("Created session %s", session_id)
-    # except Exception:
-    #     logger.info("Session %s already exists — continuing", session_id)
-    #
-    # update_analysis_session(session_id, {
-    #     "status":     "RUNNING",
-    #     "started_at": started_at,
-    #     "stage_statuses": {"data_ingestion": "COMPLETE", "started_ist": started_at},
-    # })
-    #
-    # # ── Kite token check (best-effort) ────────────────────────────────────────
-    # kite = None
-    # try:
-    #     from new_data_ingestion.kite_oauth import get_authenticated_kite
-    #     kite = get_authenticated_kite()
-    #     token_ok = True
-    # except Exception as exc:
-    #     logger.warning("Kite token unavailable: %s", exc)
-    #     token_ok = False
-    #
-    # # ── Stage 2.5: OI Series Builder ─────────────────────────────────────────
-    # logger.info("Stage 2.5: OI Continuous Series Builder...")
-    # oi_result = run_oi_series_builder(symbols, session_date)
-    # logger.info(
-    #     "OI builder: stored=%d no_futures=%d no_options=%d errors=%d",
-    #     oi_result["stored"], len(oi_result["no_futures"]),
-    #     len(oi_result["no_options"]), len(oi_result["errors"]),
-    # )
-    # update_analysis_session(session_id, {
-    #     "stage_statuses": {
-    #         "data_ingestion": "COMPLETE",
-    #         "oi_series": "COMPLETE" if not oi_result["errors"] else "PARTIAL",
-    #         "oi_stored":  oi_result["stored"],
-    #     }
-    # })
-    #
-    # # ── Stage 3: Level 1 Filter ───────────────────────────────────────────────
-    # logger.info("Stage 3: Level 1 Filter...")
-    # earnings_window = fetch_nse_earnings_window(session_date)
-    # l1_result       = run_level1_filter(symbols, session_date, kite, earnings_window)
-    # level1_passed   = l1_result["passed"]
-    # logger.info(
-    #     "Level 1: passed=%d eliminated=%d errors=%d",
-    #     len(level1_passed), len(l1_result["eliminated"]), len(l1_result["errors"]),
-    # )
-    # update_analysis_session(session_id, {
-    #     "stocks_level1_passed": len(level1_passed),
-    #     "status": "PRE_PROCESSING_COMPLETE",
-    #     "stage_statuses": {
-    #         "data_ingestion": "COMPLETE",
-    #         "oi_series":      "COMPLETE" if not oi_result["errors"] else "PARTIAL",
-    #         "level1_filter":  "COMPLETE" if not l1_result["errors"] else "PARTIAL",
-    #         "l1_passed":      len(level1_passed),
-    #         "l1_eliminated":  len(l1_result["eliminated"]),
-    #     }
-    # })
-    #
-    # if not level1_passed:
-    #     logger.error("Level 1 passed 0 stocks — aborting pipeline")
-    #     update_analysis_session(session_id, {"status": "ABORTED"})
-    #     return {"error": "Level 1 passed 0 stocks", "session_id": session_id}
-    #
-    # # ── Stage 4: Context Bundle ───────────────────────────────────────────────
-    # logger.info("Stage 4: Building context bundle...")
-    # context_bundle = build_context_bundle(session_date, session_id, regime_result=None)
-    #
-    # # ── Stage 4.5: Watchlist Priority ─────────────────────────────────────────
-    # # Fetch active watchlist stocks and prioritize for deep analysis
-    # watchlist_stocks = []
-    # try:
-    #     active_wl = get_watchlist()
-    #     # Filter for active ones (WATCH/ON_RADAR) within 10 days
-    #     watchlist_stocks = [
-    #         {
-    #             "symbol": r["symbol"],
-    #             "direction": r.get("direction_bias", "AUTO"),
-    #             "priority": "HIGH",
-    #             "forward_to_deep": True,
-    #             "is_watchlist_reanalysis": True,
-    #             "days_in_stage": r.get("days_in_stage", 0)
-    #         }
-    #         for r in active_wl
-    #         if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY", "MANUAL_ADD") and r.get("days_in_stage", 0) <= 10
-    #     ]
-    #     if watchlist_stocks:
-    #         logger.info("Watchlist re-analysis: %d stocks prioritized", len(watchlist_stocks))
-    # except Exception as exc:
-    #     logger.warning("Failed to fetch watchlist for re-analysis: %s", exc)
-    #
-    # # ── Stage 5: Claude Session ───────────────────────────────────────────────
-    # logger.info("Stage 5: Claude multi-turn session (%d stocks)...", len(level1_passed))
-    # claude_result = run_claude_session(context_bundle, level1_passed, session_id, watchlist_priority=watchlist_stocks)
-    # regime_result = claude_result["regime_result"]
-    #
+    # ── Create / reuse session record ─────────────────────────────────────────
+    try:
+        create_analysis_session(session_id, session_date)
+        logger.info("Created session %s", session_id)
+    except Exception:
+        logger.info("Session %s already exists — continuing", session_id)
+
+    update_analysis_session(session_id, {
+        "status":     "RUNNING",
+        "started_at": started_at,
+        "stage_statuses": {"data_validation": "COMPLETE", "started_ist": started_at},
+    })
+
+    # ── Kite token check (best-effort) ────────────────────────────────────────
+    kite = None
+    try:
+        from new_data_ingestion.kite_oauth import get_authenticated_kite
+        kite = get_authenticated_kite()
+        token_ok = True
+    except Exception as exc:
+        logger.warning("Kite token unavailable: %s", exc)
+        token_ok = False
+
+    # ── Stage 2.5: OI Series Builder ─────────────────────────────────────────
+    logger.info("Stage 2.5: OI Continuous Series Builder...")
+    oi_result = run_oi_series_builder(symbols, session_date)
+    logger.info(
+        "OI builder: stored=%d no_futures=%d no_options=%d errors=%d",
+        oi_result["stored"], len(oi_result["no_futures"]),
+        len(oi_result["no_options"]), len(oi_result["errors"]),
+    )
+    update_analysis_session(session_id, {
+        "stage_statuses": {
+            "data_ingestion": "COMPLETE",
+            "oi_series": "COMPLETE" if not oi_result["errors"] else "PARTIAL",
+            "oi_stored":  oi_result["stored"],
+        }
+    })
+
+    # ── Stage 3: Level 1 Filter ───────────────────────────────────────────────
+    logger.info("Stage 3: Level 1 Filter...")
+    earnings_window = fetch_nse_earnings_window(session_date)
+    l1_result       = run_level1_filter(symbols, session_date, kite, earnings_window)
+    level1_passed   = l1_result["passed"]
+    logger.info(
+        "Level 1: passed=%d eliminated=%d errors=%d",
+        len(level1_passed), len(l1_result["eliminated"]), len(l1_result["errors"]),
+    )
+    update_analysis_session(session_id, {
+        "stocks_level1_passed": len(level1_passed),
+        "status": "PRE_PROCESSING_COMPLETE",
+        "stage_statuses": {
+            "data_ingestion": "COMPLETE",
+            "oi_series":      "COMPLETE" if not oi_result["errors"] else "PARTIAL",
+            "level1_filter":  "COMPLETE" if not l1_result["errors"] else "PARTIAL",
+            "l1_passed":      len(level1_passed),
+            "l1_eliminated":  len(l1_result["eliminated"]),
+        }
+    })
+
+    if not level1_passed:
+        logger.error("Level 1 passed 0 stocks — aborting pipeline")
+        update_analysis_session(session_id, {"status": "ABORTED"})
+        return {"error": "Level 1 passed 0 stocks", "session_id": session_id}
+
+    # ── Stage 4: Context Bundle ───────────────────────────────────────────────
+    logger.info("Stage 4: Building context bundle...")
+    context_bundle = build_context_bundle(session_date, session_id, regime_result=None)
+
+    # ── Stage 4.5: Watchlist Priority ─────────────────────────────────────────
+    # Fetch active watchlist stocks and prioritize for deep analysis
+    watchlist_stocks = []
+    try:
+        active_wl = get_watchlist()
+        # Filter for active ones (WATCH/ON_RADAR) within 10 days
+        watchlist_stocks = [
+            {
+                "symbol": r["symbol"],
+                "direction": r.get("direction_bias", "AUTO"),
+                "priority": "HIGH",
+                "forward_to_deep": True,
+                "is_watchlist_reanalysis": True,
+                "days_in_stage": r.get("days_in_stage", 0)
+            }
+            for r in active_wl
+            if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY", "MANUAL_ADD") and r.get("days_in_stage", 0) <= 10
+        ]
+        if watchlist_stocks:
+            logger.info("Watchlist re-analysis: %d stocks prioritized", len(watchlist_stocks))
+    except Exception as exc:
+        logger.warning("Failed to fetch watchlist for re-analysis: %s", exc)
+
+    # ── Stage 5: Claude Session ───────────────────────────────────────────────
+    logger.info("Stage 5: Claude multi-turn session (%d stocks)...", len(level1_passed))
+    claude_result = run_claude_session(context_bundle, level1_passed, session_id, watchlist_priority=watchlist_stocks)
+    regime_result = claude_result["regime_result"]
+    print (regime_result)
+
     # # ── Pipeline complete ─────────────────────────────────────────────────────
     # # FIX: Ground-truth DB validation before final notification
     # from database.queries import get_row_count
@@ -270,3 +270,4 @@ def run_pipeline(session_date: date) -> dict:
     #     "total_output_tokens": claude_result["total_output_tokens"],
     #     "cost_usd":            claude_result["cost_usd"],
     # }
+    return {}

@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 _EARNINGS_WINDOW_DAYS = 5          # trading days forward
 _ATR_DEAD_THRESHOLD   = 0.5        # % — below this = dead zone - for Nifty 50
 _ATM_OI_MINIMUM       = 10_000     # combined ATM CE+PE OI
-_ATR_HISTORY_ROWS     = 25         # need 14 for ATR + a few extra
+_ATR_HISTORY_ROWS     = 100         # need 14 for ATR + a few extra
 
 # NSE event-calendar purpose strings that indicate binary event risk.
 # kite.corporate_actions() does not exist in KiteConnect Python client —

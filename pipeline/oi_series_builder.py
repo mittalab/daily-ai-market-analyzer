@@ -117,12 +117,13 @@ def _pcr_and_oi_from_options(
 
 def _calc_max_pain(rows: list[dict], near_expiry_str: str) -> float | None:
     """
-    Max pain = strike price that causes maximum total loss to option buyers.
+    Max pain = strike price that minimizes the total intrinsic value payout
+               by option sellers (which minimizes total value held by buyers).
 
     For each candidate settlement S:
-      CE buyer loss: sum( (K - S) * CE_OI(K) )  for all K > S
-      PE buyer loss: sum( (S - K) * PE_OI(K) )  for all K < S
-    Max pain = S maximising total buyer loss.
+      CE payout: sum( (S - K) * CE_OI(K) )  for all K < S  (ITM Calls)
+      PE payout: sum( (K - S) * PE_OI(K) )  for all K > S  (ITM Puts)
+    Max pain = S minimizing total payout.
     """
     near_rows = [r for r in rows if str(r.get("expiry_date", "")) == near_expiry_str]
     if not near_rows:
@@ -142,13 +143,20 @@ def _calc_max_pain(rows: list[dict], near_expiry_str: str) -> float | None:
     if not strikes:
         return None
 
-    max_loss  = -1
+    # CRITICAL FIX: Initialize with infinity because we want to MINIMIZE the pain value
+    min_loss = float('inf')
     pain_strike = None
+
     for s in strikes:
-        loss  = sum((k - s) * ce_oi[k] for k in strikes if k > s)
-        loss += sum((s - k) * pe_oi[k] for k in strikes if k < s)
-        if loss > max_loss:
-            max_loss, pain_strike = loss, s
+        # CE has value (payout) when settlement S is greater than strike K (S > K)
+        loss = sum((s - k) * ce_oi[k] for k in strikes if k < s)
+
+        # PE has value (payout) when settlement S is less than strike K (S < k)
+        loss += sum((k - s) * pe_oi[k] for k in strikes if k > s)
+
+        # CRITICAL FIX: Find the absolute minimum payout point
+        if loss < min_loss:
+            min_loss, pain_strike = loss, s
 
     return pain_strike
 
@@ -181,18 +189,12 @@ def run_oi_series_builder(symbols: list[str], analysis_date: date) -> dict:
         try:
             # ── Spot price (bhavcopy close) ────────────────────────────────
             spot_price: float | None = None
-            #AI: This assumes that price data is available for today. You can't run the analysis on any other day.
-            # instead, use the last day available data and send alert that using which date of data. This is needed
-            # only for manual analysis AND NOT DAILY ANLAYSIS.
             for pr in reversed(get_price_history(symbol, days=5)):
                 if str(pr["date"]) == str(analysis_date):
                     spot_price = float(pr["close"])
                     break
 
             # ── Futures series row ─────────────────────────────────────────
-            #AI: Check how is futures_continuous_series table populated?
-            # also use the same date logic as that of price. May be from top, pass the analysis date as the last run
-            # date for manual analysis.
             fut = get_futures_row(symbol, analysis_date)
             if fut is None:
                 logger.warning("%s: no futures row for %s — skipping", symbol, analysis_date)
@@ -204,10 +206,10 @@ def run_oi_series_builder(symbols: list[str], analysis_date: date) -> dict:
             near_expiry     = date.fromisoformat(near_expiry_str)
 
             # ── Update spot_price + basis in futures table ─────────────────
-            futures_price = float(fut["futures_price"]) if fut.get("futures_price") else None
+            futures_price = float(fut["futures_price"]) if fut.get("futures_price") else spot_price
             if spot_price is not None and futures_price is not None:
                 basis     = round(futures_price - spot_price, 2)
-                basis_pct = round(basis / spot_price * 100, 4) if spot_price else None
+                basis_pct = round(basis / spot_price * 100, 4) if spot_price else 0.0
                 update_futures_spot(symbol, analysis_date, spot_price, basis, basis_pct)
 
             # ── Rollover phase (re-computed correctly) ─────────────────────
@@ -221,12 +223,10 @@ def run_oi_series_builder(symbols: list[str], analysis_date: date) -> dict:
                 pcr_near, pcr_total, near_oi, next_oi = _pcr_and_oi_from_options(
                     opt_rows, near_expiry_str
                 )
-                #AI: Can we get max_pain from the KITE or somewhere else
                 max_pain    = _calc_max_pain(opt_rows, near_expiry_str)
                 total_oi    = near_oi + next_oi
                 rollover_pct = round(next_oi / total_oi * 100, 2) if total_oi > 0 else None
             else:
-                #AI: Show warning option data is not available. This should never happen
                 no_options.append(symbol)
                 # Fall back to futures OI when snapshot unavailable
                 near_oi      = int(fut.get("near_month_oi") or 0)
@@ -237,7 +237,6 @@ def run_oi_series_builder(symbols: list[str], analysis_date: date) -> dict:
 
             # ── OI change vs previous day ──────────────────────────────────
             prev = _prev_total_oi(symbol, analysis_date)
-            #AI: Should oi_change be computed for each strike individually as well
             oi_change = (total_oi - prev) if prev is not None else None
 
             upsert_continuous_oi({

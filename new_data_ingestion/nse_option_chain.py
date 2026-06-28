@@ -136,8 +136,9 @@ def parse_snapshot_for_db(
                 iv_filtered += 1
                 continue  # Filter out deep OTM zeroes
 
+            final_symbol = symbol.replace('%26', '&')
             rows.append({
-                "symbol":        symbol.upper(),
+                "symbol":        final_symbol.upper(),
                 "snapshot_date": str(snapshot_date),
                 "expiry_date":   str(expiry_date),
                 "strike":        float(strike),
@@ -217,18 +218,20 @@ def run_snapshot_batch(
     all_rows = []
     failed_symbols = []
 
-    for symbol in symbols:
+    for sym in symbols:
         try:
+            symbol = sym.replace('&', '%26')
             rows = fetch_option_chain_symbol(session, symbol, snapshot_date)
             if not rows:
                 logger.warning("%s: parsed 0 option rows", symbol)
                 failed_symbols.append(symbol)
             else:
+                print(rows)
                 all_rows.extend(rows)
                 logger.info("%s: %d option rows parsed", symbol, len(rows))
         except Exception as exc:
-            logger.warning("Option chain scraper failed for %s: %s", symbol, exc)
-            failed_symbols.append(symbol)
+            logger.warning("Option chain scraper failed for %s: %s", sym, exc)
+            failed_symbols.append(sym)
 
         time.sleep(sleep_secs)
 

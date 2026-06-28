@@ -104,7 +104,8 @@ def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] |
     """
     snap_date = snapshot_date or date.today()
     summary: dict = {"ok": False, "rows_stored": 0, "source": "NONE", "failed_symbols": [], "errors": []}
-    target_symbols = symbols or get_stock_list_for_analysis()
+    stock_list_for_analysis = get_stock_list_for_analysis()
+    target_symbols = symbols or list(stock_list_for_analysis.keys())
 
     # # A. Kite Quotes (Primary)
     # kite_rows = []
@@ -161,7 +162,8 @@ def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] |
     # # B. NSE Scrape (Secondary/Enrichment for IVs)
     try:
         nse_session = make_nse_session()
-        nse_rows, failed = run_snapshot_batch(nse_session, target_symbols, snap_date)
+        nse_rows: list[dict]
+        nse_rows, failed = run_snapshot_batch(nse_session, symbols=target_symbols, snapshot_date=snap_date)
         if nse_rows:
             n = upsert_options_snapshots(nse_rows)
             summary["ok"] = True
@@ -360,3 +362,6 @@ def backfill_historical_date(target_date: date, symbol: str | None = None, optio
     # _check_backfill_coverage(target_date)
 
     return summary
+
+if __name__ == '__main__':
+    ingest_today_options(symbols=['JIOFIN'])

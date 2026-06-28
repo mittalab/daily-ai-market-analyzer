@@ -51,7 +51,6 @@ def build_context_bundle(
         "session_date":      session_date,
         "session_id":        session_id,
         "config":            config,
-        "regime":            regime_result,
         # Phase 2 placeholders (empty in Phase 1)
         "system_memory":     [],
         "active_directives": [],

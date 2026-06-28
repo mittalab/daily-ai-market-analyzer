@@ -15,7 +15,7 @@ from datetime import datetime
 
 import pytz
 
-from integrations.nse_bhavcopy import get_nifty50_symbols, last_trading_day
+from new_integrations.nse_bhavcopy import last_trading_day
 from pipeline.oi_series_builder import run_oi_series_builder
 from pipeline.market_regime import get_index_indicators
 from pipeline.level1_filter import run_level1_filter, fetch_nse_earnings_window

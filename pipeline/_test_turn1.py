@@ -8,7 +8,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-from integrations.nse_bhavcopy import last_trading_day
+from new_data_ingestion.nse_bhavcopy import last_trading_day
 from pipeline.context_builder import build_context_bundle
 from pipeline.system_prompt_builder import build_system_prompt
 from pipeline.claude_session import run_turn1_market_context

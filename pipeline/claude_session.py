@@ -870,184 +870,185 @@ def run_claude_session(
     except Exception as _exc:
         logger.warning("Phase 1 notification failed: %s", _exc)
 
-    # Re-build system prompt using the dynamically generated regime context
-    context_bundle["regime"] = regime_result
-    system_text = build_system_prompt(context_bundle)
-
-    # Token ceiling check before Turn 2
-    if total_input + total_output + 25_000 >= _TOKEN_CEILING:
-        raise RuntimeError(
-            f"Token ceiling ({_TOKEN_CEILING}) would be exceeded entering Turn 2 "
-            f"({total_input + total_output} tokens used so far)."
-        )
-
-    # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────
-    turn2_results, forwarded_stocks, messages, t2_cost = run_turn2_prescan(
-        client=client,
-        session_id=session_id,
-        session_date=session_date,
-        level1_passed=level1_passed,
-        messages=messages,
-        system_text=system_text,
-    )
-    turn_costs.append(t2_cost)
-    total_input += t2_cost["input_tokens"]
-    total_output += t2_cost["output_tokens"]
-
-    try:
-        from new_notifications.telegram import send_prescan_complete
-        send_prescan_complete(str(session_date), len(forwarded_stocks), len(turn2_results))
-    except Exception as _exc:
-        logger.warning("Prescan notification failed: %s", _exc)
-
-    # Truncation / empty safety check
-    n = len(turn2_results)
-    if n == 0:
-        reason = "Pre-scan returned 0 stocks — likely JSON parse failure or truncation"
-        logger.error(reason)
-        cost_usd = round(total_input / 1_000_000 * 3.00 + total_output / 1_000_000 * 15.00, 6)
-        update_analysis_session(session_id, {
-            "claude_tokens_input":  total_input,
-            "claude_tokens_output": total_output,
-            "claude_cost_usd":      cost_usd,
-            "status":               "FAILED",
-            "stage_statuses": {
-                "claude_turn1":     "COMPLETE",
-                "claude_turn2":     "FAILED",
-                "failure_reason":   reason,
-                "turn2_out_tokens": t2_cost["output_tokens"],
-            },
-        })
-        _save_session_cost_json(session_id, session_date, turn_costs)
-        raise RuntimeError(reason)
-    elif n < 5:
-        logger.warning("Pre-scan returned only %d stocks — possible truncation.", n)
-
-    # Combine pre-scan forwarded stocks with priority watchlist stocks
-    final_queue = forwarded_stocks[:]
-    for wl_stock in (watchlist_priority or []):
-        if not any(fs["symbol"] == wl_stock["symbol"] for fs in forwarded_stocks):
-            final_queue.insert(0, wl_stock)
-        else:
-            for fs in final_queue:
-                if fs["symbol"] == wl_stock["symbol"]:
-                    fs["is_watchlist_reanalysis"] = True
-                    fs["days_in_stage"] = wl_stock.get("days_in_stage", 0)
-
-    # ── Turns 3+: Deep Analysis ───────────────────────────────────────────────
-    deep_results: list[dict] = []
-    trade_ready_list: list[dict] = []
-
-    # Pack the index dimensions explicitly for single stock runs
-    index_ctx = {
-        "regime":            regime_result.get("regime")      if regime_result else "UNKNOWN",
-        "market_trend":      regime_result.get("market_trend") if regime_result else "UNKNOWN",
-        "market_volatility":  regime_result.get("market_volatility") if regime_result else "UNKNOWN",
-        "market_structure":   regime_result.get("market_structure") if regime_result else "UNKNOWN",
-        "execution_bias":     regime_result.get("execution_bias") if regime_result else "UNKNOWN",
-        "fii_dii_stance":     regime_result.get("fii_dii_stance") if regime_result else "UNKNOWN",
-        "nifty_close":       regime_result.get("nifty_close") if regime_result else None,
-        "vix":               regime_result.get("vix")         if regime_result else None,
-        "ema20":             regime_result.get("ema20")        if regime_result else None,
-        "ema50":             regime_result.get("ema50")        if regime_result else None,
-        "ret20d_pct":        regime_result.get("ret20d")       if regime_result else None,
-    }
-
-    for i, prescan_stock in enumerate(final_queue):
-        symbol    = prescan_stock.get("symbol", "")
-        direction = prescan_stock.get("direction", "AUTO")
-        is_re     = prescan_stock.get("is_watchlist_reanalysis", False)
-        days_in   = prescan_stock.get("days_in_stage", 0)
-        turn_num  = 3 + i
-
-        if not symbol:
-            continue
-
-        deep_res, deep_cost = run_turn_deep_analysis(
-            client=client,
-            session_id=session_id,
-            session_date=session_date,
-            symbol=symbol,
-            direction=direction,
-            is_re=is_re,
-            days_in=days_in,
-            index_ctx=index_ctx,
-            config=config,
-            turn_num=turn_num,
-            trade_ready_list=trade_ready_list,
-        )
-        deep_results.append(deep_res)
-        turn_costs.append(deep_cost)
-        total_input += deep_cost["input_tokens"]
-        total_output += deep_cost["output_tokens"]
-
-    cost_usd = round(
-        total_input  / 1_000_000 * 3.00 +
-        total_output / 1_000_000 * 15.00,
-        6,
-    )
-
-    trade_ready = sum(1 for d in deep_results if d.get("stage") == "TRADE_READY")
-    watch       = sum(1 for d in deep_results if d.get("stage") == "WATCH")
-    on_radar    = sum(1 for d in deep_results if d.get("stage") == "ON_RADAR")
-    skipped     = sum(1 for d in deep_results if d.get("stage") == "SKIP")
-    prescan_fwd = sum(1 for s in turn2_results if s.get("forward_to_deep"))
-
-    try:
-        from new_notifications.telegram import send_deep_analysis_complete
-        send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped)
-    except Exception as _exc:
-        logger.warning("Deep analysis complete notification failed: %s", _exc)
-
-    update_analysis_session(session_id, {
-        "claude_tokens_input":  total_input,
-        "claude_tokens_output": total_output,
-        "claude_cost_usd":      cost_usd,
-        "status":               "ANALYSIS_COMPLETE",
-        "trade_ready_count":    trade_ready,
-        "watch_count":          watch,
-        "radar_count":          on_radar,
-        "stage_statuses": {
-            "claude_turn1":          "COMPLETE",
-            "claude_turn2":          "COMPLETE",
-            "deep_analysis":         "COMPLETE",
-            "prescan_total":         len(turn2_results),
-            "prescan_forwarded":     prescan_fwd,
-            "prescan_high_pri":      sum(1 for s in turn2_results if s.get("priority") == "HIGH"),
-            "deep_trade_ready":      trade_ready,
-            "deep_watch":            watch,
-            "deep_on_radar":         on_radar,
-            "deep_skip":             skipped,
-        },
-        "prompt_versions": _PROMPT_VERSIONS,
-    })
-
-    logger.info(
-        "Session complete: turns=%d in=%d out=%d cost=$%.4f | "
-        "TRADE_READY=%d WATCH=%d ON_RADAR=%d SKIP=%d",
-        2 + len(deep_results), total_input, total_output, cost_usd,
-        trade_ready, watch, on_radar, skipped,
-    )
-
-    _save_session_cost_json(
-        session_id=session_id,
-        session_date=session_date,
-        turn_costs=turn_costs,
-        regime=regime_result.get("regime") if regime_result else None,
-        monthly_spent_before=monthly_spent if isinstance(monthly_spent, float) else 0.0,
-        budget_usd=budget_usd,
-        usd_to_inr=float(config.get("usd_to_inr_rate", 84.0)),
-        deep_results=deep_results,
-    )
-
-    return {
-        "turn1_result":        turn1_result,
-        "turn2_results":       turn2_results,
-        "deep_results":        deep_results,
-        "trade_ready":         trade_ready,
-        "watch":               watch,
-        "total_input_tokens":  total_input,
-        "total_output_tokens": total_output,
-        "cost_usd":            cost_usd,
-        "regime_result":       regime_result,
-    }
+    # # Re-build system prompt using the dynamically generated regime context
+    # context_bundle["regime"] = regime_result
+    # system_text = build_system_prompt(context_bundle)
+    #
+    # # Token ceiling check before Turn 2
+    # if total_input + total_output + 25_000 >= _TOKEN_CEILING:
+    #     raise RuntimeError(
+    #         f"Token ceiling ({_TOKEN_CEILING}) would be exceeded entering Turn 2 "
+    #         f"({total_input + total_output} tokens used so far)."
+    #     )
+    #
+    # # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────
+    # turn2_results, forwarded_stocks, messages, t2_cost = run_turn2_prescan(
+    #     client=client,
+    #     session_id=session_id,
+    #     session_date=session_date,
+    #     level1_passed=level1_passed,
+    #     messages=messages,
+    #     system_text=system_text,
+    # )
+    # turn_costs.append(t2_cost)
+    # total_input += t2_cost["input_tokens"]
+    # total_output += t2_cost["output_tokens"]
+    #
+    # try:
+    #     from new_notifications.telegram import send_prescan_complete
+    #     send_prescan_complete(str(session_date), len(forwarded_stocks), len(turn2_results))
+    # except Exception as _exc:
+    #     logger.warning("Prescan notification failed: %s", _exc)
+    #
+    # # Truncation / empty safety check
+    # n = len(turn2_results)
+    # if n == 0:
+    #     reason = "Pre-scan returned 0 stocks — likely JSON parse failure or truncation"
+    #     logger.error(reason)
+    #     cost_usd = round(total_input / 1_000_000 * 3.00 + total_output / 1_000_000 * 15.00, 6)
+    #     update_analysis_session(session_id, {
+    #         "claude_tokens_input":  total_input,
+    #         "claude_tokens_output": total_output,
+    #         "claude_cost_usd":      cost_usd,
+    #         "status":               "FAILED",
+    #         "stage_statuses": {
+    #             "claude_turn1":     "COMPLETE",
+    #             "claude_turn2":     "FAILED",
+    #             "failure_reason":   reason,
+    #             "turn2_out_tokens": t2_cost["output_tokens"],
+    #         },
+    #     })
+    #     _save_session_cost_json(session_id, session_date, turn_costs)
+    #     raise RuntimeError(reason)
+    # elif n < 5:
+    #     logger.warning("Pre-scan returned only %d stocks — possible truncation.", n)
+    #
+    # # Combine pre-scan forwarded stocks with priority watchlist stocks
+    # final_queue = forwarded_stocks[:]
+    # for wl_stock in (watchlist_priority or []):
+    #     if not any(fs["symbol"] == wl_stock["symbol"] for fs in forwarded_stocks):
+    #         final_queue.insert(0, wl_stock)
+    #     else:
+    #         for fs in final_queue:
+    #             if fs["symbol"] == wl_stock["symbol"]:
+    #                 fs["is_watchlist_reanalysis"] = True
+    #                 fs["days_in_stage"] = wl_stock.get("days_in_stage", 0)
+    #
+    # # ── Turns 3+: Deep Analysis ───────────────────────────────────────────────
+    # deep_results: list[dict] = []
+    # trade_ready_list: list[dict] = []
+    #
+    # # Pack the index dimensions explicitly for single stock runs
+    # index_ctx = {
+    #     "regime":            regime_result.get("regime")      if regime_result else "UNKNOWN",
+    #     "market_trend":      regime_result.get("market_trend") if regime_result else "UNKNOWN",
+    #     "market_volatility":  regime_result.get("market_volatility") if regime_result else "UNKNOWN",
+    #     "market_structure":   regime_result.get("market_structure") if regime_result else "UNKNOWN",
+    #     "execution_bias":     regime_result.get("execution_bias") if regime_result else "UNKNOWN",
+    #     "fii_dii_stance":     regime_result.get("fii_dii_stance") if regime_result else "UNKNOWN",
+    #     "nifty_close":       regime_result.get("nifty_close") if regime_result else None,
+    #     "vix":               regime_result.get("vix")         if regime_result else None,
+    #     "ema20":             regime_result.get("ema20")        if regime_result else None,
+    #     "ema50":             regime_result.get("ema50")        if regime_result else None,
+    #     "ret20d_pct":        regime_result.get("ret20d")       if regime_result else None,
+    # }
+    #
+    # for i, prescan_stock in enumerate(final_queue):
+    #     symbol    = prescan_stock.get("symbol", "")
+    #     direction = prescan_stock.get("direction", "AUTO")
+    #     is_re     = prescan_stock.get("is_watchlist_reanalysis", False)
+    #     days_in   = prescan_stock.get("days_in_stage", 0)
+    #     turn_num  = 3 + i
+    #
+    #     if not symbol:
+    #         continue
+    #
+    #     deep_res, deep_cost = run_turn_deep_analysis(
+    #         client=client,
+    #         session_id=session_id,
+    #         session_date=session_date,
+    #         symbol=symbol,
+    #         direction=direction,
+    #         is_re=is_re,
+    #         days_in=days_in,
+    #         index_ctx=index_ctx,
+    #         config=config,
+    #         turn_num=turn_num,
+    #         trade_ready_list=trade_ready_list,
+    #     )
+    #     deep_results.append(deep_res)
+    #     turn_costs.append(deep_cost)
+    #     total_input += deep_cost["input_tokens"]
+    #     total_output += deep_cost["output_tokens"]
+    #
+    # cost_usd = round(
+    #     total_input  / 1_000_000 * 3.00 +
+    #     total_output / 1_000_000 * 15.00,
+    #     6,
+    # )
+    #
+    # trade_ready = sum(1 for d in deep_results if d.get("stage") == "TRADE_READY")
+    # watch       = sum(1 for d in deep_results if d.get("stage") == "WATCH")
+    # on_radar    = sum(1 for d in deep_results if d.get("stage") == "ON_RADAR")
+    # skipped     = sum(1 for d in deep_results if d.get("stage") == "SKIP")
+    # prescan_fwd = sum(1 for s in turn2_results if s.get("forward_to_deep"))
+    #
+    # try:
+    #     from new_notifications.telegram import send_deep_analysis_complete
+    #     send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped)
+    # except Exception as _exc:
+    #     logger.warning("Deep analysis complete notification failed: %s", _exc)
+    #
+    # update_analysis_session(session_id, {
+    #     "claude_tokens_input":  total_input,
+    #     "claude_tokens_output": total_output,
+    #     "claude_cost_usd":      cost_usd,
+    #     "status":               "ANALYSIS_COMPLETE",
+    #     "trade_ready_count":    trade_ready,
+    #     "watch_count":          watch,
+    #     "radar_count":          on_radar,
+    #     "stage_statuses": {
+    #         "claude_turn1":          "COMPLETE",
+    #         "claude_turn2":          "COMPLETE",
+    #         "deep_analysis":         "COMPLETE",
+    #         "prescan_total":         len(turn2_results),
+    #         "prescan_forwarded":     prescan_fwd,
+    #         "prescan_high_pri":      sum(1 for s in turn2_results if s.get("priority") == "HIGH"),
+    #         "deep_trade_ready":      trade_ready,
+    #         "deep_watch":            watch,
+    #         "deep_on_radar":         on_radar,
+    #         "deep_skip":             skipped,
+    #     },
+    #     "prompt_versions": _PROMPT_VERSIONS,
+    # })
+    #
+    # logger.info(
+    #     "Session complete: turns=%d in=%d out=%d cost=$%.4f | "
+    #     "TRADE_READY=%d WATCH=%d ON_RADAR=%d SKIP=%d",
+    #     2 + len(deep_results), total_input, total_output, cost_usd,
+    #     trade_ready, watch, on_radar, skipped,
+    # )
+    #
+    # _save_session_cost_json(
+    #     session_id=session_id,
+    #     session_date=session_date,
+    #     turn_costs=turn_costs,
+    #     regime=regime_result.get("regime") if regime_result else None,
+    #     monthly_spent_before=monthly_spent if isinstance(monthly_spent, float) else 0.0,
+    #     budget_usd=budget_usd,
+    #     usd_to_inr=float(config.get("usd_to_inr_rate", 84.0)),
+    #     deep_results=deep_results,
+    # )
+    #
+    # return {
+    #     "turn1_result":        turn1_result,
+    #     "turn2_results":       turn2_results,
+    #     "deep_results":        deep_results,
+    #     "trade_ready":         trade_ready,
+    #     "watch":               watch,
+    #     "total_input_tokens":  total_input,
+    #     "total_output_tokens": total_output,
+    #     "cost_usd":            cost_usd,
+    #     "regime_result":       regime_result,
+    # }
+    return {}

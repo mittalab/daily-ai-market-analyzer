@@ -280,6 +280,7 @@ def heal_and_recheck(
     Updates cache in-place for any data that lands successfully.
     Returns (passed_after_healing, updated_results).
     """
+    logger.info("%s: Healing and check rechecking. Check date: %s, Today: %s", symbol, check_date, today)
     start_time = time.time()
     is_today = (check_date == today)
 
@@ -764,5 +765,5 @@ if __name__ == "__main__":
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
     #run_validation_now()
-    print(run_validation_now_for_symbol(symbol="JIOFIN", include_indexes=False))
+    print(run_validation_now_for_symbol(symbol="M&M", include_indexes=False))
     #main()

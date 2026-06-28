@@ -52,7 +52,7 @@ def job_keepalive() -> None:
 
 def job_morning_bhavcopy() -> None:
     """
-    06:30 Mon-Fri (trading day) — download equity + FO bhavcopy for the last
+    20:00 Mon-Fri (trading day) — download equity + FO bhavcopy for the last
     trading day without overwriting rows already written by the 4 PM Kite analysis.
     Purpose: persist data for ALL listed stocks, not just the Nifty 50 subset
     that gets analysed each day.
@@ -90,8 +90,8 @@ def job_morning_bhavcopy() -> None:
     #
     # # FO bhavcopy (options + futures for all symbols) — overwrite is fine here
     # try:
-    #     from new_data_ingestion.fo_bhavcopy import run_backfill as run_fo_backfill
-    #     fo_summary = run_fo_backfill([target_date])
+    #      from new_data_ingestion.fo_bhavcopy import run_backfill as run_fo_backfill
+    #      fo_summary = run_fo_backfill([target_date])
     #     if target_date in fo_summary.get("failed", []):
     #         logger.warning("Morning FO bhavcopy failed for %s", target_date)
     #     else:
@@ -236,15 +236,6 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         misfire_grace_time=300,
     )
 
-    # 06:30 Mon-Fri — morning bhavcopy (no overwrite)
-    scheduler.add_job(
-        job_morning_bhavcopy,
-        CronTrigger(hour=6, minute=30, **ist),
-        id="morning_bhavcopy",
-        name="Morning FO bhavcopy",
-        replace_existing=True,
-        misfire_grace_time=1800,
-    )
 
     # 07:00 daily — morning brief + Kite token check
     scheduler.add_job(
@@ -282,6 +273,16 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         CronTrigger(day_of_week="mon-fri", hour=16, minute=0, **ist),
         id="analysis_pipeline",
         name="Claude analysis",
+        replace_existing=True,
+        misfire_grace_time=1800,
+    )
+
+    # 20:00 FO bhavcopy (no overwrite)
+    scheduler.add_job(
+        job_morning_bhavcopy,
+        CronTrigger(hour=20, minute=0, **ist),
+        id="morning_bhavcopy",
+        name="Morning FO bhavcopy",
         replace_existing=True,
         misfire_grace_time=1800,
     )
