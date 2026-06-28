@@ -334,9 +334,7 @@ def _build_turn1_data(session_date: date) -> dict:
         logger.warning("Turn 1 options walls failed: %s", exc)
 
     try:
-        oi_rows = get_continuous_oi("NIFTY", days=1)
-        if not oi_rows:
-            oi_rows = get_continuous_oi("NIFTY_50", days=1)
+        oi_rows = get_continuous_oi("NIFTY_50", days=1)
         if oi_rows:
             last_oi = oi_rows[-1]
             pcr_current  = last_oi.get("pcr_near")
