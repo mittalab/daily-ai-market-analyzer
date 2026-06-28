@@ -945,11 +945,11 @@ def _run_turn1(
     prompt = _build_turn1_prompt(data)
     messages = [{"role": "user", "content": prompt}]
 
-    logger.info("Turn 1: calling Claude (max_tokens=2500)...")
+    logger.info("Turn 1: calling Claude (max_tokens=6000)...")
     # logger.info ("USER PROMPT: %s" , prompt)
 
     try:
-        response = _call_claude(client, _TURN1_SYSTEM, messages, max_tokens=2500)
+        response = _call_claude(client, _TURN1_SYSTEM, messages, max_tokens=6000)
     except Exception as exc:
         logger.critical("Turn 1 Claude API failed: %s", exc)
         try:
@@ -959,6 +959,7 @@ def _run_turn1(
         raise
 
     out_text = response.content[0].text
+    print("CALUDE OUTPUT TEST: ", out_text)
     u1 = response.usage
     logger.info(
         "Turn 1 done: in=%d out=%d cache_create=%s cache_read=%s",
