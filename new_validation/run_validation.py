@@ -33,8 +33,14 @@ from database.queries import (
     upsert_validation_state,
     upsert_fii_dii_flow,
     get_latest_fii_dii,
+    upsert_price_history,
 )
-from new_data_ingestion.nse_bhavcopy import get_holiday_dates, last_trading_day
+from new_data_ingestion.nse_bhavcopy import (
+    get_holiday_dates,
+    last_trading_day,
+    fetch_indices_bhavcopy,
+    indices_to_price_rows,
+)
 from new_data_ingestion.ingestion_utils import (
     ingest_today_options,
     ingest_today_kite_data,
@@ -771,11 +777,60 @@ def main():
         sys.exit(0 if ok else 1)
 
 
+def backfill_indices_for_dates(dates: list[dict]) -> dict:
+    """
+    Fetch and upsert indices bhavcopy for each date in the list.
+
+    Args:
+        dates: list of dicts with a "date" key, e.g. [{"date": "2025-10-02"}, ...]
+
+    Returns:
+        {
+            "success": [{"date": ..., "rows": n}, ...],
+            "failed":  [{"date": ..., "error": "..."}, ...],
+        }
+    """
+    result: dict = {"success": [], "failed": []}
+
+    for entry in dates:
+        raw = entry.get("date")
+        if not raw:
+            logger.warning("backfill_indices_for_dates: skipping entry with no 'date' key: %s", entry)
+            continue
+        try:
+            target_date = date.fromisoformat(str(raw))
+            indices, _ = fetch_indices_bhavcopy(target_date)
+            index_rows = indices_to_price_rows(indices, target_date)
+            n_upserted = upsert_price_history(index_rows)
+            logger.info("Indices backfill OK for %s: %d rows upserted", target_date, n_upserted)
+            result["success"].append({"date": str(target_date), "rows": n_upserted})
+        except Exception as exc:
+            logger.error("Indices backfill FAILED for %s: %s", raw, exc)
+            result["failed"].append({"date": str(raw), "error": str(exc)})
+
+    logger.info(
+        "backfill_indices_for_dates complete: %d succeeded, %d failed",
+        len(result["success"]), len(result["failed"]),
+    )
+    return result
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
-    #run_validation_now()
-    print(run_validation_now_for_symbol(symbol="M&M", include_indexes=True))
-    #main()
+    result = backfill_indices_for_dates([
+        {"date": "2025-10-02"},
+        {"date": "2025-10-21"},
+        {"date": "2025-10-22"},
+        {"date": "2025-11-05"},
+        {"date": "2025-12-25"},
+        {"date": "2026-01-15"},
+        {"date": "2026-03-03"},
+        {"date": "2026-03-26"},
+        {"date": "2026-03-31"},
+        {"date": "2026-04-03"},
+        {"date": "2026-05-28"},
+    ])
+    print(result)
