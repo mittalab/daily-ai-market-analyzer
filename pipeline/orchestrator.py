@@ -116,7 +116,9 @@ def run_pipeline(session_date: date) -> dict:
 
     # ── Stage 2.5: OI Series Builder ─────────────────────────────────────────
     logger.info("Stage 2.5: OI Continuous Series Builder...")
-    oi_result = run_oi_series_builder(symbols, session_date)
+    from new_validation.run_validation import get_other_indices
+    oi_series_symbols: list[str] = ["NIFTY_50"] + get_other_indices() + symbols
+    oi_result = run_oi_series_builder(oi_series_symbols, session_date)
     logger.info(
         "OI builder: stored=%d no_futures=%d no_options=%d errors=%d",
         oi_result["stored"], len(oi_result["no_futures"]),
@@ -187,7 +189,7 @@ def run_pipeline(session_date: date) -> dict:
     logger.info("Stage 5: Claude multi-turn session (%d stocks)...", len(level1_passed))
     claude_result = run_claude_session(context_bundle, level1_passed, session_id, watchlist_priority=watchlist_stocks)
     regime_result = claude_result["regime_result"]
-    print (regime_result)
+    print(regime_result)
 
     # # ── Pipeline complete ─────────────────────────────────────────────────────
     # # FIX: Ground-truth DB validation before final notification
@@ -271,3 +273,33 @@ def run_pipeline(session_date: date) -> dict:
     #     "cost_usd":            claude_result["cost_usd"],
     # }
     return {}
+
+
+def run_oi_series_for_indices() -> dict:
+    """
+    Run OI series builder for all sector indices + NIFTY_50 using last trading day.
+
+    Intended as a standalone utility — independent of the main analysis pipeline.
+    """
+    from new_data_ingestion.nse_bhavcopy import last_trading_day
+    from new_validation.run_validation import get_other_indices
+
+    session_date = last_trading_day(date.today())
+    symbols: list[str] = ["NIFTY_50"] + get_other_indices()
+
+    logger.info(
+        "OI series builder — %d indices, session_date=%s",
+        len(symbols), session_date,
+    )
+
+    result = run_oi_series_builder(symbols, session_date)
+
+    logger.info(
+        "OI series (indices): stored=%d no_futures=%d no_options=%d errors=%d",
+        result["stored"], len(result["no_futures"]),
+        len(result["no_options"]), len(result["errors"]),
+    )
+    return result
+
+if __name__ == "__main__":
+    run_oi_series_for_indices()

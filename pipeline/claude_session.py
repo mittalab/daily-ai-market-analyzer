@@ -25,6 +25,7 @@ from config.constants import SYMBOL_NIFTY_50, SYMBOL_INDIA_VIX, SYMBOL_NIFTY_BAN
 from database.queries import (
     create_trade_setup,
     get_all_system_config,
+    get_claude_turn,
     get_continuous_oi,
     get_fii_dii_flows,
     get_futures_row,
@@ -36,6 +37,7 @@ from database.queries import (
 )
 from indicators.technical import (
     atr_pct,
+    calculate_atr,
     calculate_ema,
     calculate_rsi,
     volume_ratio,
@@ -131,232 +133,628 @@ def _call_claude(
     raise RuntimeError(f"Claude API failed after {_MAX_RETRIES} attempts") from last_exc
 
 
-# ── Turn 1: Market Context ────────────────────────────────────────────────────
+# ── Turn 1: Market Intelligence Layer ────────────────────────────────────────
 
-def run_turn1_market_context(
-    client: anthropic.Anthropic,
-    session_id: str,
-    session_date: date,
-    system_text: str,
-    max_tokens: int = 1500,
-) -> tuple[dict, dict, list[dict], dict]:
-    """
-    Execute Turn 1: Market Context.
-    Fetches raw market context, queries Claude for dynamic regime classification,
-    saves the turn, updates analysis_sessions with classifications, and returns
-    parsed Turn 1 result, regime_result bundle, updated conversation history, and cost info.
-    """
-    logger.info("Turn 1: fetching raw market context data...")
-    nifty_rows = get_price_history("NIFTY_50",  days=180)
-    vix_rows   = get_price_history("INDIA_VIX", days=35)
-    fii_rows   = get_fii_dii_flows(days=35)
+_SECTOR_SYMBOL_MAP = {
+    SYMBOL_NIFTY_BANK:        "BANKING",
+    SYMBOL_NIFTY_IT:          "IT",
+    SYMBOL_NIFTY_AUTO:        "AUTO",
+    SYMBOL_NIFTY_PHARMA:      "PHARMA",
+    SYMBOL_NIFTY_FMCG:        "FMCG",
+    SYMBOL_NIFTY_METAL:       "METAL",
+    SYMBOL_NIFTY_ENERGY:      "ENERGY",
+    SYMBOL_NIFTY_FIN_SERVICE: "FINSERV",
+    SYMBOL_NIFTY_INFRA:       "INFRA",
+    SYMBOL_NIFTY_CONSUMPTION: "CONSUMER",
+    SYMBOL_NIFTY_MEDIA:       "MEDIA",
+}
 
-    nifty_180d = [
-        {"date": r["date"], "open": r["open"], "high": r["high"], "low": r["low"], "close": r["close"]}
-        for r in nifty_rows
+_TURN1_SYSTEM = (
+    "You are an experienced Indian F&O swing trading analyst and mentor. "
+    "You think like a disciplined proprietary trader — capital preservation first, "
+    "high conviction setups only — and you teach like a mentor, always explaining "
+    "your reasoning so the user can learn to spot these setups themselves. "
+    "You specialise in Nifty 50 stock options, 2-5 day swing trades, monthly Tuesday expiry."
+)
+
+_TURN1_REQUIRED_KEYS = [
+    "session_narrative", "market_trend", "market_volatility", "market_structure",
+    "execution_bias", "fii_dii_stance", "vix_assessment", "fii_dii_assessment",
+    "session_risk_level", "conviction_multiplier", "min_conviction_override",
+    "sector_pictures", "directional_filters", "prescan_guidance",
+    "index_key_levels", "risk_flags", "guidance",
+]
+
+_TURN1_DEFAULTS = {
+    "session_narrative":       "Market context unavailable — treating as neutral session.",
+    "market_trend":            "SIDEWAYS",
+    "market_volatility":       "NORMAL",
+    "market_structure":        "WIDE",
+    "execution_bias":          "NEUTRAL",
+    "fii_dii_stance":          "NEUTRAL",
+    "vix_assessment":          {"current": None, "trend": "STABLE", "character": "", "options_implication": ""},
+    "fii_dii_assessment":      {"fii_20d_character": "", "recent_shift": "NO", "shift_description": None,
+                                "dii_stance_description": "", "divergence": "NO", "key_insight": ""},
+    "session_risk_level":      "MEDIUM",
+    "conviction_multiplier":   0.95,
+    "min_conviction_override": None,
+    "sector_pictures":         {},
+    "directional_filters":     {"avoid_longs_in": [], "avoid_shorts_in": [], "caution_sectors": []},
+    "prescan_guidance":        {"max_stocks_to_forward": 10, "prefer_directions": ["LONG", "SHORT"],
+                                "prioritise_sectors": [], "deprioritise_sectors": [], "special_instructions": None},
+    "index_key_levels":        {"strong_support": 0, "support": 0, "current": 0,
+                                "resistance": 0, "strong_resistance": 0,
+                                "max_pain": None, "pcr_signal": "NEUTRAL", "levels_note": ""},
+    "risk_flags":              [],
+    "guidance":                {"favour": "No specific guidance.", "caution": "Exercise standard caution."},
+}
+
+
+def _build_turn1_data(session_date: date) -> dict:
+    """
+    Reads all required data from DB for Turn 1.
+    No API calls. No external dependencies.
+    Returns structured dict for prompt injection.
+    """
+    # ── Source 1: Nifty 50 ───────────────────────────────────────────────────
+    nifty_rows = get_price_history("NIFTY_50", days=250)
+    df_nifty = pd.DataFrame(nifty_rows)
+    for col in ("open", "high", "low", "close", "volume"):
+        df_nifty[col] = pd.to_numeric(df_nifty[col], errors="coerce")
+    df_nifty = df_nifty.dropna(subset=["close"]).reset_index(drop=True)
+
+    close_series = df_nifty["close"]
+    price        = float(close_series.iloc[-1])
+    ema20_val    = round(float(calculate_ema(close_series, 20).iloc[-1]), 2)
+    ema50_val    = round(float(calculate_ema(close_series, 50).iloc[-1]), 2)
+    ema200_val   = round(float(calculate_ema(close_series, 200).iloc[-1]), 2) if len(df_nifty) >= 200 else None
+    ret5d_val    = round((price / float(close_series.iloc[-5])  - 1) * 100, 2) if len(df_nifty) >= 5  else None
+    ret20d_val   = round((price / float(close_series.iloc[-20]) - 1) * 100, 2) if len(df_nifty) >= 20 else None
+    ret60d_val   = round((price / float(close_series.iloc[-60]) - 1) * 100, 2) if len(df_nifty) >= 60 else None
+    atr_series   = calculate_atr(df_nifty, 14)
+    atr_pct_val  = round(float(atr_series.iloc[-1]) / price * 100, 2) if not pd.isna(atr_series.iloc[-1]) else None
+
+    df_60 = df_nifty.tail(60)
+    nifty_ohlcv_60d = [
+        {
+            "date":   str(r["date"]),
+            "open":   float(r["open"]),
+            "high":   float(r["high"]),
+            "low":    float(r["low"]),
+            "close":  float(r["close"]),
+            "volume": int(r["volume"]) if not pd.isna(r["volume"]) else 0,
+        }
+        for _, r in df_60.iterrows()
     ]
-    vix_35d = [
-        {"date": r["date"], "open": r["open"], "high": r["high"], "low": r["low"], "close": r["close"]}
+
+    nifty_indicators = {
+        "current": round(price, 2),
+        "ema20":   ema20_val,
+        "ema50":   ema50_val,
+        "ema200":  ema200_val,
+        "ret5d":   ret5d_val,
+        "ret20d":  ret20d_val,
+        "ret60d":  ret60d_val,
+        "atr_pct": atr_pct_val,
+    }
+
+    # ── Source 2: India VIX ──────────────────────────────────────────────────
+    vix_rows = get_price_history("INDIA_VIX", days=30)
+    vix_close_30d = [
+        {"date": str(r["date"]), "close": float(r["close"])}
         for r in vix_rows
+        if r.get("close") is not None and float(r["close"]) != 0
     ]
-    fii_dii_35d = [
-        {"date": r["date"], "fii_net_cr": r.get("fii_net_cr"), "dii_net_cr": r.get("dii_net_cr")}
+
+    # ── Source 3: FII / DII flows ────────────────────────────────────────────
+    fii_rows = get_fii_dii_flows(days=30)
+    fii_dii_flows_30d = [
+        {
+            "date":       str(r["date"]),
+            "fii_net_cr": r.get("fii_net_cr"),
+            "dii_net_cr": r.get("dii_net_cr"),
+        }
         for r in fii_rows
     ]
 
-    # Fetch Nifty OI continuous series
-    nifty_oi_rows = get_continuous_oi("NIFTY_50", days=30)
-    nifty_oi_30d = [
-        {
-            "date": r.get("date"),
-            "pcr_near": r.get("pcr_near"),
-            "max_pain": r.get("max_pain"),
-            "near_month_oi": r.get("near_month_oi"),
-            "next_month_oi": r.get("next_month_oi"),
+    data_quality = "LIVE"
+    if fii_rows:
+        last_val = fii_rows[-1].get("fii_net_cr")
+        consecutive_same = 1
+        for i in range(len(fii_rows) - 2, -1, -1):
+            if fii_rows[i].get("fii_net_cr") == last_val:
+                consecutive_same += 1
+            else:
+                break
+        if consecutive_same >= 3:
+            data_quality = f"STALE_{consecutive_same}d"
+        else:
+            try:
+                last_date = date.fromisoformat(str(fii_rows[-1]["date"]))
+                if last_date < session_date - timedelta(days=2):
+                    data_quality = "CACHED_1D"
+            except Exception:
+                pass
+
+    # ── Source 4: Sector indices ─────────────────────────────────────────────
+    sectors_data: dict[str, dict] = {}
+    for symbol, display_name in _SECTOR_SYMBOL_MAP.items():
+        sec_rows = get_price_history(symbol, days=60)
+        if len(sec_rows) < 7:
+            logger.warning("Insufficient data for sector %s — skipping", symbol)
+            continue
+        df_sec = pd.DataFrame(sec_rows)
+        for col in ("open", "high", "low", "close"):
+            df_sec[col] = pd.to_numeric(df_sec[col], errors="coerce")
+        df_sec = df_sec.dropna(subset=["close"]).reset_index(drop=True)
+
+        sec_close = df_sec["close"]
+        sec_price = float(sec_close.iloc[-1])
+        s_ret7d  = round((sec_price / float(sec_close.iloc[-7])  - 1) * 100, 2) if len(df_sec) >= 7  else None
+        s_ret20d = round((sec_price / float(sec_close.iloc[-20]) - 1) * 100, 2) if len(df_sec) >= 20 else None
+        s_ret60d = round((sec_price / float(sec_close.iloc[-60]) - 1) * 100, 2) if len(df_sec) >= 60 else None
+        vs_nifty = round(s_ret20d - ret20d_val, 2) if (s_ret20d is not None and ret20d_val is not None) else None
+
+        df_30 = df_sec.tail(30)
+        sec_ohlcv_30d = [
+            {
+                "date":  str(r["date"]),
+                "open":  float(r["open"]),
+                "high":  float(r["high"]),
+                "low":   float(r["low"]),
+                "close": float(r["close"]),
+            }
+            for _, r in df_30.iterrows()
+        ]
+
+        sectors_data[display_name] = {
+            "returns":    {"ret7d": s_ret7d, "ret20d": s_ret20d, "ret60d": s_ret60d, "vs_nifty_20d": vs_nifty},
+            "ohlcv_30d":  sec_ohlcv_30d,
         }
-        for r in nifty_oi_rows
-    ]
 
-    # Fetch nearest expiry options chain OI walls
-    nifty_oi_walls = {}
-    if nifty_rows:
-        try:
-            n_snap = get_options_by_date("NIFTY_50", session_date)
-            if not n_snap:
-                n_snap = get_options_by_date("NIFTY_50", session_date - timedelta(days=1))
-            if n_snap:
-                expiries = sorted(list(set(r["expiry_date"] for r in n_snap)))
-                if expiries:
-                    nifty_oi_walls = oi_walls(n_snap, expiries[0])
-        except Exception as exc:
-            logger.warning("Failed to calculate Nifty OI walls: %s", exc)
+    # ── Source 5: Options positioning ────────────────────────────────────────
+    options_available = False
+    ce_walls: list[dict] = []
+    pe_walls: list[dict] = []
+    pcr_current = None
+    max_pain_val = None
 
-    # Compute multi-timeframe performance matrix for tracked sector indices
-    sectors = [
-        SYMBOL_NIFTY_50,
-        SYMBOL_NIFTY_BANK,
-        SYMBOL_NIFTY_IT,
-        SYMBOL_NIFTY_AUTO,
-        SYMBOL_NIFTY_PHARMA,
-        SYMBOL_NIFTY_FMCG,
-        SYMBOL_NIFTY_METAL,
-        SYMBOL_NIFTY_ENERGY,
-        SYMBOL_NIFTY_FIN_SERVICE,
-        SYMBOL_NIFTY_CONSUMPTION,
-        SYMBOL_NIFTY_INFRA,
-        SYMBOL_NIFTY_MEDIA
-    ]
-    from pipeline.market_regime import get_index_indicators
-    sector_performance = {}
-    for sec in sectors:
-        ind = get_index_indicators(session_date, sec)
-        sector_performance[sec] = {
-            "ret7d": ind.get("ret7d"),
-            "ret20d": ind.get("ret20d"),
-            "ret60d": ind.get("ret60d")
-        }
+    try:
+        n_snap = get_options_by_date("NIFTY_50", session_date)
+        if not n_snap:
+            n_snap = get_options_by_date("NIFTY_50", session_date - timedelta(days=1))
+        if n_snap:
+            expiries = sorted(list(set(str(r["expiry_date"]) for r in n_snap)))
+            if expiries:
+                walls = oi_walls(n_snap, expiries[0], top_n=5)
+                ce_walls = [{"strike": int(w["strike"]), "oi": int(w["oi"] or 0)} for w in walls.get("ce_walls", [])]
+                pe_walls = [{"strike": int(w["strike"]), "oi": int(w["oi"] or 0)} for w in walls.get("pe_walls", [])]
+                options_available = True
+    except Exception as exc:
+        logger.warning("Turn 1 options walls failed: %s", exc)
 
-    # Compute Nifty indicators for regime result
-    nifty_ind = get_index_indicators(session_date, "NIFTY_50")
-    # nifty_close = nifty_ind.get("close") or (nifty_rows[-1]["close"] if nifty_rows else 0.0)
-    # vix_latest  = float(vix_rows[-1]["close"]) if vix_rows else 0.0
+    try:
+        oi_rows = get_continuous_oi("NIFTY", days=1)
+        if not oi_rows:
+            oi_rows = get_continuous_oi("NIFTY_50", days=1)
+        if oi_rows:
+            last_oi = oi_rows[-1]
+            pcr_current  = last_oi.get("pcr_near")
+            max_pain_val = last_oi.get("max_pain")
+    except Exception as exc:
+        logger.warning("Turn 1 continuous OI fetch failed: %s", exc)
 
-    payload = {
-        "turn": "market_context",
-        "session_date": str(session_date),
-        "nifty_180d": nifty_180d,
-        "vix_35d": vix_35d,
-        "fii_dii_35d": fii_dii_35d,
-        "nifty_oi_30d": nifty_oi_30d,
-        "nifty_oi_walls": nifty_oi_walls,
-        "sector_performance": sector_performance,
-    }
-
-    instructions = (
-        "Analyse the market context data above. Provide a macro market context assessment.\n"
-        "You must determine the following values using these strict enums:\n"
-        "1. market_trend: BULLISH | BEARISH | SIDEWAYS\n"
-        "2. market_volatility: LOW | NORMAL | HIGH\n"
-        "3. market_structure: TIGHT | WIDE | STRETCHED\n"
-        "4. execution_bias: FAVOUR_LONGS | FAVOUR_SHORTS | BOTH | CAUTIOUS | NEUTRAL\n"
-        "5. fii_dii_stance: BULLISH | BEARISH | NEUTRAL\n\n"
-        "Identify the leading sectors, lagging sectors, recommended strategies (favour), and caution notes.\n"
-        "Identify the key levels (support, resistance) for the Nifty 50.\n"
-        "Respond with ONLY a JSON object — no commentary outside the JSON:\n"
-        "{\n"
-        '  "session_narrative": "3-4 sentences on market condition and tone tonight",\n'
-        '  "market_trend": "BULLISH | BEARISH | SIDEWAYS",\n'
-        '  "market_volatility": "LOW | NORMAL | HIGH",\n'
-        '  "market_structure": "TIGHT | WIDE | STRETCHED",\n'
-        '  "execution_bias": "FAVOUR_LONGS | FAVOUR_SHORTS | BOTH | CAUTIOUS | NEUTRAL",\n'
-        '  "fii_dii_stance": "BULLISH | BEARISH | NEUTRAL",\n'
-        '  "sector_weights": {\n'
-        '    "leading_sectors": ["SECTOR_1", "SECTOR_2"],\n'
-        '    "lagging_sectors": ["SECTOR_3"]\n'
-        '  },\n'
-        '  "guidance": {\n'
-        '    "favour": "recommended strategy or areas to favour",\n'
-        '    "caution": "areas of caution or warnings"\n'
-        '  },\n'
-        '  "index_key_levels": {"support": 0, "resistance": 0},\n'
-        '  "risk_flags": ["key risk 1", "key risk 2"]\n'
-        "}"
+    logger.info(
+        "Turn 1 data ready: nifty=%d rows, vix=%d rows, fii=%d rows, sectors=%d available, options=%s",
+        len(nifty_ohlcv_60d),
+        len(vix_close_30d),
+        len(fii_dii_flows_30d),
+        len(sectors_data),
+        "YES" if options_available else "NO",
     )
 
-    t1_text_user = json.dumps(payload, ensure_ascii=False) + "\n\n" + instructions
-    messages = [{"role": "user", "content": t1_text_user}]
+    pcr_value = None
+    if pcr_current is not None:
+        pcr_value = float(pcr_current)
 
-    logger.info("Turn 1: calling Claude...")
-    print("TEXT1: " + system_text)
-    print("HELLO1")
-    print(messages)
-    print("HELLO2")
-    print(t1_text_user)
-    print("HELLO 2.1")
-    print(max_tokens)
-    print("HELLO3")
+    max_pain_value = None
+    if max_pain_val is not None:
+        max_pain_value = float(max_pain_val)
 
-    # t1_resp = _call_claude(client, system_text, messages, max_tokens=max_tokens)
-    # t1_out_text = t1_resp.content[0].text
-    #
-    # u1 = t1_resp.usage
-    # cost_info = _turn_cost(1, "market_context", None, u1.input_tokens, u1.output_tokens)
-    # t1_cost = cost_info.get('total_cost_usd')
-    # logger.info("Turn 1 done: in=%d out=%d cache_create=%s cache_read=%s",
-    #             u1.input_tokens, u1.output_tokens,
-    #             getattr(u1, "cache_creation_input_tokens", "-"),
-    #             getattr(u1, "cache_read_input_tokens", "-"))
-    #
-    # save_claude_turn(session_id, 1, "market_context", None,
-    #                  u1.input_tokens, u1.output_tokens, t1_text_user, t1_out_text)
-    # messages.append({"role": "assistant", "content": t1_out_text})
-    #
-    # try:
-    #     turn1_result = _parse_json(t1_out_text)
-    # except Exception as exc:
-    #     logger.error("Turn 1 JSON parse failed: %s | raw=%s", exc, t1_out_text[:300])
-    #     turn1_result = {
-    #         "session_narrative": t1_out_text,
-    #         "market_trend": "SIDEWAYS",
-    #         "market_volatility": "NORMAL",
-    #         "market_structure": "WIDE",
-    #         "execution_bias": "NEUTRAL",
-    #         "fii_dii_stance": "NEUTRAL",
-    #         "sector_weights": {"leading_sectors": [], "lagging_sectors": []},
-    #         "guidance": {"favour": "General analysis", "caution": "Elevated caution"},
-    #         "index_key_levels": {"support": 0, "resistance": 0},
-    #         "risk_flags": [],
-    #         "parse_error": str(exc)
-    #     }
-    #
-    # trend_val  = turn1_result.get("market_trend", "SIDEWAYS")
-    # vol_val    = turn1_result.get("market_volatility", "NORMAL")
-    # struct_val = turn1_result.get("market_structure", "WIDE")
-    # bias_val   = turn1_result.get("execution_bias", "NEUTRAL")
-    # stance_val = turn1_result.get("fii_dii_stance", "NEUTRAL")
-    #
-    # # Combined market regime string
-    # market_regime = f"{trend_val}_{vol_val}_{struct_val}"
-    #
-    # regime_result = {
-    #     "regime":            market_regime,
-    #     "market_trend":      trend_val,
-    #     "market_volatility":  vol_val,
-    #     "market_structure":   struct_val,
-    #     "execution_bias":     bias_val,
-    #     "fii_dii_stance":     stance_val,
-    #     "sector_weights":    turn1_result.get("sector_weights") or {"leading_sectors": [], "lagging_sectors": []},
-    #     "guidance":          turn1_result.get("guidance") or {"favour": "General analysis", "caution": "Elevated caution"},
-    #     "nifty_close":       nifty_close,
-    #     "vix":               vix_latest,
-    #     "ema20":             nifty_ind.get("ema20"),
-    #     "ema50":             nifty_ind.get("ema50"),
-    #     "ret20d":            nifty_ind.get("ret20d"),
-    #     "index_key_levels":  turn1_result.get("index_key_levels") or {"support": 0, "resistance": 0},
-    #     "session_narrative": turn1_result.get("session_narrative", ""),
-    #     "risk_flags":        turn1_result.get("risk_flags", []),
-    # }
-    #
-    # # Save details to analysis_sessions table
-    # update_analysis_session(session_id, {
-    #     "market_regime":     market_regime,
-    #     "market_trend":      trend_val,
-    #     "market_volatility":  vol_val,
-    #     "market_structure":   struct_val,
-    #     "execution_bias":     bias_val,
-    #     "fii_dii_stance":     stance_val,
-    #     "nifty_close":       nifty_close,
-    #     "vix_close":         vix_latest,
-    #     "stage_statuses": {
-    #         "data_ingestion": "COMPLETE",
-    #         "oi_series":      "COMPLETE",
-    #         "regime_detect":  "COMPLETE",
-    #         "claude_turn1":   "COMPLETE",
-    #     }
-    # })
-    #
-    # return turn1_result, regime_result, messages, t1_cost
-    return {}, {}, [], {}
+    return {
+        "session_date": str(session_date),
+        "nifty": {
+            "indicators": nifty_indicators,
+            "ohlcv_60d":  nifty_ohlcv_60d,
+        },
+        "vix": {
+            "close_30d": vix_close_30d,
+        },
+        "fii_dii": {
+            "data_quality": data_quality,
+            "flows_30d":    fii_dii_flows_30d,
+        },
+        "sectors": sectors_data,
+        "options": {
+            "available":   options_available,
+            "ce_walls":    ce_walls,
+            "pe_walls":    pe_walls,
+            "pcr_current": pcr_value,
+            "max_pain":    max_pain_value,
+        },
+    }
+
+
+def _build_turn1_prompt(data: dict) -> str:
+    """
+    Builds the Turn 1 user message from prepared data.
+    Returns plain text string ready for Claude.
+    """
+    _j = lambda arr: json.dumps(arr, separators=(",", ":"))
+
+    ind    = data["nifty"]["indicators"]
+    opt    = data["options"]
+    fii    = data["fii_dii"]
+    vix    = data["vix"]
+
+    ema200_str = str(ind["ema200"]) if ind["ema200"] is not None else "Unavailable"
+
+    # Options section
+    if opt["available"]:
+        ce_lines = "\n".join(f"  Strike {w['strike']}: OI {w['oi']:,}" for w in opt["ce_walls"])
+        pe_lines = "\n".join(f"  Strike {w['strike']}: OI {w['oi']:,}" for w in opt["pe_walls"])
+        pcr_str  = str(round(opt["pcr_current"], 2)) if opt["pcr_current"] is not None else "Unavailable"
+        mp_str   = str(int(opt["max_pain"]))         if opt["max_pain"]    is not None else "Unavailable"
+        options_block = f"""Nifty resistance levels (CE OI concentration):
+{ce_lines}
+
+Nifty support levels (PE OI concentration):
+{pe_lines}
+
+PCR (Put-Call Ratio): {pcr_str}
+Max Pain strike     : {mp_str}
+
+PCR interpretation (contrarian indicator):
+  PCR < 0.7   -> contrarian bearish signal
+  PCR 0.7-1.1 -> neutral positioning
+  PCR 1.1-1.3 -> mild protective hedging present
+  PCR > 1.3   -> contrarian bullish signal"""
+    else:
+        options_block = "Options data unavailable for today.\nUse price structure and FII flows for key levels."
+
+    # FII data quality warning
+    dq = fii["data_quality"]
+    dq_warning = ""
+    if dq != "LIVE":
+        dq_warning = f"\nWARNING: Flows may not reflect today's actual data ({dq}). Factor this uncertainty into your assessment.\n"
+
+    # Sector blocks
+    sector_blocks = []
+    for name, sec in data["sectors"].items():
+        r = sec["returns"]
+        sector_blocks.append(
+            f"── {name} ──────────────────────────────────────────────────\n"
+            f"Returns: 7d={r['ret7d']}% | 20d={r['ret20d']}% | 60d={r['ret60d']}% | vs_nifty={r['vs_nifty_20d']}%\n"
+            f"30d OHLCV: {_j(sec['ohlcv_30d'])}"
+        )
+    sectors_text = "\n\n".join(sector_blocks)
+
+    prompt = f"""You are performing post-market analysis for {data['session_date']}. Market has closed for the day.
+All data below reflects today's final values.
+
+Analyse all sections thoroughly.
+Think step by step through each data source.
+Build a complete market intelligence picture.
+Be specific — cite actual numbers in your output.
+This picture guides all stock analysis tonight.
+
+════════════════════════════════════════════════════
+SECTION 1: NIFTY 50 PRICE ACTION
+════════════════════════════════════════════════════
+
+Pre-computed indicators:
+  Current price : {ind['current']}
+  EMA 20        : {ind['ema20']}
+  EMA 50        : {ind['ema50']}
+  EMA 200       : {ema200_str}
+  5-day return  : {ind['ret5d']}%
+  20-day return : {ind['ret20d']}%
+  60-day return : {ind['ret60d']}%
+  ATR% (14)     : {ind['atr_pct']}%
+
+Last 60 days OHLCV — read the price action:
+{_j(data['nifty']['ohlcv_60d'])}
+
+════════════════════════════════════════════════════
+SECTION 2: INDIA VIX
+════════════════════════════════════════════════════
+
+Last 30 days VIX closing values:
+{_j(vix['close_30d'])}
+
+Read this data and determine:
+  Current level and what it signals
+  Direction over 30 days (falling/rising/choppy)
+  Character of the move (gradual or spike-driven)
+  Implication for option pricing tonight
+
+════════════════════════════════════════════════════
+SECTION 3: FII / DII INSTITUTIONAL FLOWS
+════════════════════════════════════════════════════
+
+Data quality: {dq}{dq_warning}
+Last 30 days daily institutional flows (Crores):
+{_j(fii['flows_30d'])}
+
+Read this data and determine:
+  Cumulative FII direction over last 20 days
+  Whether behaviour shifted in last 5 days
+  Whether selling/buying is consistent or event-driven
+  DII stance — absorbing FII or following same direction
+  Meaningful divergence between FII and DII
+
+════════════════════════════════════════════════════
+SECTION 4: SECTOR ANALYSIS
+════════════════════════════════════════════════════
+
+For each sector you have summary returns and 30 days of price action to read.
+
+Determine for each sector:
+  Trend direction and momentum character
+  Whether outperforming or underperforming Nifty
+  Stance for tonight: TAILWIND, NEUTRAL, or HEADWIND
+  Strength: STRONG, MODERATE, or WEAK
+
+vs_nifty_20d guide:
+  > +3%       : TAILWIND STRONG
+  +1 to +3%   : TAILWIND MODERATE
+  -1 to +1%   : NEUTRAL
+  -1 to -3%   : HEADWIND MODERATE
+  < -3%       : HEADWIND STRONG
+
+{sectors_text}
+
+════════════════════════════════════════════════════
+SECTION 5: OPTIONS MARKET POSITIONING
+════════════════════════════════════════════════════
+
+{options_block}
+
+════════════════════════════════════════════════════
+REQUIRED OUTPUT
+════════════════════════════════════════════════════
+
+Produce the market intelligence JSON below.
+Every field is consumed by downstream stock analysis.
+Null only where explicitly marked nullable.
+No text outside the JSON. No markdown fences.
+
+{{
+  "session_narrative": "3-4 sentences: (1) Nifty trend and price structure, (2) VIX level and direction you read, (3) Institutional flow character, (4) Implication for tonight. Cite actual numbers.",
+
+  "market_trend": "BULLISH | BEARISH | SIDEWAYS",
+
+  "market_volatility": "LOW | NORMAL | HIGH",
+
+  "market_structure": "TIGHT | WIDE | STRETCHED",
+
+  "execution_bias": "FAVOUR_LONGS | FAVOUR_SHORTS | BOTH | CAUTIOUS | NEUTRAL",
+
+  "fii_dii_stance": "BULLISH | BEARISH | NEUTRAL",
+
+  "session_risk_level": "LOW | MEDIUM | HIGH | EXTREME",
+
+  "conviction_multiplier": 0.70-1.10,
+
+  "min_conviction_override": null or 80 or 85,
+
+  "vix_assessment": {{
+    "current": float,
+    "trend": "FALLING | RISING | STABLE | CHOPPY",
+    "character": "1 sentence on nature of VIX move",
+    "options_implication": "1 sentence on what this means for option buyers"
+  }},
+
+  "fii_dii_assessment": {{
+    "fii_20d_character": "1 sentence on FII behaviour over 20 days",
+    "recent_shift": "YES | NO",
+    "shift_description": "string or null",
+    "dii_stance_description": "1 sentence on DII behaviour",
+    "divergence": "YES | NO",
+    "key_insight": "Most important observation from flow data"
+  }},
+
+  "sector_pictures": {{
+    "BANKING": {{
+      "trend": "UPTREND | DOWNTREND | SIDEWAYS",
+      "momentum": "ACCELERATING | DECELERATING | STABLE",
+      "vs_nifty": "OUTPERFORMING | UNDERPERFORMING | INLINE",
+      "stance": "TAILWIND | NEUTRAL | HEADWIND",
+      "strength": "STRONG | MODERATE | WEAK",
+      "character": "1 sentence on price action character",
+      "trading_note": "1 sentence implication for stock selection"
+    }},
+    "IT": {{ ... }},
+    "AUTO": {{ ... }},
+    "PHARMA": {{ ... }},
+    "FMCG": {{ ... }},
+    "METAL": {{ ... }},
+    "ENERGY": {{ ... }},
+    "FINSERV": {{ ... }},
+    "INFRA": {{ ... }},
+    "CONSUMER": {{ ... }},
+    "MEDIA": {{ ... }}
+  }},
+
+  "directional_filters": {{
+    "avoid_longs_in": ["sectors with HEADWIND stance"],
+    "avoid_shorts_in": ["sectors with TAILWIND stance"],
+    "caution_sectors": ["sectors with conflicting signals"]
+  }},
+
+  "prescan_guidance": {{
+    "max_stocks_to_forward": 5-15,
+    "prefer_directions": ["LONG"] or ["SHORT"] or ["LONG","SHORT"],
+    "prioritise_sectors": ["TAILWIND sectors"],
+    "deprioritise_sectors": ["HEADWIND sectors"],
+    "special_instructions": "string or null"
+  }},
+
+  "index_key_levels": {{
+    "strong_support": integer,
+    "support": integer,
+    "current": integer,
+    "resistance": integer,
+    "strong_resistance": integer,
+    "max_pain": integer or null,
+    "pcr_signal": "BULLISH | BEARISH | NEUTRAL",
+    "levels_note": "1 sentence on key level implication tonight"
+  }},
+
+  "risk_flags": ["2-4 specific risks citing actual data"],
+
+  "guidance": {{
+    "favour": "1-2 sentences on best setups tonight",
+    "caution": "1-2 sentences on what to avoid tonight"
+  }}
+}}"""
+
+    return prompt
+
+
+def _run_turn1(
+    client: anthropic.Anthropic,
+    session_id: str,
+    session_date: date,
+    config: dict,
+) -> tuple[dict, dict]:
+    """
+    Runs Turn 1 complete: builds data, builds prompt, calls Claude,
+    parses response, saves to DB, sends Telegram notification.
+    Returns (turn1_result, cost_info).
+    """
+    from new_notifications.telegram import send_loud, send_silent
+
+    # Crash recovery: if this session's Turn 1 already completed, reuse it
+    existing = get_claude_turn(session_id, 1)
+    if existing and existing.get("output_text"):
+        logger.info("Turn 1: found existing turn in session_claude_turns — skipping Claude call")
+        try:
+            result = _parse_json(existing["output_text"])
+        except Exception as exc:
+            logger.warning("Turn 1 recovery parse failed: %s — re-running", exc)
+            result = None
+        if result:
+            in_tok  = existing.get("input_tokens", 0)
+            out_tok = existing.get("output_tokens", 0)
+            return result, _turn_cost(1, "market_context", None, in_tok, out_tok)
+
+    data   = _build_turn1_data(session_date)
+    prompt = _build_turn1_prompt(data)
+    messages = [{"role": "user", "content": prompt}]
+
+    logger.info("Turn 1: calling Claude (max_tokens=2500)...")
+    logger.info ("USER PROMPT: %s" , prompt)
+
+    try:
+        response = _call_claude(client, _TURN1_SYSTEM, messages, max_tokens=2500)
+    except Exception as exc:
+        logger.critical("Turn 1 Claude API failed: %s", exc)
+        try:
+            send_loud("❌ Turn 1 failed — pipeline cannot continue")
+        except Exception:
+            pass
+        raise
+
+    out_text = response.content[0].text
+    u1 = response.usage
+    logger.info(
+        "Turn 1 done: in=%d out=%d cache_create=%s cache_read=%s",
+        u1.input_tokens, u1.output_tokens,
+        getattr(u1, "cache_creation_input_tokens", "-"),
+        getattr(u1, "cache_read_input_tokens", "-"),
+    )
+
+    # Parse response
+    try:
+        result = _parse_json(out_text)
+        if not isinstance(result, dict):
+            raise ValueError(f"Expected JSON object, got {type(result).__name__}")
+    except Exception as exc:
+        logger.error("Turn 1 JSON parse failed: %s | raw=%s", exc, out_text[:400])
+        result = dict(_TURN1_DEFAULTS)
+
+    # Validate required keys — fill defaults for any missing
+    missing = [k for k in _TURN1_REQUIRED_KEYS if k not in result]
+    if missing:
+        logger.error("Turn 1 response missing keys: %s — applying defaults", missing)
+        for k in missing:
+            result[k] = _TURN1_DEFAULTS.get(k)
+
+    # Clamp conviction_multiplier
+    cm = result.get("conviction_multiplier", 0.95)
+    try:
+        cm = float(cm)
+    except (TypeError, ValueError):
+        cm = 0.95
+    if not (0.70 <= cm <= 1.10):
+        clamped = max(0.70, min(1.10, cm))
+        logger.warning("conviction_multiplier %s out of range — clamped to %s", cm, clamped)
+        cm = clamped
+    result["conviction_multiplier"] = cm
+
+    # Save to session_claude_turns
+    save_claude_turn(
+        session_id=session_id,
+        turn_number=1,
+        turn_type="market_context",
+        symbol=None,
+        input_tokens=u1.input_tokens,
+        output_tokens=u1.output_tokens,
+        input_text=prompt,
+        output_text=out_text,
+    )
+
+    # Update analysis_sessions
+    market_regime = (
+        f"{result.get('market_trend', 'SIDEWAYS')}_"
+        f"{result.get('market_volatility', 'NORMAL')}_"
+        f"{result.get('market_structure', 'WIDE')}"
+    )
+    vix_current = (result.get("vix_assessment") or {}).get("current")
+    update_analysis_session(session_id, {
+        "market_regime":         market_regime,
+        "market_trend":          result.get("market_trend"),
+        "market_volatility":     result.get("market_volatility"),
+        "market_structure":      result.get("market_structure"),
+        "execution_bias":        result.get("execution_bias"),
+        "fii_dii_stance":        result.get("fii_dii_stance"),
+        "session_risk_level":    result.get("session_risk_level"),
+        "conviction_multiplier": result.get("conviction_multiplier"),
+        "nifty_close":           data["nifty"]["indicators"]["current"],
+        "vix_close":             vix_current,
+        "stage_statuses":        {"turn1": "COMPLETE"},
+    })
+
+    # Telegram silent notification
+    try:
+        narrative = result.get("session_narrative", "")
+        first_sentence = narrative.split(".")[0] + "." if narrative else ""
+        vix_trend = (result.get("vix_assessment") or {}).get("trend", "")
+        vix_str   = f"{vix_current} ({vix_trend})" if vix_current else "n/a"
+        msg = (
+            f"📊 Market Context — {session_date}\n"
+            f"Trend: {result.get('market_trend')} | Vol: {result.get('market_volatility')}\n"
+            f"VIX: {vix_str}\n"
+            f"Risk: {result.get('session_risk_level')}\n"
+            f"{first_sentence}"
+        )
+        send_silent(msg)
+    except Exception as exc:
+        logger.warning("Turn 1 Telegram notification failed: %s", exc)
+
+    cost_info = _turn_cost(1, "market_context", None, u1.input_tokens, u1.output_tokens)
+    return result, cost_info
 
 
 # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────────
@@ -861,26 +1259,39 @@ def run_claude_session(
     session_date  = context_bundle["session_date"]
 
     # ── Turn 1: Market Context ────────────────────────────────────────────────
-    # Initialize prompt builder with regime = None
-    context_bundle["regime"] = None
-    system_text = build_system_prompt(context_bundle)
-
-    turn1_result, regime_result, messages, t1_cost = run_turn1_market_context(
-        client=client,
-        session_id=session_id,
-        session_date=session_date,
-        system_text=system_text,
-    )
-    turn_costs = [t1_cost]
-    total_input = t1_cost["input_tokens"]
+    turn1_result, t1_cost = _run_turn1(client, session_id, session_date, config)
+    turn_costs   = [t1_cost]
+    total_input  = t1_cost["input_tokens"]
     total_output = t1_cost["output_tokens"]
+    messages     = []  # conversation history for Turn 2 when un-commented
+
+    # Build regime_result for send_phase1_complete and Turn 2 system prompt
+    regime_result = {
+        "regime":            (
+            f"{turn1_result.get('market_trend', 'SIDEWAYS')}_"
+            f"{turn1_result.get('market_volatility', 'NORMAL')}_"
+            f"{turn1_result.get('market_structure', 'WIDE')}"
+        ),
+        "market_trend":      turn1_result.get("market_trend", "SIDEWAYS"),
+        "market_volatility": turn1_result.get("market_volatility", "NORMAL"),
+        "market_structure":  turn1_result.get("market_structure", "WIDE"),
+        "execution_bias":    turn1_result.get("execution_bias", "NEUTRAL"),
+        "fii_dii_stance":    turn1_result.get("fii_dii_stance", "NEUTRAL"),
+        "nifty_close":       (turn1_result.get("index_key_levels") or {}).get("current"),
+        "vix":               (turn1_result.get("vix_assessment") or {}).get("current"),
+        "sector_weights":    turn1_result.get("sector_pictures", {}),
+        "guidance":          turn1_result.get("guidance", {}),
+        "index_key_levels":  turn1_result.get("index_key_levels", {}),
+        "session_narrative": turn1_result.get("session_narrative", ""),
+        "risk_flags":        turn1_result.get("risk_flags", []),
+    }
 
     try:
         from new_notifications.telegram import send_phase1_complete
         send_phase1_complete(
             str(session_date),
-            regime_result.get("regime", "UNKNOWN"),
-            regime_result.get("execution_bias", "UNKNOWN"),
+            str(regime_result.get("regime", "UNKNOWN")),
+            str(regime_result.get("execution_bias", "UNKNOWN")),
         )
     except Exception as _exc:
         logger.warning("Phase 1 notification failed: %s", _exc)

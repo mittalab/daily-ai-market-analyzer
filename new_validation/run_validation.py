@@ -777,5 +777,5 @@ if __name__ == "__main__":
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
     #run_validation_now()
-    print(run_validation_now_for_symbol(symbol="M&M", include_indexes=False))
+    print(run_validation_now_for_symbol(symbol="M&M", include_indexes=True))
     #main()
