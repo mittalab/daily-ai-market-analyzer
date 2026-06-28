@@ -342,6 +342,15 @@ def send_deep_analysis_complete(
     return send_silent(text)
 
 
+def send_fii_dii_data_missing(target_date: str, found_date: str) -> int | None:
+    text = (
+        f"❌ <b>FII/DII Data Missing — {target_date}</b>\n"
+        f"No data found for <code>{target_date}</code>.\n"
+        f"Latest available: <code>{found_date}</code>"
+    )
+    return send_loud(text)
+
+
 def verify_bot() -> dict:
     """Confirm bot token is valid. Returns bot info dict."""
     r = requests.get(f"{_base_url()}/getMe", timeout=10)

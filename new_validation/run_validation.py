@@ -473,6 +473,35 @@ def validate_and_heal(
     )
     return all_passed
 
+# Running FII/DII data insertion in table
+def fii_dii_insertion_validation(target_date: date):
+    # FII/DII — daily, as FII/DII historical data is not available, i want to ensure it is available daily
+    logger.info("Fetching FII/DII flows for %s", target_date)
+    try:
+        cached_fii = get_latest_fii_dii(target_date)
+        if cached_fii:
+            logger.info("FII/DII flows already present for %s — skipping fetch", target_date)
+        else:
+            session = create_nse_session()
+            fii_data = fetch_fii_dii(session)
+            parsed_date = datetime.strptime(str(fii_data.get("date")), "%d-%b-%Y").date()
+            if parsed_date == target_date:
+                upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
+                logger.info("FII/DII flows stored for %s", target_date)
+            else:
+                from new_notifications.telegram import send_fii_dii_data_missing
+                send_fii_dii_data_missing(str(target_date), str(fii_data.get("date")))
+    except Exception as exc:
+        logger.warning("FII/DII ingestion failed (%s) — using cached value", exc)
+        try:
+            cached = get_latest_fii_dii()
+            if cached:
+                row = {**dict(cached), "source": "CACHED", "date": str(target_date)}
+                row.pop("id", None)
+                row.pop("created_at", None)
+                upsert_fii_dii_flow(row)
+        except Exception as cache_exc:
+            logger.error("FII/DII cache fallback also failed: %s", cache_exc)
 
 # ── Daily run ─────────────────────────────────────────────────────────────────
 
@@ -514,29 +543,8 @@ def run_daily_validation(
 
     other_indices = get_other_indices()
 
-    # FII/DII — when we are running indexes
-    if include_indexes:
-        logger.info("Fetching FII/DII flows for %s", target_date)
-        try:
-            cached_fii = get_latest_fii_dii(target_date)
-            if cached_fii:
-                logger.info("FII/DII flows already present for %s — skipping fetch", target_date)
-            else:
-                session = create_nse_session()
-                fii_data = fetch_fii_dii(session)
-                upsert_fii_dii_flow(fii_dii_to_db_row(fii_data, target_date))
-                logger.info("FII/DII flows stored for %s", target_date)
-        except Exception as exc:
-            logger.warning("FII/DII ingestion failed (%s) — using cached value", exc)
-            try:
-                cached = get_latest_fii_dii()
-                if cached:
-                    row = {**dict(cached), "source": "CACHED", "date": str(target_date)}
-                    row.pop("id", None)
-                    row.pop("created_at", None)
-                    upsert_fii_dii_flow(row)
-            except Exception as cache_exc:
-                logger.error("FII/DII cache fallback also failed: %s", cache_exc)
+    # Running FII/DII validation
+    fii_dii_insertion_validation(target_date)
 
     # Symbol universe
     # 1. Standardize core tracking indices into a fixed list
@@ -688,6 +696,10 @@ def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
 
     Returns (passed_count, total_count, failed_symbols).
     """
+
+    # Running FII/DII validation
+    fii_dii_insertion_validation(target_date)
+
     from new_utils.stock_list import fetch_kite_fo_stocks
 
     holidays = get_holiday_dates()

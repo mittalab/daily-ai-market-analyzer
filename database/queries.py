@@ -710,6 +710,20 @@ def get_claude_turns(session_id: str) -> list[dict]:
     return resp.data
 
 
+def get_claude_turn(session_id: str, turn_number: int) -> dict | None:
+    """Fetch a single Claude turn row. Returns None if not found."""
+    resp = (
+        get_client()
+        .table("session_claude_turns")
+        .select("*")
+        .eq("session_id", session_id)
+        .eq("turn_number", turn_number)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # trade_setups
 # ─────────────────────────────────────────────────────────────────────────────
