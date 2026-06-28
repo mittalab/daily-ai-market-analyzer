@@ -334,12 +334,22 @@ def _build_turn1_data(session_date: date) -> dict:
         logger.warning("Turn 1 options walls failed: %s", exc)
 
     oi_rows = None
+    expiry_context = {
+        "current_expiry": "Unavailable",
+        "next_expiry":    "Unavailable",
+        "rollover_phase": "UNKNOWN",
+    }
     try:
         oi_rows = get_continuous_oi("NIFTY_50", days=1)
         if oi_rows:
             last_oi = oi_rows[-1]
             pcr_current  = last_oi.get("pcr_near")
             max_pain_val = last_oi.get("max_pain")
+            expiry_context = {
+                "current_expiry": str(last_oi.get("near_expiry") or "Unavailable"),
+                "next_expiry":    str(last_oi.get("next_expiry") or "Unavailable"),
+                "rollover_phase": str(last_oi.get("rollover_phase") or "UNKNOWN"),
+            }
     except Exception as exc:
         logger.warning("Turn 1 continuous OI fetch failed: %s", exc)
 
@@ -366,11 +376,7 @@ def _build_turn1_data(session_date: date) -> dict:
             "indicators": nifty_indicators,
             "ohlcv_60d":  nifty_ohlcv_60d,
         },
-        "expiry_context": {
-            "current_expiry": str(oi_rows.get("near_expiry")),
-            "next_expiry": str(oi_rows.get("next_expiry")),
-            "rollover_phase": str(oi_rows.get("rollover_phase"))
-        },
+        "expiry_context": expiry_context,
         "vix": {
             "close_30d": vix_close_30d,
         },
@@ -402,6 +408,11 @@ def _build_turn1_prompt(data: dict) -> str:
     vix    = data["vix"]
 
     ema180_str = str(ind["ema180"]) if ind["ema180"] is not None else "Unavailable"
+
+    expiry         = data["expiry_context"]
+    current_expiry = expiry["current_expiry"]
+    next_expiry    = expiry["next_expiry"]
+    rollover_phase = expiry["rollover_phase"]
 
     # Options section
     if opt["available"]:
@@ -467,6 +478,11 @@ Pre-computed indicators:
   ATR% (14)     : {ind['atr_pct']}%
 
 Last 60 days OHLCV — read the price action:
+Note: Today's volume shows 0 — this is expected
+as exchange volume data is finalized after market
+close and may not yet be available. Ignore volume
+for today's candle only. Use all prior days'
+volume for momentum and participation assessment.
 {_j(data['nifty']['ohlcv_60d'])}
 
 ════════════════════════════════════════════════════
@@ -525,6 +541,34 @@ SECTION 5: OPTIONS MARKET POSITIONING
 {options_block}
 
 ════════════════════════════════════════════════════
+SECTION 6: EXPIRY AND ROLLOVER CONTEXT
+════════════════════════════════════════════════════
+
+Current expiry : {current_expiry}
+Next expiry    : {next_expiry}
+Rollover phase : {rollover_phase}
+
+Rollover phase guide:
+  NORMAL        : More than 6 trading days to expiry
+                  Normal analysis — no special constraints
+  ROLLOVER_WATCH: 5-6 trading days to expiry
+                  Begin watching for rollover signals
+                  Prefer setups with next expiry in mind
+  TRANSITION    : 3-4 trading days to expiry
+                  Near-month options losing time value fast
+                  Flag any near-month setups as higher risk
+  EXPIRY        : 1-2 trading days to expiry
+                  Extreme caution — avoid near-month entries
+                  Only next-month setups are valid tonight
+
+Factor rollover phase into:
+  prescan_guidance.special_instructions
+  prescan_guidance.max_stocks_to_forward
+    (reduce by 20-30% if TRANSITION or EXPIRY)
+  risk_flags
+    (add expiry risk flag if TRANSITION or EXPIRY)
+
+════════════════════════════════════════════════════
 REQUIRED OUTPUT
 ════════════════════════════════════════════════════
 
@@ -537,6 +581,13 @@ No text outside the JSON. No markdown fences.
   "session_narrative": "3-4 sentences: (1) Nifty trend and price structure, (2) VIX level and direction you read, (3) Institutional flow character, (4) Implication for tonight. Cite actual numbers.",
 
   "market_trend": "BULLISH | BEARISH | SIDEWAYS",
+  // BULLISH  : price > ema20 > ema50 > ema180
+  // BEARISH  : price < ema20 < ema50 < ema180
+  // SIDEWAYS : mixed or conflicting EMA signals
+  // Note: EMA180 is the long-term trend anchor.
+  //       EMA50 is the medium-term trend signal.
+  //       EMA20 is the short-term momentum signal.
+  //       All three must align for a clean trend call.
 
   "market_volatility": "LOW | NORMAL | HIGH",
 
@@ -548,7 +599,16 @@ No text outside the JSON. No markdown fences.
 
   "session_risk_level": "LOW | MEDIUM | HIGH | EXTREME",
 
-  "conviction_multiplier": 0.70-1.10,
+  "conviction_multiplier": 0.0,
+  // Output a single float value between 0.70 and 1.10
+  // Do not output a range — one number only
+  // Guidelines for your judgment:
+  //   Clear bull trend + LOW VIX + FII buying : 1.05-1.10
+  //   Recovering trend + NORMAL VIX + mixed   : 1.00-1.05
+  //   Sideways + NORMAL VIX + neutral flows   : 0.95-1.00
+  //   High VIX or conflicting signals          : 0.80-0.90
+  //   EXTREME conditions                       : 0.70-0.75
+  // Example output: 0.95
 
   "min_conviction_override": null or 80 or 85,
 
@@ -569,25 +629,127 @@ No text outside the JSON. No markdown fences.
   }},
 
   "sector_pictures": {{
+
+    IMPORTANT: You must provide a complete assessment
+    for ALL 11 sectors listed below.
+    Do not use shortcuts, ellipsis, or placeholders.
+    Each sector must have all 7 fields filled.
+    Required sectors: BANKING, IT, AUTO, PHARMA,
+    FMCG, METAL, ENERGY, FINSERV, INFRA, CONSUMER, MEDIA
+
+    Field definitions:
+      trend    : UPTREND | DOWNTREND | SIDEWAYS
+      momentum : ACCELERATING | DECELERATING | STABLE
+      vs_nifty : OUTPERFORMING | UNDERPERFORMING | INLINE
+      stance   : TAILWIND | NEUTRAL | HEADWIND
+      strength : STRONG | MODERATE | WEAK
+      character: 1 sentence on price action character
+                 Cite actual price levels or patterns.
+                 e.g. "Clean breakout from 54000 to 58000
+                       with consistent higher highs"
+      trading_note: 1 sentence on stock selection implication
+                 e.g. "Favour LONG setups in BFSI —
+                       strong sector tailwind tonight"
+
     "BANKING": {{
-      "trend": "UPTREND | DOWNTREND | SIDEWAYS",
-      "momentum": "ACCELERATING | DECELERATING | STABLE",
-      "vs_nifty": "OUTPERFORMING | UNDERPERFORMING | INLINE",
-      "stance": "TAILWIND | NEUTRAL | HEADWIND",
-      "strength": "STRONG | MODERATE | WEAK",
-      "character": "1 sentence on price action character",
-      "trading_note": "1 sentence implication for stock selection"
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
     }},
-    "IT": {{ ... }},
-    "AUTO": {{ ... }},
-    "PHARMA": {{ ... }},
-    "FMCG": {{ ... }},
-    "METAL": {{ ... }},
-    "ENERGY": {{ ... }},
-    "FINSERV": {{ ... }},
-    "INFRA": {{ ... }},
-    "CONSUMER": {{ ... }},
-    "MEDIA": {{ ... }}
+    "IT": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "AUTO": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "PHARMA": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "FMCG": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "METAL": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "ENERGY": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "FINSERV": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "INFRA": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "CONSUMER": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }},
+    "MEDIA": {{
+      "trend": "",
+      "momentum": "",
+      "vs_nifty": "",
+      "stance": "",
+      "strength": "",
+      "character": "",
+      "trading_note": ""
+    }}
   }},
 
   "directional_filters": {{
@@ -597,11 +759,31 @@ No text outside the JSON. No markdown fences.
   }},
 
   "prescan_guidance": {{
-    "max_stocks_to_forward": 5-15,
-    "prefer_directions": ["LONG"] or ["SHORT"] or ["LONG","SHORT"],
-    "prioritise_sectors": ["TAILWIND sectors"],
-    "deprioritise_sectors": ["HEADWIND sectors"],
-    "special_instructions": "string or null"
+    "max_stocks_to_forward": integer,
+    // Reduce by 20-30% if rollover_phase is
+    // TRANSITION or EXPIRY due to time decay risk
+
+    "prefer_directions": [...],
+
+    "prioritise_sectors": [...],
+
+    "deprioritise_sectors": [...],
+
+    "special_instructions": string or null,
+    // If NORMAL: null unless other conditions warrant
+    // If ROLLOVER_WATCH: note to prefer next expiry
+    // If TRANSITION: "Prefer next month expiry setups.
+    //                Near-month time decay accelerating."
+    // If EXPIRY: "Avoid near-month entries.
+    //             Only next-month setups valid tonight."
+
+    "expiry_note": string or null
+    // If TRANSITION or EXPIRY:
+    //   Add specific note about expiry risk
+    //   e.g. "2 days to expiry — theta decay severe
+    //         on near-month options. Flag any setup
+    //         targeting near-month strike."
+    // If NORMAL or ROLLOVER_WATCH: null
   }},
 
   "index_key_levels": {{
