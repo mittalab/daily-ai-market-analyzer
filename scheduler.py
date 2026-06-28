@@ -50,7 +50,7 @@ def job_keepalive() -> None:
 
 # ── Job 2: Morning bhavcopy ────────────────────────────────────────────────────
 
-def job_morning_bhavcopy() -> None:
+def job_evening_bhavcopy() -> None:
     """
     20:00 Mon-Fri (trading day) — download equity + FO bhavcopy for the last
     trading day without overwriting rows already written by the 4 PM Kite analysis.
@@ -279,19 +279,19 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
 
     # 20:00 FO bhavcopy (no overwrite)
     scheduler.add_job(
-        job_morning_bhavcopy,
+        job_evening_bhavcopy,
         CronTrigger(hour=20, minute=0, **ist),
-        id="morning_bhavcopy",
-        name="Morning FO bhavcopy",
+        id="evening_bhavcopy",
+        name="Evening FO bhavcopy",
         replace_existing=True,
         misfire_grace_time=1800,
     )
 
     logger.info(
         "Scheduler: 6 jobs registered "
-        "(keepalive, morning_bhavcopy, morning_brief, kite_check×2, analysis_pipeline)"
+        "(keepalive, evening_bhavcopy, morning_brief, kite_check×2, analysis_pipeline)"
     )
 
 
 if __name__ == "__main__":
-    job_morning_bhavcopy()
+    job_evening_bhavcopy()
