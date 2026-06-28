@@ -19,6 +19,9 @@ import pandas as pd
 import pytz
 from dotenv import load_dotenv
 
+from config.constants import SYMBOL_NIFTY_50, SYMBOL_INDIA_VIX, SYMBOL_NIFTY_BANK, SYMBOL_NIFTY_IT, SYMBOL_NIFTY_AUTO, \
+    SYMBOL_NIFTY_PHARMA, SYMBOL_NIFTY_FMCG, SYMBOL_NIFTY_METAL, SYMBOL_NIFTY_ENERGY, SYMBOL_NIFTY_FIN_SERVICE, \
+    SYMBOL_NIFTY_CONSUMPTION, SYMBOL_NIFTY_INFRA, SYMBOL_NIFTY_MEDIA
 from database.queries import (
     create_trade_setup,
     get_all_system_config,
@@ -190,17 +193,18 @@ def run_turn1_market_context(
 
     # Compute multi-timeframe performance matrix for tracked sector indices
     sectors = [
-        "NIFTY_BANK",
-        "NIFTY_IT",
-        "NIFTY_AUTO",
-        "NIFTY_PHARMA",
-        "NIFTY_FMCG",
-        "NIFTY_METAL",
-        "NIFTY_ENERGY",
-        "NIFTY_FIN_SERVICE",
-        "NIFTY_CONSUMPTION",
-        "NIFTY_INFRA",
-        "NIFTY_MEDIA",
+        SYMBOL_NIFTY_50,
+        SYMBOL_NIFTY_BANK,
+        SYMBOL_NIFTY_IT,
+        SYMBOL_NIFTY_AUTO,
+        SYMBOL_NIFTY_PHARMA,
+        SYMBOL_NIFTY_FMCG,
+        SYMBOL_NIFTY_METAL,
+        SYMBOL_NIFTY_ENERGY,
+        SYMBOL_NIFTY_FIN_SERVICE,
+        SYMBOL_NIFTY_CONSUMPTION,
+        SYMBOL_NIFTY_INFRA,
+        SYMBOL_NIFTY_MEDIA
     ]
     from pipeline.market_regime import get_index_indicators
     sector_performance = {}
@@ -214,8 +218,8 @@ def run_turn1_market_context(
 
     # Compute Nifty indicators for regime result
     nifty_ind = get_index_indicators(session_date, "NIFTY_50")
-    nifty_close = nifty_ind.get("close") or (nifty_rows[-1]["close"] if nifty_rows else 0.0)
-    vix_latest  = float(vix_rows[-1]["close"]) if vix_rows else 0.0
+    # nifty_close = nifty_ind.get("close") or (nifty_rows[-1]["close"] if nifty_rows else 0.0)
+    # vix_latest  = float(vix_rows[-1]["close"]) if vix_rows else 0.0
 
     payload = {
         "turn": "market_context",
@@ -263,85 +267,96 @@ def run_turn1_market_context(
     messages = [{"role": "user", "content": t1_text_user}]
 
     logger.info("Turn 1: calling Claude...")
-    t1_resp = _call_claude(client, system_text, messages, max_tokens=max_tokens)
-    t1_out_text = t1_resp.content[0].text
+    print("TEXT1: " + system_text)
+    print("HELLO1")
+    print(messages)
+    print("HELLO2")
+    print(t1_text_user)
+    print("HELLO 2.1")
+    print(max_tokens)
+    print("HELLO3")
 
-    u1 = t1_resp.usage
-    cost_info = _turn_cost(1, "market_context", None, u1.input_tokens, u1.output_tokens)
-    logger.info("Turn 1 done: in=%d out=%d cache_create=%s cache_read=%s",
-                u1.input_tokens, u1.output_tokens,
-                getattr(u1, "cache_creation_input_tokens", "-"),
-                getattr(u1, "cache_read_input_tokens", "-"))
-
-    save_claude_turn(session_id, 1, "market_context", None,
-                     u1.input_tokens, u1.output_tokens, t1_text_user, t1_out_text)
-    messages.append({"role": "assistant", "content": t1_out_text})
-
-    try:
-        turn1_result = _parse_json(t1_out_text)
-    except Exception as exc:
-        logger.error("Turn 1 JSON parse failed: %s | raw=%s", exc, t1_out_text[:300])
-        turn1_result = {
-            "session_narrative": t1_out_text,
-            "market_trend": "SIDEWAYS",
-            "market_volatility": "NORMAL",
-            "market_structure": "WIDE",
-            "execution_bias": "NEUTRAL",
-            "fii_dii_stance": "NEUTRAL",
-            "sector_weights": {"leading_sectors": [], "lagging_sectors": []},
-            "guidance": {"favour": "General analysis", "caution": "Elevated caution"},
-            "index_key_levels": {"support": 0, "resistance": 0},
-            "risk_flags": [],
-            "parse_error": str(exc)
-        }
-
-    trend_val  = turn1_result.get("market_trend", "SIDEWAYS")
-    vol_val    = turn1_result.get("market_volatility", "NORMAL")
-    struct_val = turn1_result.get("market_structure", "WIDE")
-    bias_val   = turn1_result.get("execution_bias", "NEUTRAL")
-    stance_val = turn1_result.get("fii_dii_stance", "NEUTRAL")
-
-    # Combined market regime string
-    market_regime = f"{trend_val}_{vol_val}_{struct_val}"
-
-    regime_result = {
-        "regime":            market_regime,
-        "market_trend":      trend_val,
-        "market_volatility":  vol_val,
-        "market_structure":   struct_val,
-        "execution_bias":     bias_val,
-        "fii_dii_stance":     stance_val,
-        "sector_weights":    turn1_result.get("sector_weights") or {"leading_sectors": [], "lagging_sectors": []},
-        "guidance":          turn1_result.get("guidance") or {"favour": "General analysis", "caution": "Elevated caution"},
-        "nifty_close":       nifty_close,
-        "vix":               vix_latest,
-        "ema20":             nifty_ind.get("ema20"),
-        "ema50":             nifty_ind.get("ema50"),
-        "ret20d":            nifty_ind.get("ret20d"),
-        "index_key_levels":  turn1_result.get("index_key_levels") or {"support": 0, "resistance": 0},
-        "session_narrative": turn1_result.get("session_narrative", ""),
-        "risk_flags":        turn1_result.get("risk_flags", []),
-    }
-
-    # Save details to analysis_sessions table
-    update_analysis_session(session_id, {
-        "market_regime":     market_regime,
-        "market_trend":      trend_val,
-        "market_volatility":  vol_val,
-        "market_structure":   struct_val,
-        "execution_bias":     bias_val,
-        "fii_dii_stance":     stance_val,
-        "nifty_close":       nifty_close,
-        "vix_close":         vix_latest,
-        "stage_statuses": {
-            "data_ingestion": "COMPLETE",
-            "oi_series":      "COMPLETE",
-            "regime_detect":  "COMPLETE",
-            "claude_turn1":   "COMPLETE",
-        }
-    })
-
-    return turn1_result, regime_result, messages, t1_cost
+    # t1_resp = _call_claude(client, system_text, messages, max_tokens=max_tokens)
+    # t1_out_text = t1_resp.content[0].text
+    #
+    # u1 = t1_resp.usage
+    # cost_info = _turn_cost(1, "market_context", None, u1.input_tokens, u1.output_tokens)
+    # t1_cost = cost_info.get('total_cost_usd')
+    # logger.info("Turn 1 done: in=%d out=%d cache_create=%s cache_read=%s",
+    #             u1.input_tokens, u1.output_tokens,
+    #             getattr(u1, "cache_creation_input_tokens", "-"),
+    #             getattr(u1, "cache_read_input_tokens", "-"))
+    #
+    # save_claude_turn(session_id, 1, "market_context", None,
+    #                  u1.input_tokens, u1.output_tokens, t1_text_user, t1_out_text)
+    # messages.append({"role": "assistant", "content": t1_out_text})
+    #
+    # try:
+    #     turn1_result = _parse_json(t1_out_text)
+    # except Exception as exc:
+    #     logger.error("Turn 1 JSON parse failed: %s | raw=%s", exc, t1_out_text[:300])
+    #     turn1_result = {
+    #         "session_narrative": t1_out_text,
+    #         "market_trend": "SIDEWAYS",
+    #         "market_volatility": "NORMAL",
+    #         "market_structure": "WIDE",
+    #         "execution_bias": "NEUTRAL",
+    #         "fii_dii_stance": "NEUTRAL",
+    #         "sector_weights": {"leading_sectors": [], "lagging_sectors": []},
+    #         "guidance": {"favour": "General analysis", "caution": "Elevated caution"},
+    #         "index_key_levels": {"support": 0, "resistance": 0},
+    #         "risk_flags": [],
+    #         "parse_error": str(exc)
+    #     }
+    #
+    # trend_val  = turn1_result.get("market_trend", "SIDEWAYS")
+    # vol_val    = turn1_result.get("market_volatility", "NORMAL")
+    # struct_val = turn1_result.get("market_structure", "WIDE")
+    # bias_val   = turn1_result.get("execution_bias", "NEUTRAL")
+    # stance_val = turn1_result.get("fii_dii_stance", "NEUTRAL")
+    #
+    # # Combined market regime string
+    # market_regime = f"{trend_val}_{vol_val}_{struct_val}"
+    #
+    # regime_result = {
+    #     "regime":            market_regime,
+    #     "market_trend":      trend_val,
+    #     "market_volatility":  vol_val,
+    #     "market_structure":   struct_val,
+    #     "execution_bias":     bias_val,
+    #     "fii_dii_stance":     stance_val,
+    #     "sector_weights":    turn1_result.get("sector_weights") or {"leading_sectors": [], "lagging_sectors": []},
+    #     "guidance":          turn1_result.get("guidance") or {"favour": "General analysis", "caution": "Elevated caution"},
+    #     "nifty_close":       nifty_close,
+    #     "vix":               vix_latest,
+    #     "ema20":             nifty_ind.get("ema20"),
+    #     "ema50":             nifty_ind.get("ema50"),
+    #     "ret20d":            nifty_ind.get("ret20d"),
+    #     "index_key_levels":  turn1_result.get("index_key_levels") or {"support": 0, "resistance": 0},
+    #     "session_narrative": turn1_result.get("session_narrative", ""),
+    #     "risk_flags":        turn1_result.get("risk_flags", []),
+    # }
+    #
+    # # Save details to analysis_sessions table
+    # update_analysis_session(session_id, {
+    #     "market_regime":     market_regime,
+    #     "market_trend":      trend_val,
+    #     "market_volatility":  vol_val,
+    #     "market_structure":   struct_val,
+    #     "execution_bias":     bias_val,
+    #     "fii_dii_stance":     stance_val,
+    #     "nifty_close":       nifty_close,
+    #     "vix_close":         vix_latest,
+    #     "stage_statuses": {
+    #         "data_ingestion": "COMPLETE",
+    #         "oi_series":      "COMPLETE",
+    #         "regime_detect":  "COMPLETE",
+    #         "claude_turn1":   "COMPLETE",
+    #     }
+    # })
+    #
+    # return turn1_result, regime_result, messages, t1_cost
+    return {}, {}, [], {}
 
 
 # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────────
@@ -870,17 +885,17 @@ def run_claude_session(
     except Exception as _exc:
         logger.warning("Phase 1 notification failed: %s", _exc)
 
-    # # Re-build system prompt using the dynamically generated regime context
-    # context_bundle["regime"] = regime_result
-    # system_text = build_system_prompt(context_bundle)
-    #
-    # # Token ceiling check before Turn 2
-    # if total_input + total_output + 25_000 >= _TOKEN_CEILING:
-    #     raise RuntimeError(
-    #         f"Token ceiling ({_TOKEN_CEILING}) would be exceeded entering Turn 2 "
-    #         f"({total_input + total_output} tokens used so far)."
-    #     )
-    #
+    # Re-build system prompt using the dynamically generated regime context
+    context_bundle["regime"] = regime_result
+    system_text = build_system_prompt(context_bundle)
+
+    # Token ceiling check before Turn 2
+    if total_input + total_output + 25_000 >= _TOKEN_CEILING:
+        raise RuntimeError(
+            f"Token ceiling ({_TOKEN_CEILING}) would be exceeded entering Turn 2 "
+            f"({total_input + total_output} tokens used so far)."
+        )
+
     # # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────
     # turn2_results, forwarded_stocks, messages, t2_cost = run_turn2_prescan(
     #     client=client,
