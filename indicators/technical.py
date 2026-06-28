@@ -5,7 +5,7 @@ All functions accept/return pandas Series or DataFrame.
 Formulas from Appendix C of spec.
 """
 import pandas as pd
-
+import numpy as np
 
 def calculate_ema(series: pd.Series, period: int) -> pd.Series:
     """

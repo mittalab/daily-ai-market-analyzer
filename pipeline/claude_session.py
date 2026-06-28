@@ -207,7 +207,7 @@ def _build_turn1_data(session_date: date) -> dict:
     price        = float(close_series.iloc[-1])
     ema20_val    = round(float(calculate_ema(close_series, 20).iloc[-1]), 2)
     ema50_val    = round(float(calculate_ema(close_series, 50).iloc[-1]), 2)
-    ema200_val   = round(float(calculate_ema(close_series, 200).iloc[-1]), 2) if len(df_nifty) >= 200 else None
+    ema180_val   = round(float(calculate_ema(close_series, 180).iloc[-1]), 2) if len(df_nifty) >= 180 else None
     ret5d_val    = round((price / float(close_series.iloc[-5])  - 1) * 100, 2) if len(df_nifty) >= 5  else None
     ret20d_val   = round((price / float(close_series.iloc[-20]) - 1) * 100, 2) if len(df_nifty) >= 20 else None
     ret60d_val   = round((price / float(close_series.iloc[-60]) - 1) * 100, 2) if len(df_nifty) >= 60 else None
@@ -231,7 +231,7 @@ def _build_turn1_data(session_date: date) -> dict:
         "current": round(price, 2),
         "ema20":   ema20_val,
         "ema50":   ema50_val,
-        "ema200":  ema200_val,
+        "ema180":  ema180_val,
         "ret5d":   ret5d_val,
         "ret20d":  ret20d_val,
         "ret60d":  ret60d_val,
@@ -333,6 +333,7 @@ def _build_turn1_data(session_date: date) -> dict:
     except Exception as exc:
         logger.warning("Turn 1 options walls failed: %s", exc)
 
+    oi_rows = None
     try:
         oi_rows = get_continuous_oi("NIFTY_50", days=1)
         if oi_rows:
@@ -365,6 +366,11 @@ def _build_turn1_data(session_date: date) -> dict:
             "indicators": nifty_indicators,
             "ohlcv_60d":  nifty_ohlcv_60d,
         },
+        "expiry_context": {
+            "current_expiry": str(oi_rows.get("near_expiry")),
+            "next_expiry": str(oi_rows.get("next_expiry")),
+            "rollover_phase": str(oi_rows.get("rollover_phase"))
+        },
         "vix": {
             "close_30d": vix_close_30d,
         },
@@ -395,7 +401,7 @@ def _build_turn1_prompt(data: dict) -> str:
     fii    = data["fii_dii"]
     vix    = data["vix"]
 
-    ema200_str = str(ind["ema200"]) if ind["ema200"] is not None else "Unavailable"
+    ema180_str = str(ind["ema180"]) if ind["ema180"] is not None else "Unavailable"
 
     # Options section
     if opt["available"]:
@@ -454,7 +460,7 @@ Pre-computed indicators:
   Current price : {ind['current']}
   EMA 20        : {ind['ema20']}
   EMA 50        : {ind['ema50']}
-  EMA 200       : {ema200_str}
+  EMA 180       : {ema180_str}
   5-day return  : {ind['ret5d']}%
   20-day return : {ind['ret20d']}%
   60-day return : {ind['ret60d']}%
