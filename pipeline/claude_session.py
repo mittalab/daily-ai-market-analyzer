@@ -197,6 +197,9 @@ def _build_turn1_data(session_date: date) -> dict:
     Returns structured dict for prompt injection.
     """
     # ── Source 1: Nifty 50 ───────────────────────────────────────────────────
+    from new_data_ingestion.nse_bhavcopy import get_holiday_dates
+    _holidays_str = {str(d) for d in get_holiday_dates()}
+
     nifty_rows = get_price_history("NIFTY_50", days=250)
     df_nifty = pd.DataFrame(nifty_rows)
     for col in ("open", "high", "low", "close", "volume"):
@@ -215,6 +218,8 @@ def _build_turn1_data(session_date: date) -> dict:
     atr_pct_val  = round(float(atr_series.iloc[-1]) / price * 100, 2) if not pd.isna(atr_series.iloc[-1]) else None
 
     df_60 = df_nifty.tail(60)
+    df_60 = df_60[~df_60["date"].astype(str).isin(_holidays_str)]
+    df_60 = df_60.tail(60)
     nifty_ohlcv_60d = [
         {
             "date":   str(r["date"]),
@@ -296,6 +301,8 @@ def _build_turn1_data(session_date: date) -> dict:
         vs_nifty = round(s_ret20d - ret20d_val, 2) if (s_ret20d is not None and ret20d_val is not None) else None
 
         df_30 = df_sec.tail(30)
+        df_30 = df_30[~df_30["date"].astype(str).isin(_holidays_str)]
+        df_30 = df_30.tail(30)
         sec_ohlcv_30d = [
             {
                 "date":  str(r["date"]),
@@ -413,6 +420,14 @@ def _build_turn1_prompt(data: dict) -> str:
     current_expiry = expiry["current_expiry"]
     next_expiry    = expiry["next_expiry"]
     rollover_phase = expiry["rollover_phase"]
+
+    try:
+        from pipeline.oi_series_builder import _trading_days_to
+        _session_date_obj = date.fromisoformat(data["session_date"])
+        _exp_date         = date.fromisoformat(current_expiry)
+        days_left         = _trading_days_to(_session_date_obj, _exp_date)
+    except Exception:
+        days_left = "unknown"
 
     # Options section
     if opt["available"]:
@@ -608,9 +623,9 @@ Factor this into your output:
 
   risk_flags:
     Always add expiry risk flag if TRANSITION or EXPIRY:
-    "TRANSITION phase — X trading days to
-     {current_expiry} expiry — near-month theta risk
-     severe. All new setups must use {next_expiry}."
+    "{days_left} trading days to {current_expiry} expiry
+     — near-month theta risk severe.
+     All new setups must use {next_expiry}."
 
 ════════════════════════════════════════════════════
 REQUIRED OUTPUT
@@ -648,32 +663,26 @@ No text outside the JSON. No markdown fences.
   "session_narrative": "3-4 sentences: (1) Nifty trend and price structure, (2) VIX level and direction you read, (3) Institutional flow character, (4) Implication for tonight. Cite actual numbers.",
 
   "market_trend": "BULLISH | BEARISH | SIDEWAYS",
-  // Read EMA ARRANGEMENT not just price vs EMAs.
-  // Check if EMA20 is above or below EMA50 first.
-  // EMA20 > EMA50 = bullish short-term arrangement
-  // EMA20 < EMA50 = bearish short-term arrangement
-  //
   // BULLISH  : price > ema20 > ema50
   //            AND price > ema180
-  //            Long-term trend recovered and confirmed
+  //            All three timeframes aligned bullish
   //
   // BEARISH  : price < ema20 < ema50
-  //            OR price < ema180 with ema20 < ema50
-  //            Trend broken at multiple timeframes
+  //            Short and medium-term trend broken
   //
-  // SIDEWAYS : Any mixed arrangement including:
+  // SIDEWAYS : Any other arrangement, including:
   //            price above ema20/ema50 but below ema180
-  //            price above ema20 but ema20 < ema50
+  //            ema20 < ema50 but price above both
   //            price between ema20 and ema50
   //            Conflicting signals across timeframes
   //
-  // Note: Tonight's values are:
+  // Tonight's EMA values (pre-computed):
   //   Price  : {price}
   //   EMA20  : {ema20} (price {price_vs_ema20})
   //   EMA50  : {ema50} (price {price_vs_ema50})
-  //   EMA180 : {ema180_str} (price {price_vs_ema180})
+  //   EMA180 : {ema180} (price {price_vs_ema180})
   //   EMA20 {ema20_vs_ema50} EMA50
-  //         ({ema_arrangement} arrangement)
+  //         ({ema_arrangement} short-term arrangement)
 
   "market_volatility": "LOW | NORMAL | HIGH",
 
@@ -854,12 +863,14 @@ No text outside the JSON. No markdown fences.
     "deprioritise_sectors": [...],
 
     "special_instructions": string or null,
-    // If NORMAL: null unless other conditions warrant
-    // If ROLLOVER_WATCH: note to prefer next expiry
-    // If TRANSITION: "Prefer next month expiry setups.
-    //                Near-month time decay accelerating."
-    // If EXPIRY: "Avoid near-month entries.
-    //             Only next-month setups valid tonight."
+    // Use the phase-specific instruction from Section 6.
+    // Include actual dates: {current_expiry}, {next_expiry}
+    // NORMAL          : null
+    // ROLLOVER_WATCH  : prefer next expiry note
+    // TRANSITION      : mandate next-month expiry,
+    //                   cite {current_expiry} and
+    //                   {next_expiry} explicitly
+    // EXPIRY          : no near-month entries at all
 
     "expiry_note": string or null
     // If TRANSITION or EXPIRY:
@@ -881,7 +892,18 @@ No text outside the JSON. No markdown fences.
     "levels_note": "1 sentence on key level implication tonight"
   }},
 
-  "risk_flags": ["2-4 specific risks citing actual data"],
+  "risk_flags": [],
+  // Required: 2 to 4 items.
+  // Rule 1: If rollover_phase is TRANSITION or EXPIRY,
+  //         first item MUST be the expiry warning:
+  //         "{days_left} trading days to {current_expiry}
+  //          expiry — near-month theta risk severe.
+  //          All new setups must target {next_expiry}."
+  // Rule 2: All other flags must cite actual numbers.
+  //         GOOD: "VIX at 13.05 near 30-day low of 12.67
+  //                — complacency risk if event triggers"
+  //         BAD:  "Market is volatile"
+  // Rule 3: Minimum 2 flags always required.
 
   "guidance": {{
     "favour": "1-2 sentences on best setups tonight",
@@ -924,7 +946,7 @@ def _run_turn1(
     messages = [{"role": "user", "content": prompt}]
 
     logger.info("Turn 1: calling Claude (max_tokens=2500)...")
-    logger.info ("USER PROMPT: %s" , prompt)
+    # logger.info ("USER PROMPT: %s" , prompt)
 
     try:
         response = _call_claude(client, _TURN1_SYSTEM, messages, max_tokens=2500)

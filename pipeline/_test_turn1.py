@@ -65,9 +65,10 @@ def main():
     print("USER PROMPT: %s", prompt)
 
     # # ── Step 3: full Turn 1 run ────────────────────────────────────────────────
-    # print("\n[3/3] Calling Claude (Turn 1)...")
-    # turn1_result, cost_info = _run_turn1(client, session_id, session_date, config)
-    #
+    print("\n[3/3] Calling Claude (Turn 1)...")
+    turn1_result, cost_info = _run_turn1(client, session_id, session_date, config)
+    print("RESULT: ", turn1_result)
+    print("COST: ", cost_info)
     # print("\n" + "=" * 60)
     # print("TURN 1 COMPLETE")
     # print("=" * 60)
