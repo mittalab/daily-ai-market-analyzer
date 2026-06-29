@@ -69,7 +69,7 @@ def job_evening_bhavcopy() -> None:
     from new_data_ingestion.nse_bhavcopy import last_trading_day
     from new_notifications.telegram import send_validation_start, send_validation_complete
 
-    target_date = last_trading_day(today - timedelta(days=1))
+    target_date = last_trading_day(today)
     logger.info("Morning bhavcopy: fetching equity + FO data for %s", target_date)
 
     send_validation_start(str(target_date), label="F&O Universe")
