@@ -159,11 +159,32 @@ _TURN1_SYSTEM = (
 
 _TURN1_REQUIRED_KEYS = [
     "session_narrative", "market_trend", "market_volatility", "market_structure",
-    "execution_bias", "fii_dii_stance", "vix_assessment", "fii_dii_assessment",
-    "session_risk_level", "conviction_multiplier", "min_conviction_override",
-    "sector_pictures", "directional_filters", "prescan_guidance",
-    "index_key_levels", "risk_flags", "guidance",
+    "execution_bias", "fii_dii_stance", "session_risk_level", "conviction_multiplier",
+    "vix_assessment", "fii_dii_assessment", "sector_pictures", "directional_filters",
+    "prescan_guidance", "nifty_price_structure", "index_key_levels", "risk_flags", "guidance",
 ]
+
+_TURN1_REQUIRED_SECTORS = [
+    "BANKING", "IT", "AUTO", "PHARMA", "FMCG",
+    "METAL", "ENERGY", "FINSERV", "INFRA", "CONSUMER", "MEDIA",
+]
+
+_TURN1_REQUIRED_PRICE_STRUCTURE_KEYS = [
+    "overall_structure", "trend_quality", "swing_points", "key_price_zones",
+    "pattern_identified", "ema_structure", "breakout_conditions", "volume_analysis",
+    "price_narrative", "trading_implication",
+]
+
+_TURN1_REQUIRED_TRADING_IMPLICATION_KEYS = [
+    "summary", "index_bias", "conviction_adjustment", "key_condition_to_watch",
+]
+
+_TURN1_DEFAULT_SECTOR_PICTURE = {
+    "trend": "SIDEWAYS", "momentum": "STABLE", "stance": "NEUTRAL", "strength": "WEAK",
+    "structure": "RANGE",
+    "key_levels": {"support": None, "resistance": None, "breakout_above": None, "breakdown_below": None},
+    "volume_note": "", "character": "", "trading_note": "",
+}
 
 _TURN1_DEFAULTS = {
     "session_narrative":       "Market context unavailable — treating as neutral session.",
@@ -172,16 +193,37 @@ _TURN1_DEFAULTS = {
     "market_structure":        "WIDE",
     "execution_bias":          "NEUTRAL",
     "fii_dii_stance":          "NEUTRAL",
+    "session_risk_level":      "MEDIUM",
+    "conviction_multiplier":   0.95,
     "vix_assessment":          {"current": None, "trend": "STABLE", "character": "", "options_implication": ""},
     "fii_dii_assessment":      {"fii_20d_character": "", "recent_shift": "NO", "shift_description": None,
                                 "dii_stance_description": "", "divergence": "NO", "key_insight": ""},
-    "session_risk_level":      "MEDIUM",
-    "conviction_multiplier":   0.95,
-    "min_conviction_override": None,
-    "sector_pictures":         {},
+    "sector_pictures":         {name: dict(_TURN1_DEFAULT_SECTOR_PICTURE) for name in _TURN1_REQUIRED_SECTORS},
     "directional_filters":     {"avoid_longs_in": [], "avoid_shorts_in": [], "caution_sectors": []},
     "prescan_guidance":        {"max_stocks_to_forward": 10, "prefer_directions": ["LONG", "SHORT"],
-                                "prioritise_sectors": [], "deprioritise_sectors": [], "special_instructions": None},
+                                "prioritise_sectors": [], "deprioritise_sectors": [], "special_instructions": None,
+                                "expiry_note": None},
+    "nifty_price_structure":   {
+        "overall_structure": "RANGE", "trend_quality": "CONFLICTING",
+        "swing_points": {"major_high": {"price": None, "date": None}, "major_low": {"price": None, "date": None},
+                         "recent_high": {"price": None, "date": None}, "recent_low": {"price": None, "date": None}},
+        "key_price_zones": [],
+        "pattern_identified": {
+            "classical_pattern":   {"name": "NONE", "completion": "FAILED", "target": None, "note": ""},
+            "candlestick_pattern": {"name": "NONE", "location": "MID_RANGE", "significance": "LOW", "note": ""},
+            "volume_pattern":      {"name": "NONE", "note": ""},
+        },
+        "ema_structure": {"short_term": "", "medium_term": "", "long_term": "", "arrangement": "MIXED", "arrangement_note": ""},
+        "breakout_conditions": {"bull_breakout_above": None, "bull_breakout_note": "",
+                                "bear_breakdown_below": None, "bear_breakdown_note": ""},
+        "volume_analysis": {"recent_trend": "STABLE", "anomaly_days": [], "confirmation": "MIXED", "note": ""},
+        "price_narrative": "Price structure unavailable — treating as neutral session.",
+        "trading_implication": {
+            "summary": "No structural read available — apply standard caution.",
+            "index_bias": "NEUTRAL", "conviction_adjustment": "NEUTRAL",
+            "key_condition_to_watch": "",
+        },
+    },
     "index_key_levels":        {"strong_support": 0, "support": 0, "current": 0,
                                 "resistance": 0, "strong_resistance": 0,
                                 "max_pain": None, "pcr_signal": "NEUTRAL", "levels_note": ""},
@@ -190,17 +232,47 @@ _TURN1_DEFAULTS = {
 }
 
 
+def _next_thursday(d: date) -> date:
+    """Nifty weekly index options expire on Thursday. Returns d itself if d is a Thursday."""
+    return d + timedelta(days=(3 - d.weekday()) % 7)
+
+def _next_tuesday(d: date) -> date:
+    """Nifty weekly index options expire on Tuesday. Returns d itself if d is a Tuesday."""
+    return d + timedelta(days=(1 - d.weekday()) % 7)
+
+def _expiry_oi_block(snapshot_rows: list[dict], expiry_d: date) -> dict | None:
+    """Build CE/PE walls + PCR + max pain for one expiry from a day's options_snapshots rows."""
+    from pipeline.oi_series_builder import _calc_max_pain, _pcr_and_oi_from_options
+
+    expiry_str = str(expiry_d)
+    rows = [r for r in snapshot_rows if str(r.get("expiry_date")) == expiry_str]
+    if not rows:
+        return None
+
+    walls = oi_walls(rows, expiry_str, top_n=5)
+    pcr_near, _, _, _ = _pcr_and_oi_from_options(rows, expiry_str)
+    max_pain = _calc_max_pain(rows, expiry_str)
+    return {
+        "expiry_date": expiry_str,
+        "ce_walls": [{"strike": float(w["strike"]), "oi": int(w["oi"] or 0)} for w in walls["ce_walls"]],
+        "pe_walls": [{"strike": float(w["strike"]), "oi": int(w["oi"] or 0)} for w in walls["pe_walls"]],
+        "pcr_near": pcr_near,
+        "max_pain": max_pain,
+    }
+
+
 def _build_turn1_data(session_date: date) -> dict:
     """
-    Reads all required data from DB for Turn 1.
-    No API calls. No external dependencies.
+    Reads all required data from DB for Turn 1 — market intelligence layer only.
+    No API calls. No external dependencies. No stock-level data.
     Returns structured dict for prompt injection.
     """
-    # ── Source 1: Nifty 50 ───────────────────────────────────────────────────
+    from pipeline.oi_series_builder import _trading_days_to
     from new_data_ingestion.nse_bhavcopy import get_holiday_dates
     _holidays_str = {str(d) for d in get_holiday_dates()}
 
-    nifty_rows = get_price_history("NIFTY_50", days=250)
+    # ── Source 1: Nifty 50 ───────────────────────────────────────────────────
+    nifty_rows = get_price_history(SYMBOL_NIFTY_50, days=180)
     df_nifty = pd.DataFrame(nifty_rows)
     for col in ("open", "high", "low", "close", "volume"):
         df_nifty[col] = pd.to_numeric(df_nifty[col], errors="coerce")
@@ -217,10 +289,14 @@ def _build_turn1_data(session_date: date) -> dict:
     atr_series   = calculate_atr(df_nifty, 14)
     atr_pct_val  = round(float(atr_series.iloc[-1]) / price * 100, 2) if not pd.isna(atr_series.iloc[-1]) else None
 
-    df_60 = df_nifty.tail(60)
-    df_60 = df_60[~df_60["date"].astype(str).isin(_holidays_str)]
-    df_60 = df_60.tail(60)
-    nifty_ohlcv_60d = [
+    price_vs_ema20  = "above" if price > ema20_val else "below"
+    price_vs_ema50  = "above" if price > ema50_val else "below"
+    price_vs_ema180 = ("above" if price > ema180_val else "below") if ema180_val is not None else "unavailable"
+    ema20_vs_ema50  = ">" if ema20_val > ema50_val else "<"
+    ema_arrangement = "bullish" if ema20_val > ema50_val else "bearish"
+
+    df_120 = df_nifty[~df_nifty["date"].astype(str).isin(_holidays_str)].tail(120)
+    nifty_ohlcv_120d = [
         {
             "date":   str(r["date"]),
             "open":   float(r["open"]),
@@ -229,11 +305,11 @@ def _build_turn1_data(session_date: date) -> dict:
             "close":  float(r["close"]),
             "volume": int(r["volume"]) if not pd.isna(r["volume"]) else 0,
         }
-        for _, r in df_60.iterrows()
+        for _, r in df_120.iterrows()
     ]
 
     nifty_indicators = {
-        "current": round(price, 2),
+        "current_price": round(price, 2),
         "ema20":   ema20_val,
         "ema50":   ema50_val,
         "ema180":  ema180_val,
@@ -242,13 +318,20 @@ def _build_turn1_data(session_date: date) -> dict:
         "ret60d":  ret60d_val,
         "atr_pct": atr_pct_val,
     }
+    nifty_ema_relationships = {
+        "price_vs_ema20":  price_vs_ema20,
+        "price_vs_ema50":  price_vs_ema50,
+        "price_vs_ema180": price_vs_ema180,
+        "ema20_vs_ema50":  ema20_vs_ema50,
+        "ema_arrangement": ema_arrangement,
+    }
 
     # ── Source 2: India VIX ──────────────────────────────────────────────────
-    vix_rows = get_price_history("INDIA_VIX", days=30)
+    vix_rows = get_price_history(SYMBOL_INDIA_VIX, days=30)
     vix_close_30d = [
         {"date": str(r["date"]), "close": float(r["close"])}
         for r in vix_rows
-        if r.get("close") is not None and float(r["close"]) != 0
+        if r.get("close") is not None and float(r["close"]) != 0 and str(r["date"]) not in _holidays_str
     ]
 
     # ── Source 3: FII / DII flows ────────────────────────────────────────────
@@ -285,13 +368,16 @@ def _build_turn1_data(session_date: date) -> dict:
     sectors_data: dict[str, dict] = {}
     for symbol, display_name in _SECTOR_SYMBOL_MAP.items():
         sec_rows = get_price_history(symbol, days=60)
-        if len(sec_rows) < 7:
-            logger.warning("Insufficient data for sector %s — skipping", symbol)
-            continue
         df_sec = pd.DataFrame(sec_rows)
-        for col in ("open", "high", "low", "close"):
-            df_sec[col] = pd.to_numeric(df_sec[col], errors="coerce")
-        df_sec = df_sec.dropna(subset=["close"]).reset_index(drop=True)
+        if not df_sec.empty:
+            for col in ("open", "high", "low", "close"):
+                df_sec[col] = pd.to_numeric(df_sec[col], errors="coerce")
+            df_sec = df_sec.dropna(subset=["close"]).reset_index(drop=True)
+            df_sec = df_sec[~df_sec["date"].astype(str).isin(_holidays_str)].reset_index(drop=True)
+
+        if len(df_sec) < 7:
+            logger.warning("Insufficient data for sector %s after holiday filter — skipping", symbol)
+            continue
 
         sec_close = df_sec["close"]
         sec_price = float(sec_close.iloc[-1])
@@ -301,8 +387,6 @@ def _build_turn1_data(session_date: date) -> dict:
         vs_nifty = round(s_ret20d - ret20d_val, 2) if (s_ret20d is not None and ret20d_val is not None) else None
 
         df_30 = df_sec.tail(30)
-        df_30 = df_30[~df_30["date"].astype(str).isin(_holidays_str)]
-        df_30 = df_30.tail(30)
         sec_ohlcv_30d = [
             {
                 "date":  str(r["date"]),
@@ -319,71 +403,72 @@ def _build_turn1_data(session_date: date) -> dict:
             "ohlcv_30d":  sec_ohlcv_30d,
         }
 
-    # ── Source 5: Options positioning ────────────────────────────────────────
+    # ── Source 5: Nifty weekly options positioning ───────────────────────────
+    current_weekly_expiry = _next_tuesday(session_date)
+    next_weekly_expiry    = current_weekly_expiry + timedelta(days=7)
+    days_to_nifty_expiry  = _trading_days_to(session_date, current_weekly_expiry)
+
+    if days_to_nifty_expiry == 0:
+        reliability = "UNRELIABLE"
+        reliability_note = ("Expiry today — OI reflects only expiring positions. "
+                            "Do not use for forward sentiment assessment.")
+    elif days_to_nifty_expiry == 1:
+        reliability = "DISTORTED"
+        reliability_note = ("Expiry tomorrow — positions actively unwinding. "
+                            "Use for broad directional read only, not precise level assessment.")
+    elif days_to_nifty_expiry == 2:
+        reliability = "MODERATE"
+        reliability_note = ("2 days to expiry — some distortion from position management. "
+                            "Weight next week OI more heavily.")
+    else:
+        reliability = "HIGH"
+        reliability_note = f"{days_to_nifty_expiry} days to expiry — OI positions are active and reliable."
+
+    dual_expiry = days_to_nifty_expiry <= 2
+
     options_available = False
-    ce_walls: list[dict] = []
-    pe_walls: list[dict] = []
-    pcr_current = None
-    max_pain_val = None
-
+    current_oi_block = None
+    next_oi_block = None
     try:
-        n_snap = get_options_by_date("NIFTY_50", session_date)
-        if not n_snap:
-            n_snap = get_options_by_date("NIFTY_50", session_date - timedelta(days=1))
-        if n_snap:
-            expiries = sorted(list(set(str(r["expiry_date"]) for r in n_snap)))
-            if expiries:
-                walls = oi_walls(n_snap, expiries[0], top_n=5)
-                ce_walls = [{"strike": int(w["strike"]), "oi": int(w["oi"] or 0)} for w in walls.get("ce_walls", [])]
-                pe_walls = [{"strike": int(w["strike"]), "oi": int(w["oi"] or 0)} for w in walls.get("pe_walls", [])]
-                options_available = True
+        snap_rows = get_options_by_date(SYMBOL_NIFTY_50, session_date)
+        if snap_rows:
+            current_oi_block = _expiry_oi_block(snap_rows, current_weekly_expiry)
+            options_available = current_oi_block is not None
+            if dual_expiry:
+                next_oi_block = _expiry_oi_block(snap_rows, next_weekly_expiry)
     except Exception as exc:
-        logger.warning("Turn 1 options walls failed: %s", exc)
+        logger.warning("Turn 1 Nifty weekly options fetch failed: %s", exc)
 
-    oi_rows = None
-    expiry_context = {
-        "current_expiry": "Unavailable",
-        "next_expiry":    "Unavailable",
-        "rollover_phase": "UNKNOWN",
+    nifty_options = {
+        "current_weekly_expiry": str(current_weekly_expiry),
+        "next_weekly_expiry":    str(next_weekly_expiry),
+        "days_to_nifty_expiry":  days_to_nifty_expiry,
+        "reliability":           reliability,
+        "reliability_note":      reliability_note,
+        "dual_expiry":           dual_expiry,
+        "options_available":     options_available,
+        "current": current_oi_block or {"ce_walls": [], "pe_walls": [], "pcr_near": None, "max_pain": None},
+        "next":    next_oi_block,
     }
-    try:
-        oi_rows = get_continuous_oi("NIFTY_50", days=1)
-        if oi_rows:
-            last_oi = oi_rows[-1]
-            pcr_current  = last_oi.get("pcr_near")
-            max_pain_val = last_oi.get("max_pain")
-            expiry_context = {
-                "current_expiry": str(last_oi.get("near_expiry") or "Unavailable"),
-                "next_expiry":    str(last_oi.get("next_expiry") or "Unavailable"),
-                "rollover_phase": str(last_oi.get("rollover_phase") or "UNKNOWN"),
-            }
-    except Exception as exc:
-        logger.warning("Turn 1 continuous OI fetch failed: %s", exc)
 
     logger.info(
-        "Turn 1 data ready: nifty=%d rows, vix=%d rows, fii=%d rows, sectors=%d available, options=%s",
-        len(nifty_ohlcv_60d),
+        "Turn 1 data ready: nifty=%d rows, vix=%d rows, fii=%d rows, sectors=%d/11 available, "
+        "options=%s, dual_expiry=%s",
+        len(nifty_ohlcv_120d),
         len(vix_close_30d),
         len(fii_dii_flows_30d),
         len(sectors_data),
         "YES" if options_available else "NO",
+        "YES" if dual_expiry else "NO",
     )
-
-    pcr_value = None
-    if pcr_current is not None:
-        pcr_value = float(pcr_current)
-
-    max_pain_value = None
-    if max_pain_val is not None:
-        max_pain_value = float(max_pain_val)
 
     return {
         "session_date": str(session_date),
         "nifty": {
-            "indicators": nifty_indicators,
-            "ohlcv_60d":  nifty_ohlcv_60d,
+            "indicators":        nifty_indicators,
+            "ema_relationships": nifty_ema_relationships,
+            "ohlcv_120d":        nifty_ohlcv_120d,
         },
-        "expiry_context": expiry_context,
         "vix": {
             "close_30d": vix_close_30d,
         },
@@ -392,13 +477,7 @@ def _build_turn1_data(session_date: date) -> dict:
             "flows_30d":    fii_dii_flows_30d,
         },
         "sectors": sectors_data,
-        "options": {
-            "available":   options_available,
-            "ce_walls":    ce_walls,
-            "pe_walls":    pe_walls,
-            "pcr_current": pcr_value,
-            "max_pain":    max_pain_value,
-        },
+        "nifty_options": nifty_options,
     }
 
 
@@ -406,51 +485,50 @@ def _build_turn1_prompt(data: dict) -> str:
     """
     Builds the Turn 1 user message from prepared data.
     Returns plain text string ready for Claude.
+    Turn 1 is the market intelligence layer only — no stock-level scope.
     """
     _j = lambda arr: json.dumps(arr, separators=(",", ":"))
 
-    ind    = data["nifty"]["indicators"]
-    opt    = data["options"]
-    fii    = data["fii_dii"]
-    vix    = data["vix"]
+    ind     = data["nifty"]["indicators"]
+    rel     = data["nifty"]["ema_relationships"]
+    opt     = data["nifty_options"]
+    fii     = data["fii_dii"]
+    vix     = data["vix"]
 
     ema180_str = str(ind["ema180"]) if ind["ema180"] is not None else "Unavailable"
+    price  = ind["current_price"]
+    ema20  = ind["ema20"]
+    ema50  = ind["ema50"]
+    ema180 = ind["ema180"]
 
-    expiry         = data["expiry_context"]
-    current_expiry = expiry["current_expiry"]
-    next_expiry    = expiry["next_expiry"]
-    rollover_phase = expiry["rollover_phase"]
+    # ── Options section (Section 5) ──────────────────────────────────────────
+    def _expiry_oi_text(block: dict, label: str) -> str:
+        if not block or not block.get("ce_walls"):
+            return f"{label}: no options data available."
+        ce_lines = "\n".join(f"  Strike {w['strike']}: OI {w['oi']:,}" for w in block["ce_walls"])
+        pe_lines = "\n".join(f"  Strike {w['strike']}: OI {w['oi']:,}" for w in block["pe_walls"])
+        pcr_str  = str(round(block["pcr_near"], 2)) if block.get("pcr_near") is not None else "Unavailable"
+        mp_str   = str(int(block["max_pain"]))      if block.get("max_pain") is not None else "Unavailable"
+        return (
+            f"{label} (expiry {block['expiry_date']}):\n"
+            f"CE walls (resistance / supply):\n{ce_lines}\n\n"
+            f"PE walls (support / demand):\n{pe_lines}\n\n"
+            f"PCR: {pcr_str}\nMax Pain: {mp_str}"
+        )
 
-    try:
-        from pipeline.oi_series_builder import _trading_days_to
-        _session_date_obj = date.fromisoformat(data["session_date"])
-        _exp_date         = date.fromisoformat(current_expiry)
-        days_left         = _trading_days_to(_session_date_obj, _exp_date)
-    except Exception:
-        days_left = "unknown"
-
-    # Options section
-    if opt["available"]:
-        ce_lines = "\n".join(f"  Strike {w['strike']}: OI {w['oi']:,}" for w in opt["ce_walls"])
-        pe_lines = "\n".join(f"  Strike {w['strike']}: OI {w['oi']:,}" for w in opt["pe_walls"])
-        pcr_str  = str(round(opt["pcr_current"], 2)) if opt["pcr_current"] is not None else "Unavailable"
-        mp_str   = str(int(opt["max_pain"]))         if opt["max_pain"]    is not None else "Unavailable"
-        options_block = f"""Nifty resistance levels (CE OI concentration):
-{ce_lines}
-
-Nifty support levels (PE OI concentration):
-{pe_lines}
-
-PCR (Put-Call Ratio): {pcr_str}
-Max Pain strike     : {mp_str}
-
-PCR interpretation (contrarian indicator):
-  PCR < 0.7   -> contrarian bearish signal
-  PCR 0.7-1.1 -> neutral positioning
-  PCR 1.1-1.3 -> mild protective hedging present
-  PCR > 1.3   -> contrarian bullish signal"""
+    if not opt["options_available"]:
+        options_block = "No Nifty weekly options data available for today.\nUse price structure and FII flows only — do not infer OI-based sentiment."
+    elif opt["dual_expiry"]:
+        options_block = (
+            f"{_expiry_oi_text(opt['current'], 'CURRENT WEEK')}\n\n"
+            f"{_expiry_oi_text(opt['next'], 'NEXT WEEK')}\n\n"
+            "Next week OI is more relevant for forward-looking sentiment — "
+            "current week positions are actively unwinding into expiry. "
+            "Compare sentiment between the two expiries, note any divergence, "
+            "and state which expiry better represents forward positioning."
+        )
     else:
-        options_block = "Options data unavailable for today.\nUse price structure and FII flows for key levels."
+        options_block = _expiry_oi_text(opt["current"], "CURRENT WEEK")
 
     # FII data quality warning
     dq = fii["data_quality"]
@@ -464,24 +542,18 @@ PCR interpretation (contrarian indicator):
         r = sec["returns"]
         sector_blocks.append(
             f"── {name} ──────────────────────────────────────────────────\n"
-            f"Returns: 7d={r['ret7d']}% | 20d={r['ret20d']}% | 60d={r['ret60d']}% | vs_nifty={r['vs_nifty_20d']}%\n"
+            f"Returns: 7d={r['ret7d']}% | 20d={r['ret20d']}% | 60d={r['ret60d']}% | vs_nifty_20d={r['vs_nifty_20d']}%\n"
             f"30d OHLCV: {_j(sec['ohlcv_30d'])}"
         )
     sectors_text = "\n\n".join(sector_blocks)
 
-    # Pre-compute EMA comparisons for market_trend guidance (FIX 4)
-    price           = ind["current"]
-    ema20           = ind["ema20"]
-    ema50           = ind["ema50"]
-    ema180          = ind["ema180"]
-    price_vs_ema20  = "above" if price > ema20  else "below"
-    price_vs_ema50  = "above" if price > ema50  else "below"
-    price_vs_ema180 = ("above" if price > ema180 else "below") if ema180 is not None else "unavailable"
-    ema20_vs_ema50  = ">" if ema20 > ema50 else "<"
-    ema_arrangement = "bullish" if ema20 > ema50 else "bearish"
-
     prompt = f"""You are performing post-market analysis for {data['session_date']}. Market has closed for the day.
 All data below reflects today's final values.
+
+Turn 1 is the market intelligence layer only — Nifty 50, VIX, FII/DII flows,
+sector indices, and Nifty weekly options sentiment. It has NO stock-level scope.
+Do not analyse or reference individual stocks, stock option expiries, or stock
+futures anywhere in this turn.
 
 Analyse all sections thoroughly.
 Think step by step through each data source.
@@ -494,22 +566,43 @@ SECTION 1: NIFTY 50 PRICE ACTION
 ════════════════════════════════════════════════════
 
 Pre-computed indicators:
-  Current price : {ind['current']}
-  EMA 20        : {ind['ema20']}
-  EMA 50        : {ind['ema50']}
+  Current price : {price}
+  EMA 20        : {ema20}
+  EMA 50        : {ema50}
   EMA 180       : {ema180_str}
   5-day return  : {ind['ret5d']}%
   20-day return : {ind['ret20d']}%
   60-day return : {ind['ret60d']}%
   ATR% (14)     : {ind['atr_pct']}%
 
-Last 60 days OHLCV — read the price action:
+Pre-computed EMA relationships:
+  Price vs EMA20  : {rel['price_vs_ema20']}
+  Price vs EMA50  : {rel['price_vs_ema50']}
+  Price vs EMA180 : {rel['price_vs_ema180']}
+  EMA20 {rel['ema20_vs_ema50']} EMA50 ({rel['ema_arrangement']} short-term arrangement)
+
+Last 120 days OHLCV — read the price action:
 Note: Today's volume shows 0 — this is expected
 as exchange volume data is finalized after market
 close and may not yet be available. Ignore volume
 for today's candle only. Use all prior days'
 volume for momentum and participation assessment.
-{_j(data['nifty']['ohlcv_60d'])}
+{_j(data['nifty']['ohlcv_120d'])}
+
+Perform a full price action analysis. Identify:
+  Overall price structure, trend quality and consistency
+  All significant swing highs and lows with actual price values
+  Consolidation zones and ranges
+  Classical chart patterns (flags, pennants, triangles, wedges,
+    head and shoulders, double top/bottom, cup and handle, rectangles)
+  Candlestick patterns at key levels (engulfing, doji, pin bars,
+    morning/evening star, inside bars)
+  Volume character: is volume confirming price moves? Any climax
+    or dry-up patterns? Flag anomalous volume days (2x+ average volume)
+  Key price zones (not just points): support zones (demand areas)
+    and resistance zones (supply areas)
+  Breakout/breakdown levels: what price confirms bullish structure?
+    What price invalidates the current recovery?
 
 ════════════════════════════════════════════════════
 SECTION 2: INDIA VIX
@@ -518,10 +611,12 @@ SECTION 2: INDIA VIX
 Last 30 days VIX closing values:
 {_j(vix['close_30d'])}
 
-Read this data and determine:
-  Current level and what it signals
-  Direction over 30 days (falling/rising/choppy)
-  Character of the move (gradual or spike-driven)
+Determine from the raw data — do not rely on any pre-computed trend:
+  Current level and what it signals for India
+  30-day trend: FALLING, RISING, STABLE, or CHOPPY
+  Character: gradual move or spike-driven
+  Whether current level is at an extreme (low or high) relative
+    to the 30-day range shown
   Implication for option pricing tonight
 
 ════════════════════════════════════════════════════
@@ -532,24 +627,20 @@ Data quality: {dq}{dq_warning}
 Last 30 days daily institutional flows (Crores):
 {_j(fii['flows_30d'])}
 
-Read this data and determine:
+Determine from the raw data — do not rely on any pre-computed aggregates:
   Cumulative FII direction over last 20 days
-  Whether behaviour shifted in last 5 days
+  Cumulative DII direction over last 20 days
+  Whether FII behaviour shifted in last 5 days
   Whether selling/buying is consistent or event-driven
   DII stance — absorbing FII or following same direction
   Meaningful divergence between FII and DII
+  Most important observation from the flow data
 
 ════════════════════════════════════════════════════
 SECTION 4: SECTOR ANALYSIS
 ════════════════════════════════════════════════════
 
 For each sector you have summary returns and 30 days of price action to read.
-
-Determine for each sector:
-  Trend direction and momentum character
-  Whether outperforming or underperforming Nifty
-  Stance for tonight: TAILWIND, NEUTRAL, or HEADWIND
-  Strength: STRONG, MODERATE, or WEAK
 
 vs_nifty_20d guide:
   > +3%       : TAILWIND STRONG
@@ -558,74 +649,41 @@ vs_nifty_20d guide:
   -1 to -3%   : HEADWIND MODERATE
   < -3%       : HEADWIND STRONG
 
+For each sector determine:
+  Overall trend and momentum character
+  Price structure type
+  Key price levels from the 30-day data: support (recent swing low
+    or demand zone), resistance (recent swing high or supply zone),
+    breakout level (price that upgrades sector stance), breakdown
+    level (price that downgrades sector stance)
+  Volume character of recent moves
+  Whether outperforming or underperforming Nifty
+  Stance and strength for tonight
+
 {sectors_text}
 
 ════════════════════════════════════════════════════
-SECTION 5: OPTIONS MARKET POSITIONING
+SECTION 5: NIFTY WEEKLY OPTIONS POSITIONING
 ════════════════════════════════════════════════════
+
+IMPORTANT: These are Nifty INDEX options (weekly expiry). We do NOT trade
+Nifty options in this system. Use this section ONLY to read market sentiment
+and understand where index option writers are positioned. Do NOT cite these
+levels as trading levels for stock setups.
+
+Current weekly expiry : {opt['current_weekly_expiry']}
+Next weekly expiry    : {opt['next_weekly_expiry']}
+Days to expiry        : {opt['days_to_nifty_expiry']}
+Reliability           : {opt['reliability']}
+{opt['reliability_note']}
 
 {options_block}
 
-════════════════════════════════════════════════════
-SECTION 6: EXPIRY AND ROLLOVER CONTEXT
-════════════════════════════════════════════════════
-
-Current expiry : {current_expiry}
-Next expiry    : {next_expiry}
-Rollover phase : {rollover_phase}
-
-Rollover phase definitions (based on trading days
-remaining before expiry, excluding expiry day itself):
-
-  NORMAL        : More than 5 trading days remaining
-                  Normal analysis — no special constraints
-                  Full stock universe eligible for near month
-
-  ROLLOVER_WATCH: 3-5 trading days remaining
-                  Monitor rollover activity in futures OI
-                  Prefer setups that work on next expiry too
-                  Near-month setups still valid if DTE >= 6
-
-  TRANSITION    : Exactly 2 trading days remaining
-                  Near-month theta decay accelerating fast
-                  New near-month entries carry high time risk
-                  Prefer next-month expiry for all new setups
-
-  EXPIRY        : 0-1 trading days remaining or expiry day
-                  Do not recommend near-month entries at all
-                  Only next-month setups are valid tonight
-                  Existing near-month positions: manage only
-
-Tonight's phase is: {rollover_phase}
-
-Factor this into your output:
-  prescan_guidance.max_stocks_to_forward:
-    NORMAL or ROLLOVER_WATCH: use risk_level base
-    TRANSITION: reduce base by 20%
-    EXPIRY: reduce base by 30%
-
-  prescan_guidance.special_instructions:
-    NORMAL: null
-    ROLLOVER_WATCH: note preference for setups
-                    that work on next expiry too
-    TRANSITION: "All new setups must target next expiry
-                 ({next_expiry}). Near-month theta
-                 decay is severe — avoid new entries
-                 on {current_expiry} strikes."
-    EXPIRY: "Only next-month expiry ({next_expiry})
-             setups valid tonight. No near-month
-             entries under any circumstances."
-
-  prescan_guidance.expiry_note:
-    NORMAL or ROLLOVER_WATCH: null
-    TRANSITION or EXPIRY: specific warning string
-      citing current_expiry and days remaining
-
-  risk_flags:
-    Always add expiry risk flag if TRANSITION or EXPIRY:
-    "{days_left} trading days to {current_expiry} expiry
-     — near-month theta risk severe.
-     All new setups must use {next_expiry}."
+PCR interpretation (contrarian indicator):
+  PCR < 0.7   -> excessive bullishness (contrarian bearish)
+  PCR 0.7-1.1 -> neutral positioning
+  PCR 1.1-1.3 -> mild protective hedging
+  PCR > 1.3   -> excessive bearishness (contrarian bullish)
 
 ════════════════════════════════════════════════════
 REQUIRED OUTPUT
@@ -634,25 +692,30 @@ REQUIRED OUTPUT
 SECTOR PICTURE INSTRUCTIONS:
 Provide a complete assessment for ALL 11 sectors.
 No shortcuts. No placeholders. No ellipsis.
-Every sector must have all 7 fields completed.
+Every sector must have all 9 fields completed.
 
 Required sectors (all 11 mandatory):
   BANKING, IT, AUTO, PHARMA, FMCG,
   METAL, ENERGY, FINSERV, INFRA, CONSUMER, MEDIA
 
-Field value options:
-  trend    : UPTREND | DOWNTREND | SIDEWAYS
-  momentum : ACCELERATING | DECELERATING | STABLE
-  vs_nifty : OUTPERFORMING | UNDERPERFORMING | INLINE
-  stance   : TAILWIND | NEUTRAL | HEADWIND
-  strength : STRONG | MODERATE | WEAK
-  character: 1 sentence describing price action.
-             Cite actual price levels seen in data.
-             e.g. "Broke out from 54000 to 58177
-                   with consistent higher highs"
-  trading_note: 1 sentence on stock selection tonight.
-             e.g. "Favour LONG setups — strong sector
-                   tailwind from Banking outperformance"
+Field value options (9 fields per sector):
+  trend       : UPTREND | DOWNTREND | SIDEWAYS
+  momentum    : ACCELERATING | DECELERATING | STABLE
+  stance      : TAILWIND | NEUTRAL | HEADWIND
+  strength    : STRONG | MODERATE | WEAK
+  structure   : BREAKOUT | BREAKDOWN | RANGE | UPTREND_PULLBACK | DOWNTREND_RALLY
+  key_levels  : object with 4 price numbers —
+                support, resistance, breakout_above, breakdown_below
+  volume_note : 1 sentence on volume character citing actual observations
+  character   : 1 sentence on price action citing actual price levels seen
+                e.g. "Broke out from 54000 to 58177 with consistent higher highs"
+  trading_note: 1 sentence on stock selection implication for tonight
+                e.g. "Favour LONG setups — strong sector tailwind from
+                      Banking outperformance"
+
+Note: there is no vs_nifty enum field — stance + strength already covers
+relative performance, and vs_nifty_20d is given numerically in the returns
+data above.
 
 Produce the market intelligence JSON below.
 Every field is consumed by downstream stock analysis.
@@ -678,11 +741,11 @@ No text outside the JSON. No markdown fences.
   //
   // Tonight's EMA values (pre-computed):
   //   Price  : {price}
-  //   EMA20  : {ema20} (price {price_vs_ema20})
-  //   EMA50  : {ema50} (price {price_vs_ema50})
-  //   EMA180 : {ema180} (price {price_vs_ema180})
-  //   EMA20 {ema20_vs_ema50} EMA50
-  //         ({ema_arrangement} short-term arrangement)
+  //   EMA20  : {ema20} (price {rel['price_vs_ema20']})
+  //   EMA50  : {ema50} (price {rel['price_vs_ema50']})
+  //   EMA180 : {ema180} (price {rel['price_vs_ema180']})
+  //   EMA20 {rel['ema20_vs_ema50']} EMA50
+  //         ({rel['ema_arrangement']} short-term arrangement)
 
   "market_volatility": "LOW | NORMAL | HIGH",
 
@@ -705,8 +768,6 @@ No text outside the JSON. No markdown fences.
   //   EXTREME conditions                       : 0.70-0.75
   // Example output: 0.95
 
-  "min_conviction_override": null or 80 or 85,
-
   "vix_assessment": {{
     "current": float,
     "trend": "FALLING | RISING | STABLE | CHOPPY",
@@ -724,105 +785,39 @@ No text outside the JSON. No markdown fences.
   }},
 
   "sector_pictures": {{
-    "BANKING": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "IT": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "AUTO": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "PHARMA": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "FMCG": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "METAL": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "ENERGY": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "FINSERV": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "INFRA": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "CONSUMER": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }},
-    "MEDIA": {{
-      "trend": "",
-      "momentum": "",
-      "vs_nifty": "",
-      "stance": "",
-      "strength": "",
-      "character": "",
-      "trading_note": ""
-    }}
+    "BANKING": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "IT": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "AUTO": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "PHARMA": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "FMCG": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "METAL": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "ENERGY": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "FINSERV": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "INFRA": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "CONSUMER": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }},
+    "MEDIA": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
+      "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
+      "volume_note": "", "character": "", "trading_note": "" }}
   }},
 
   "directional_filters": {{
@@ -833,52 +828,96 @@ No text outside the JSON. No markdown fences.
 
   "prescan_guidance": {{
     "max_stocks_to_forward": integer,
-    // Calculate as follows:
-    //
-    // Step 1 — Base from session_risk_level:
-    //   LOW     : 15 stocks
-    //   MEDIUM  : 12 stocks
-    //   HIGH    :  8 stocks
-    //   EXTREME :  5 stocks
-    //
-    // Step 2 — Apply rollover reduction:
-    //   NORMAL or ROLLOVER_WATCH : no reduction
-    //   TRANSITION               : multiply by 0.80
-    //   EXPIRY                   : multiply by 0.70
-    //   Round down to nearest integer
-    //
-    // Step 3 — Hard minimum: never below 3
-    //
-    // Example calculations:
-    //   MEDIUM risk + NORMAL phase   : 12
-    //   MEDIUM risk + TRANSITION     : floor(12×0.80) = 9
-    //   MEDIUM risk + EXPIRY         : floor(12×0.70) = 8
-    //   HIGH risk   + EXPIRY         : floor(8×0.70)  = 5
-    //   LOW risk    + TRANSITION     : floor(15×0.80) = 12
-
+    // Base from session_risk_level: LOW=15, MEDIUM=12, HIGH=8, EXTREME=5
+    // Hard minimum: never below 3
     "prefer_directions": [...],
-
     "prioritise_sectors": [...],
-
     "deprioritise_sectors": [...],
-
     "special_instructions": string or null,
-    // Use the phase-specific instruction from Section 6.
-    // Include actual dates: {current_expiry}, {next_expiry}
-    // NORMAL          : null
-    // ROLLOVER_WATCH  : prefer next expiry note
-    // TRANSITION      : mandate next-month expiry,
-    //                   cite {current_expiry} and
-    //                   {next_expiry} explicitly
-    // EXPIRY          : no near-month entries at all
-
     "expiry_note": string or null
-    // If TRANSITION or EXPIRY:
-    //   Add specific note about expiry risk
-    //   e.g. "2 days to expiry — theta decay severe
-    //         on near-month options. Flag any setup
-    //         targeting near-month strike."
-    // If NORMAL or ROLLOVER_WATCH: null
+  }},
+
+  "nifty_price_structure": {{
+    "overall_structure": "UPTREND | DOWNTREND | RECOVERY | DISTRIBUTION | RANGE | BREAKDOWN",
+    // UPTREND: consistent higher highs/lows, above key EMAs
+    // DOWNTREND: consistent lower highs/lows, below key EMAs
+    // RECOVERY: recovering from lows but not yet confirmed uptrend
+    // DISTRIBUTION: topping pattern, losing momentum at highs
+    // RANGE: defined support and resistance, no directional bias
+    // BREAKDOWN: breaking down from range or prior support
+
+    "trend_quality": "STRONG | MODERATE | WEAK | CONFLICTING",
+
+    "swing_points": {{
+      "major_high":  {{ "price": 0, "date": "" }},
+      "major_low":   {{ "price": 0, "date": "" }},
+      "recent_high": {{ "price": 0, "date": "" }},
+      "recent_low":  {{ "price": 0, "date": "" }}
+    }},
+
+    "key_price_zones": [
+      // 2 to 5 zones. Price-derived only (not OI-derived — those live in index_key_levels).
+      {{ "type": "SUPPORT | RESISTANCE", "zone_low": 0, "zone_high": 0,
+        "significance": "MAJOR | MINOR", "note": "why this zone matters" }}
+    ],
+
+    "pattern_identified": {{
+      "classical_pattern": {{
+        "name": "pattern name or NONE",
+        "completion": "COMPLETE | FORMING | FAILED",
+        "target": 0,
+        "note": "1 sentence explanation"
+      }},
+      "candlestick_pattern": {{
+        "name": "pattern name or NONE",
+        "location": "AT_SUPPORT | AT_RESISTANCE | MID_RANGE",
+        "significance": "HIGH | MEDIUM | LOW",
+        "note": "1 sentence explanation"
+      }},
+      "volume_pattern": {{
+        "name": "CLIMAX | DRY_UP | CONFIRMATION | DIVERGENCE | ANOMALY | NONE",
+        "note": "1 sentence on what volume is telling us about the price move"
+      }}
+    }},
+
+    "ema_structure": {{
+      "short_term": "price vs EMA20 relationship",
+      "medium_term": "price vs EMA50 relationship",
+      "long_term": "price vs EMA180 relationship",
+      "arrangement": "BULLISH | BEARISH | MIXED",
+      "arrangement_note": "1 sentence on what the EMA arrangement means for trend direction"
+    }},
+
+    "breakout_conditions": {{
+      "bull_breakout_above": 0,
+      "bull_breakout_note": "what happens if price crosses this level with volume",
+      "bear_breakdown_below": 0,
+      "bear_breakdown_note": "what happens if price breaks this level"
+    }},
+
+    "volume_analysis": {{
+      "recent_trend": "INCREASING | DECREASING | STABLE",
+      "anomaly_days": ["dates with anomalous volume and a brief note on each"],
+      "confirmation": "YES | NO | MIXED",
+      "note": "1 sentence on overall volume character"
+    }},
+
+    "price_narrative": "2-3 sentences describing the complete price structure story from the data. Must cite actual prices and dates.",
+
+    "trading_implication": {{
+      "summary": "2-3 sentences: is Nifty structure helping or hurting stock long setups tonight? What condition would change this view? What does this mean for conviction scoring? Must be actionable, not generic.",
+      "index_bias": "SUPPORTIVE | NEUTRAL | RESISTANT",
+      // SUPPORTIVE: price above key EMAs, clear uptrend, at support, pattern bullish
+      // NEUTRAL: sideways, mixed signals, mid-range
+      // RESISTANT: at resistance, below EMA180, weak pattern, distribution signals
+      "conviction_adjustment": "ADD_2 | NEUTRAL | SUBTRACT_2 | SUBTRACT_5",
+      // Applied to Layer 3 (Index F&O Context) score in deep analysis turns
+      // ADD_2: SUPPORTIVE + at support + volume confirmation
+      // NEUTRAL: NEUTRAL or mixed signals
+      // SUBTRACT_2: RESISTANT + at resistance + weak volume
+      // SUBTRACT_5: RESISTANT + confirmed downtrend + breakdown pattern forming
+      "key_condition_to_watch": "Single most important price level or event that would change the view tonight, e.g. 'Break above 24261 with volume > 500M would upgrade index_bias to SUPPORTIVE and remove the SUBTRACT_2 adjustment'"
+    }}
   }},
 
   "index_key_levels": {{
@@ -891,17 +930,18 @@ No text outside the JSON. No markdown fences.
     "pcr_signal": "BULLISH | BEARISH | NEUTRAL",
     "levels_note": "1 sentence on key level implication tonight"
   }},
+  // These are OI-derived levels (from Section 5). nifty_price_structure
+  // above holds the price-derived levels. Note in levels_note when the
+  // two confluence or diverge.
 
   "risk_flags": [],
   // Required: 2 to 4 items.
-  // Rule 1: If rollover_phase is TRANSITION or EXPIRY,
-  //         first item MUST be the expiry warning:
-  //         "{days_left} trading days to {current_expiry}
-  //          expiry — near-month theta risk severe.
-  //          All new setups must target {next_expiry}."
+  // Rule 1: If Nifty weekly options reliability is UNRELIABLE or DISTORTED,
+  //         first item MUST be the expiry warning, e.g.:
+  //         "Nifty weekly expiry today/tomorrow ({opt['days_to_nifty_expiry']}d) —
+  //          OI positioning unreliable for forward sentiment."
   // Rule 2: All other flags must cite actual numbers.
-  //         GOOD: "VIX at 13.05 near 30-day low of 12.67
-  //                — complacency risk if event triggers"
+  //         GOOD: "VIX at 13.05 near 30-day low of 12.67 — complacency risk if event triggers"
   //         BAD:  "Market is volatile"
   // Rule 3: Minimum 2 flags always required.
 
@@ -945,11 +985,10 @@ def _run_turn1(
     prompt = _build_turn1_prompt(data)
     messages = [{"role": "user", "content": prompt}]
 
-    logger.info("Turn 1: calling Claude (max_tokens=6000)...")
-    # logger.info ("USER PROMPT: %s" , prompt)
+    logger.info("Turn 1: calling Claude (max_tokens=15000)...")
 
     try:
-        response = _call_claude(client, _TURN1_SYSTEM, messages, max_tokens=6000)
+        response = _call_claude(client, _TURN1_SYSTEM, messages, max_tokens=15000)
     except Exception as exc:
         logger.critical("Turn 1 Claude API failed: %s", exc)
         try:
@@ -959,7 +998,7 @@ def _run_turn1(
         raise
 
     out_text = response.content[0].text
-    print("CALUDE OUTPUT TEST: ", out_text)
+    print("CLAUDE OUTPUT: ", out_text)
     u1 = response.usage
     logger.info(
         "Turn 1 done: in=%d out=%d cache_create=%s cache_read=%s",
@@ -977,7 +1016,7 @@ def _run_turn1(
         logger.error("Turn 1 JSON parse failed: %s | raw=%s", exc, out_text[:400])
         result = dict(_TURN1_DEFAULTS)
 
-    # Validate required keys — fill defaults for any missing
+    # Validate required top-level keys — fill defaults for any missing
     missing = [k for k in _TURN1_REQUIRED_KEYS if k not in result]
     if missing:
         logger.error("Turn 1 response missing keys: %s — applying defaults", missing)
@@ -996,6 +1035,34 @@ def _run_turn1(
         cm = clamped
     result["conviction_multiplier"] = cm
 
+    # Validate sector_pictures has all 11 sectors
+    sector_pics = result.get("sector_pictures") or {}
+    missing_sectors = [s for s in _TURN1_REQUIRED_SECTORS if s not in sector_pics]
+    if missing_sectors:
+        logger.warning("Turn 1 sector_pictures missing sectors: %s — applying defaults", missing_sectors)
+        for s in missing_sectors:
+            sector_pics[s] = dict(_TURN1_DEFAULT_SECTOR_PICTURE)
+        result["sector_pictures"] = sector_pics
+
+    # Validate nifty_price_structure
+    nps = result.get("nifty_price_structure") or {}
+    missing_nps = [k for k in _TURN1_REQUIRED_PRICE_STRUCTURE_KEYS if k not in nps]
+    if missing_nps:
+        logger.warning("Turn 1 nifty_price_structure missing keys: %s — applying defaults", missing_nps)
+        defaults_nps = _TURN1_DEFAULTS["nifty_price_structure"]
+        for k in missing_nps:
+            nps[k] = defaults_nps.get(k)
+
+    trading_impl = nps.get("trading_implication") or {}
+    missing_ti = [k for k in _TURN1_REQUIRED_TRADING_IMPLICATION_KEYS if k not in trading_impl]
+    if missing_ti:
+        logger.warning("Turn 1 trading_implication missing keys: %s — applying defaults", missing_ti)
+        defaults_ti = _TURN1_DEFAULTS["nifty_price_structure"]["trading_implication"]
+        for k in missing_ti:
+            trading_impl[k] = defaults_ti.get(k)
+        nps["trading_implication"] = trading_impl
+    result["nifty_price_structure"] = nps
+
     # Save to session_claude_turns
     save_claude_turn(
         session_id=session_id,
@@ -1009,14 +1076,8 @@ def _run_turn1(
     )
 
     # Update analysis_sessions
-    market_regime = (
-        f"{result.get('market_trend', 'SIDEWAYS')}_"
-        f"{result.get('market_volatility', 'NORMAL')}_"
-        f"{result.get('market_structure', 'WIDE')}"
-    )
     vix_current = (result.get("vix_assessment") or {}).get("current")
     update_analysis_session(session_id, {
-        "market_regime":         market_regime,
         "market_trend":          result.get("market_trend"),
         "market_volatility":     result.get("market_volatility"),
         "market_structure":      result.get("market_structure"),
@@ -1024,7 +1085,7 @@ def _run_turn1(
         "fii_dii_stance":        result.get("fii_dii_stance"),
         "session_risk_level":    result.get("session_risk_level"),
         "conviction_multiplier": result.get("conviction_multiplier"),
-        "nifty_close":           data["nifty"]["indicators"]["current"],
+        "nifty_close":           data["nifty"]["indicators"]["current_price"],
         "vix_close":             vix_current,
         "stage_statuses":        {"turn1": "COMPLETE"},
     })
@@ -1035,11 +1096,15 @@ def _run_turn1(
         first_sentence = narrative.split(".")[0] + "." if narrative else ""
         vix_trend = (result.get("vix_assessment") or {}).get("trend", "")
         vix_str   = f"{vix_current} ({vix_trend})" if vix_current else "n/a"
+        overall_structure = nps.get("overall_structure", "")
+        index_bias = trading_impl.get("index_bias", "")
         msg = (
             f"📊 Market Context — {session_date}\n"
             f"Trend: {result.get('market_trend')} | Vol: {result.get('market_volatility')}\n"
+            f"Structure: {overall_structure}\n"
             f"VIX: {vix_str}\n"
-            f"Risk: {result.get('session_risk_level')}\n"
+            f"Index Bias: {index_bias}\n"
+            f"Risk Level: {result.get('session_risk_level')}\n"
             f"{first_sentence}"
         )
         send_silent(msg)
