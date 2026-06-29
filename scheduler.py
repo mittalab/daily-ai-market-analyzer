@@ -172,7 +172,7 @@ def job_kite_check() -> None:
 
 def job_analysis_pipeline() -> None:
     """
-    16:00 Mon-Fri (trading day) — run full validation + Claude analysis.
+    20:00 Mon-Fri (trading day) — run full validation + Claude analysis.
 
     Telegram notifications (in order):
       1. Validation started          (send_validation_start — in orchestrator)
@@ -267,20 +267,20 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         misfire_grace_time=600,
     )
 
-    # 16:00 Mon-Fri — full validation + Claude analysis
+    # 30:00 Mon-Fri — full validation + Claude analysis
     scheduler.add_job(
         job_analysis_pipeline,
-        CronTrigger(day_of_week="mon-fri", hour=16, minute=0, **ist),
+        CronTrigger(day_of_week="mon-fri", hour=20, minute=0, **ist),
         id="analysis_pipeline",
         name="Claude analysis",
         replace_existing=True,
         misfire_grace_time=1800,
     )
 
-    # 20:00 FO bhavcopy (no overwrite)
+    # 23:00 FO bhavcopy (no overwrite)
     scheduler.add_job(
         job_evening_bhavcopy,
-        CronTrigger(hour=20, minute=0, **ist),
+        CronTrigger(hour=23, minute=0, **ist),
         id="evening_bhavcopy",
         name="Evening FO bhavcopy",
         replace_existing=True,

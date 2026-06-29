@@ -304,6 +304,7 @@ def heal_and_recheck(
             if needs_ohlcv or needs_futures:
                 _safe(lambda: ingest_today_kite_data(check_date, [symbol]), "Kite live OHLCV+futures")
             if needs_options:
+                _safe(lambda: backfill_indices_for_dates([{"date": check_date}]), "nifty values")
                 _safe(lambda: ingest_today_options(check_date, [symbol]), "live options")
     else:
         # Historical — use bhavcopy only if it hasn't already been run for this date
@@ -820,17 +821,9 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
+    run_validation_now()
     result = backfill_indices_for_dates([
-        {"date": "2025-10-02"},
-        {"date": "2025-10-21"},
-        {"date": "2025-10-22"},
-        {"date": "2025-11-05"},
-        {"date": "2025-12-25"},
-        {"date": "2026-01-15"},
-        {"date": "2026-03-03"},
-        {"date": "2026-03-26"},
-        {"date": "2026-03-31"},
-        {"date": "2026-04-03"},
-        {"date": "2026-05-28"},
+        {"date": "2026-06-29"},
+        {"date": "2026-06-25"},
     ])
     print(result)
