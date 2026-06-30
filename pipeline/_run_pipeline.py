@@ -14,15 +14,31 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s - %(messa
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+import argparse
+
+parser = argparse.ArgumentParser(description="Run the Swing Trading Analysis Pipeline")
+parser.add_argument(
+    "--mandatory",
+    type=str,
+    help="Comma-separated list of mandatory stock symbols to include, e.g. INFY,TCS",
+)
+args = parser.parse_args()
+
+mandatory_stocks = []
+if args.mandatory:
+    mandatory_stocks = [s.strip().upper() for s in args.mandatory.split(",") if s.strip()]
+
 from integrations.nse_bhavcopy import last_trading_day
 from pipeline.orchestrator import run_pipeline
 
 analysis_date = last_trading_day()
 
 print(f"Starting pipeline for {analysis_date}...")
+if mandatory_stocks:
+    print(f"Mandatory stocks specified: {mandatory_stocks}")
 print("=" * 60)
 
-result = run_pipeline(analysis_date)
+result = run_pipeline(analysis_date, mandatory_stocks=mandatory_stocks)
 
 if "error" in result:
     print(f"\nPipeline aborted: {result['error']}")

@@ -34,6 +34,8 @@ from database.queries import (
     save_claude_turn,
     update_analysis_session,
     get_options_by_date,
+    get_options_snapshot,
+    get_analysis_session,
 )
 from indicators.technical import (
     atr_pct,
@@ -1261,7 +1263,707 @@ def _build_turn2_message(level1_passed: list[str], session_date: date) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n\n" + instructions
 
 
+_SECTOR_MAP_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "config", "sector_map.json"
+)
+
+def _load_sector_map() -> dict:
+    try:
+        with open(_SECTOR_MAP_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        logger.warning("Could not load sector map from %s: %s", _SECTOR_MAP_PATH, exc)
+        return {"stocks": {}}
+
+def _get_sector(symbol: str, sector_map: dict) -> str:
+    entry = sector_map.get("stocks", {}).get(symbol, {})
+    raw_sector = entry.get("sector", "OTHER")
+    SECTOR_MAPPING = {
+        "BANKING": "BANKING",
+        "IT": "IT",
+        "AUTO": "AUTO",
+        "PHARMA": "PHARMA",
+        "FMCG": "FMCG",
+        "METALS": "METAL",
+        "METAL": "METAL",
+        "ENERGY": "ENERGY",
+        "FINSERV": "FINSERV",
+        "INFRA": "INFRA",
+        "CONSUMER": "CONSUMER",
+        "MEDIA": "MEDIA"
+    }
+    return SECTOR_MAPPING.get(raw_sector, "OTHER")
+
+def _build_turn2_data(
+    session_date: date,
+    turn1_result: dict,
+    mandatory_stocks: list[str],
+) -> dict:
+    """
+    Step 1: Build base universe, unioning with caller-supplied mandatory stocks.
+    Step 2: Programmatically pre-filter non-mandatory stocks based on stale data & volume.
+    Step 3: Build per-stock lightweight data fields.
+    Step 4: Return dictionary structure for prompt builder.
+    """
+    from new_utils.stock_list import get_stock_list_for_analysis
+
+    # Step 1: Base Universe
+    base_stocks = get_stock_list_for_analysis() # dict keyed by symbol
+    base_symbols = set(base_stocks.keys())
+    
+    derived_mandatory = [sym for sym, info in base_stocks.items() if info.get("mandate") is True]
+    mandatory_set = set(derived_mandatory) | set(mandatory_stocks or [])
+    full_universe = base_symbols | mandatory_set
+
+    extra_mandatory = mandatory_set - base_symbols
+    logger.info(
+        "Turn 2 Universe: base count = %d, mandatory count = %d, union count = %d",
+        len(base_symbols), len(mandatory_set), len(full_universe)
+    )
+    if extra_mandatory:
+        logger.info("Extra mandatory stocks being tracked: %s", sorted(extra_mandatory))
+
+    # Step 2: Programmatic Pre-Filter
+    filtered_universe = []
+    excluded_stocks = [] # list of {"symbol": str, "reason": str}
+    sess_date_str = session_date.strftime("%Y-%m-%d") if hasattr(session_date, "strftime") else str(session_date)
+    sector_map = _load_sector_map()
+
+    # Pre-fetch and filter symbols
+    for symbol in sorted(full_universe):
+        is_mandatory = symbol in mandatory_set
+        rows = get_price_history(symbol, days=80)
+
+        if not rows:
+            reason = "No price history available"
+            if is_mandatory:
+                logger.warning("Mandatory stock %s has no price history, keeping with partial data", symbol)
+                filtered_universe.append(symbol)
+            else:
+                logger.info("Excluding %s: %s", symbol, reason)
+                excluded_stocks.append({"symbol": symbol, "reason": reason})
+            continue
+
+        # Find row for session_date
+        today_row_idx = None
+        for idx, r in enumerate(rows):
+            if str(r.get("date")) == sess_date_str:
+                today_row_idx = idx
+                break
+
+        if today_row_idx is None:
+            reason = f"No price_history row for session_date ({sess_date_str})"
+            if is_mandatory:
+                logger.warning("Mandatory stock %s: %s, keeping with partial data", symbol, reason)
+                filtered_universe.append(symbol)
+            else:
+                logger.info("Excluding %s: %s", symbol, reason)
+                excluded_stocks.append({"symbol": symbol, "reason": reason})
+            continue
+
+        today_row = rows[today_row_idx]
+        today_vol = today_row.get("volume")
+
+        # Check volume ratio and 20-day average volume
+        prev_rows = rows[:today_row_idx]
+        prev_vols = [float(r["volume"]) for r in prev_rows[-20:] if r.get("volume") is not None]
+
+        if len(prev_vols) < 20:
+            reason = f"Insufficient price history before session_date (only {len(prev_vols)} days of volume data)"
+            if is_mandatory:
+                logger.warning("Mandatory stock %s: %s, keeping with partial data", symbol, reason)
+                filtered_universe.append(symbol)
+            else:
+                logger.info("Excluding %s: %s", symbol, reason)
+                excluded_stocks.append({"symbol": symbol, "reason": reason})
+            continue
+
+        avg_vol_20d = sum(prev_vols) / len(prev_vols)
+
+        if today_vol is None:
+            reason = "Today's volume is missing/null"
+            if is_mandatory:
+                logger.warning("Mandatory stock %s: %s, keeping with partial data", symbol, reason)
+                filtered_universe.append(symbol)
+            else:
+                logger.info("Excluding %s: %s", symbol, reason)
+                excluded_stocks.append({"symbol": symbol, "reason": reason})
+            continue
+
+        today_vol_val = float(today_vol)
+        vol_ratio_val = today_vol_val / avg_vol_20d if avg_vol_20d > 0 else 0.0
+
+        if vol_ratio_val < 0.5:
+            reason = f"Abnormally low volume check failed (today's volume {today_vol_val} < 50% of 20-day average volume {avg_vol_20d:.1f}, ratio = {vol_ratio_val:.2f})"
+            if is_mandatory:
+                logger.warning("Mandatory stock %s would be filtered because: %s, but keeping it", symbol, reason)
+                filtered_universe.append(symbol)
+            else:
+                logger.info("Excluding %s: %s", symbol, reason)
+                excluded_stocks.append({"symbol": symbol, "reason": reason})
+            continue
+
+        # Passes all filters
+        filtered_universe.append(symbol)
+
+    # Step 3 & 4: Build per-stock lightweight data
+    stocks_data = []
+    for symbol in filtered_universe:
+        is_mandatory = symbol in mandatory_set
+        
+        # Initialize fields
+        sector = _get_sector(symbol, sector_map)
+        last_close = None
+        ret_5d = None
+        ret_20d = None
+        ema_position = None
+        volume_ratio_20d = None
+        pcr = None
+
+        try:
+            rows = get_price_history(symbol, days=80)
+            today_row_idx = None
+            for idx, r in enumerate(rows):
+                if str(r.get("date")) == sess_date_str:
+                    today_row_idx = idx
+                    break
+
+            if today_row_idx is not None:
+                today_row = rows[today_row_idx]
+                last_close = round(float(today_row["close"]), 2) if today_row.get("close") is not None else None
+
+                # Return % calculations
+                if today_row_idx >= 5:
+                    p_5d = float(rows[today_row_idx - 5]["close"])
+                    if p_5d > 0 and last_close is not None:
+                        ret_5d = round(((last_close / p_5d) - 1.0) * 100, 2)
+                
+                if today_row_idx >= 20:
+                    p_20d = float(rows[today_row_idx - 20]["close"])
+                    if p_20d > 0 and last_close is not None:
+                        ret_20d = round(((last_close / p_20d) - 1.0) * 100, 2)
+
+                # EMA calculations
+                closes_slice = pd.Series([float(r["close"]) for r in rows[:today_row_idx + 1] if r.get("close") is not None])
+                ema20_val = None
+                ema50_val = None
+                
+                if len(closes_slice) >= 20:
+                    ema20_series = calculate_ema(closes_slice, 20)
+                    if not ema20_series.empty:
+                        ema20_val = float(ema20_series.iloc[-1])
+                
+                if len(closes_slice) >= 50:
+                    ema50_series = calculate_ema(closes_slice, 50)
+                    if not ema50_series.empty:
+                        ema50_val = float(ema50_series.iloc[-1])
+                elif len(closes_slice) >= 20:
+                    # Default ema50 to ema20 as fallback
+                    ema50_val = ema20_val
+
+                if last_close is not None and ema20_val is not None and ema50_val is not None:
+                    if last_close > ema20_val and last_close > ema50_val:
+                        ema_position = "ABOVE_BOTH"
+                    elif last_close < ema20_val and last_close < ema50_val:
+                        ema_position = "BELOW_BOTH"
+                    else:
+                        ema_position = "MIXED"
+                else:
+                    ema_position = "MIXED"
+
+                # Volume ratio
+                prev_rows = rows[:today_row_idx]
+                prev_vols = [float(r["volume"]) for r in prev_rows[-20:] if r.get("volume") is not None]
+                if prev_vols:
+                    avg_vol_20d = sum(prev_vols) / len(prev_vols)
+                    today_vol = today_row.get("volume")
+                    if today_vol is not None and avg_vol_20d > 0:
+                        volume_ratio_20d = round(float(today_vol) / avg_vol_20d, 2)
+
+                # PCR
+                oi_rows = get_continuous_oi(symbol, days=10)
+                oi_row_tonight = None
+                for r in oi_rows:
+                    if str(r.get("date")) == sess_date_str:
+                        oi_row_tonight = r
+                        break
+
+                pcr_fallback = None
+                near_expiry_str = None
+                if oi_row_tonight:
+                    pcr_fallback = oi_row_tonight.get("pcr_near")
+                    near_expiry_str = oi_row_tonight.get("near_expiry")
+
+                if near_expiry_str:
+                    try:
+                        near_exp_date = date.fromisoformat(near_expiry_str)
+                        opt_rows = get_options_snapshot(symbol, session_date, near_exp_date)
+                        if opt_rows:
+                            near_ce = 0
+                            near_pe = 0
+                            for r in opt_rows:
+                                oi = int(r.get("oi") or 0)
+                                if r.get("option_type") == "CE":
+                                    near_ce += oi
+                                elif r.get("option_type") == "PE":
+                                    near_pe += oi
+                            if near_ce > 0:
+                                pcr = round(near_pe / near_ce, 2)
+                    except Exception as exc:
+                        logger.warning("Error computing PCR from option snapshot for %s: %s", symbol, exc)
+
+                if pcr is None and pcr_fallback is not None:
+                    pcr = round(float(pcr_fallback), 2)
+
+        except Exception as exc:
+            msg = f"Failed calculation for {symbol}: {exc}"
+            if is_mandatory:
+                logger.warning("%s (mandatory, continuing with partial data)", msg)
+            else:
+                logger.warning("%s", msg)
+
+        stocks_data.append({
+            "symbol": symbol,
+            "sector": sector,
+            "last_close": last_close,
+            "ret_5d": ret_5d,
+            "ret_20d": ret_20d,
+            "ema_position": ema_position,
+            "volume_ratio_20d": volume_ratio_20d,
+            "pcr": pcr,
+        })
+
+    # Extracted Turn 1 context
+    t1_ctx = {}
+    for field in ("market_trend", "market_volatility", "execution_bias", "session_risk_level", "conviction_multiplier"):
+        t1_ctx[field] = turn1_result.get(field)
+
+    nps = turn1_result.get("nifty_price_structure") or {}
+    ti = nps.get("trading_implication") or {}
+    t1_ctx["nifty_trading_implication"] = {
+        "summary": ti.get("summary"),
+        "index_bias": ti.get("index_bias"),
+        "conviction_adjustment": ti.get("conviction_adjustment"),
+        "key_condition_to_watch": ti.get("key_condition_to_watch"),
+    }
+
+    sec_pics = turn1_result.get("sector_pictures") or {}
+    t1_ctx["sector_pictures"] = {}
+    for sec_name, pic in sec_pics.items():
+        t1_ctx["sector_pictures"][sec_name] = {
+            "stance": pic.get("stance"),
+            "strength": pic.get("strength"),
+            "structure": pic.get("structure"),
+            "trading_note": pic.get("trading_note")
+        }
+
+    df_filters = turn1_result.get("directional_filters") or {}
+    t1_ctx["directional_filters"] = {
+        "avoid_longs_in": df_filters.get("avoid_longs_in"),
+        "avoid_shorts_in": df_filters.get("avoid_shorts_in"),
+        "caution_sectors": df_filters.get("caution_sectors"),
+    }
+
+    pg = turn1_result.get("prescan_guidance") or {}
+    t1_ctx["prescan_guidance"] = {
+        "max_stocks_to_forward": pg.get("max_stocks_to_forward"),
+        "prefer_directions": pg.get("prefer_directions"),
+        "prioritise_sectors": pg.get("prioritise_sectors"),
+        "deprioritise_sectors": pg.get("deprioritise_sectors"),
+        "special_instructions": pg.get("special_instructions"),
+        "expiry_note": pg.get("expiry_note"),
+    }
+
+    # Logging summary and data quality warnings
+    total_sent = len(stocks_data)
+    mand_sent = sum(1 for s in stocks_data if s["symbol"] in mandatory_set)
+    excl_count = len(excluded_stocks)
+    
+    warnings_found = []
+    for s in stocks_data:
+        missing_fields = [k for k, v in s.items() if v is None and k != "pcr"]
+        if missing_fields:
+            warnings_found.append(f"{s['symbol']} missing: {missing_fields}")
+
+    logger.info("Turn 2 data build complete: total sent to Claude = %d, mandatory count within sent = %d, excluded count = %d", 
+                total_sent, mand_sent, excl_count)
+    if warnings_found:
+        logger.warning("Data quality warnings: %s", "; ".join(warnings_found))
+
+    return {
+        "session_date": sess_date_str,
+        "stocks": stocks_data,
+        "mandatory_stocks": list(mandatory_stocks or []),
+        "excluded_stocks": excluded_stocks,
+        "turn1_context": t1_ctx,
+    }
+
+def _build_turn2_prompt(turn2_data: dict) -> str:
+    ctx = turn2_data["turn1_context"]
+    
+    sections = []
+    sections.append("TONIGHT'S MARKET CONTEXT")
+    sections.append("========================")
+    sections.append(f"Market Trend: {ctx.get('market_trend')}")
+    sections.append(f"Market Volatility: {ctx.get('market_volatility')}")
+    sections.append(f"Execution Bias: {ctx.get('execution_bias')}")
+    sections.append(f"Session Risk Level: {ctx.get('session_risk_level')}")
+    sections.append(f"Conviction Multiplier: {ctx.get('conviction_multiplier')}")
+    sections.append("")
+    
+    # Nifty Trading Implication
+    ti = ctx.get("nifty_trading_implication") or {}
+    sections.append("Nifty Price Structure & Trading Implication:")
+    sections.append(f"- Summary: {ti.get('summary')}")
+    sections.append(f"- Index Bias: {ti.get('index_bias')}")
+    sections.append(f"- Conviction Adjustment: {ti.get('conviction_adjustment')}")
+    sections.append(f"- Key Condition to Watch: {ti.get('key_condition_to_watch')}")
+    sections.append("")
+    
+    # Sector Pictures
+    sections.append("Sector Outlooks:")
+    for sec_name, pic in (ctx.get("sector_pictures") or {}).items():
+        sections.append(f"- {sec_name}: Stance={pic.get('stance')}, Strength={pic.get('strength')}, Structure={pic.get('structure')}")
+        sections.append(f"  Note: {pic.get('trading_note')}")
+    sections.append("")
+    
+    # Directional Filters
+    df_filters = ctx.get("directional_filters") or {}
+    sections.append("Directional Filters:")
+    sections.append(f"- Avoid LONGs in sectors: {', '.join(df_filters.get('avoid_longs_in') or []) or 'None'}")
+    sections.append(f"- Avoid SHORTs in sectors: {', '.join(df_filters.get('avoid_shorts_in') or []) or 'None'}")
+    sections.append(f"- Caution Sectors: {', '.join(df_filters.get('caution_sectors') or []) or 'None'}")
+    sections.append("")
+    
+    # Prescan Guidance
+    pg = ctx.get("prescan_guidance") or {}
+    sections.append("Pre-Scan Guidance:")
+    sections.append(f"- Max stocks to forward: {pg.get('max_stocks_to_forward')}")
+    sections.append(f"- Preferred directions: {', '.join(pg.get('prefer_directions') or []) or 'None'}")
+    sections.append(f"- Prioritise sectors: {', '.join(pg.get('prioritise_sectors') or []) or 'None'}")
+    sections.append(f"- Deprioritise sectors: {', '.join(pg.get('deprioritise_sectors') or []) or 'None'}")
+    sections.append(f"- Special instructions: {pg.get('special_instructions')}")
+    sections.append(f"- Expiry note: {pg.get('expiry_note')}")
+    sections.append("")
+
+    sections.append("STOCK UNIVERSE TO ASSESS")
+    sections.append("========================")
+    sections.append("Below is the list of stocks in the F&O universe to assess today, formatted as a JSON array.")
+    sections.append("Field Interpretation Guide:")
+    sections.append("- ema_position: ABOVE_BOTH means close price is above both EMA20 and EMA50. BELOW_BOTH means below both. MIXED means between them or conflicting.")
+    sections.append("- volume_ratio_20d: Today's volume divided by the 20-day average volume (excluding today). Values > 1.2 suggest high volume participation; values < 0.8 suggest low participation.")
+    sections.append("- pcr: Put-Call Ratio for the near-month option expiry. Low PCR (< 0.7) indicates excessive bullishness (contrarian bearish). High PCR (> 1.3) indicates excessive bearishness (contrarian bullish). PCR 0.7-1.1 is neutral.")
+    sections.append("")
+    
+    stocks_json = json.dumps(turn2_data["stocks"], ensure_ascii=False)
+    sections.append(stocks_json)
+    sections.append("")
+
+    instructions = (
+        "TASK INSTRUCTIONS\n"
+        "=================\n"
+        "For EACH stock in the list above, assess it independently using tonight's market context.\n"
+        "Do not skip any stock. Do not group stocks — provide one assessment object per stock.\n\n"
+        "For each stock determine:\n\n"
+        "1. preliminary_direction: LONG or SHORT\n"
+        "   Base this on:\n"
+        "   - Sector stance and strength from tonight's context (TAILWIND sectors favour LONG, HEADWIND sectors favour SHORT)\n"
+        "   - EMA position (ABOVE_BOTH supports LONG, BELOW_BOTH supports SHORT, MIXED needs sector context to break the tie)\n"
+        "   - Volume ratio (>1.2 suggests conviction in the current move; <0.8 suggests weak participation)\n"
+        "   - PCR if available (low PCR = bullish positioning, high PCR = bearish positioning, per the interpretation guide used in Turn 1)\n"
+        "   Respect directional_filters — do not assign LONG to a stock in avoid_longs_in sectors, do not assign SHORT to a stock in avoid_shorts_in sectors unless the stock's own data strongly contradicts its sector.\n\n"
+        "2. reason: ONE sentence citing the SPECIFIC signal(s) that drove this direction. Must cite actual numbers from the stock's data or sector context. No generic statements.\n"
+        "   - GOOD: 'Banking TAILWIND STRONG sector, price above EMA20/50, volume 1.3x 20-day average confirming participation'\n"
+        "   - BAD: 'Stock looks bullish'\n\n"
+        "3. claude_forward_decision: FORWARD or REJECT\n"
+        "   - FORWARD if the stock represents a genuinely promising setup worth deep analysis tonight.\n"
+        "   - REJECT if the setup is weak, contradicts sector context, has poor volume confirmation, or sits in a deprioritised/caution sector without strong individual override signals.\n\n"
+        "   You may FORWARD more or fewer stocks than max_stocks_to_forward — that cap is applied separately after your response. Use your honest judgment per stock, not a target count."
+    )
+    sections.append(instructions)
+    sections.append("")
+
+    output_format = (
+        "OUTPUT FORMAT INSTRUCTIONS\n"
+        "==========================\n"
+        "Produce the JSON below. Assess EVERY stock from the input list — the output array must have exactly the same number of entries as stocks provided. No omissions. No placeholders. No text outside the JSON. No markdown fences.\n\n"
+        "Required Output Schema:\n"
+        "{\n"
+        '  "stock_assessments": [\n'
+        "    {\n"
+        '      "symbol": string,\n'
+        '      "preliminary_direction": "LONG | SHORT",\n'
+        '      "reason": string,\n'
+        '      "claude_forward_decision": "FORWARD | REJECT"\n'
+        "    }\n"
+        "  ],\n"
+        '  "scan_summary": {\n'
+        '    "total_assessed": integer,\n'
+        '    "forward_count": integer,\n'
+        '    "long_bias_count": integer,\n'
+        '    "short_bias_count": integer,\n'
+        '    "notable_observations": string\n'
+        "  }\n"
+        "}"
+    )
+    sections.append(output_format)
+    
+    return "\n".join(sections)
+
+def _run_turn2(
+    client: anthropic.Anthropic,
+    session_id: str,
+    session_date: date,
+    turn1_result: dict,
+    mandatory_stocks: list[str],
+) -> tuple[list[dict], list[dict], dict]:
+    """
+    Execute Turn 2: Pre-scan.
+    Prepares raw indicator data, queries Claude, parses/validates the output,
+    handles Python overrides and trimming, saves to DB, sends Telegram notification.
+    Returns (final_forward_list, compat_turn2_results, cost_info).
+    """
+    from new_notifications.telegram import send_loud, send_silent
+
+    # 1. Prep data
+    turn2_data = _build_turn2_data(session_date, turn1_result, mandatory_stocks)
+    
+    # 2. Build prompt
+    prompt = _build_turn2_prompt(turn2_data)
+
+    # 3. Crash recovery check
+    existing = get_claude_turn(session_id, 2)
+    if existing and existing.get("output_text"):
+        logger.info("Turn 2: found existing turn in session_claude_turns — parsing cached output")
+        raw_response = existing["output_text"]
+        in_tok = existing.get("input_tokens", 0)
+        out_tok = existing.get("output_tokens", 0)
+        cost_info = _turn_cost(2, "pre_scan", None, in_tok, out_tok)
+    else:
+        messages = [{"role": "user", "content": prompt}]
+        logger.info("Turn 2: calling Claude (max_tokens=10000)...")
+        try:
+            response = _call_claude(client, _TURN1_SYSTEM, messages, max_tokens=10000)
+            raw_response = response.content[0].text
+            u2 = response.usage
+            cost_info = _turn_cost(2, "pre_scan", None, u2.input_tokens, u2.output_tokens)
+
+            print("TURN 2 PROMPT: ", prompt)
+            print("TURN 2 Response:" , raw_response)
+            print("TURN 2 Cost", cost_info)
+            # Save to session_claude_turns
+            save_claude_turn(
+                session_id=session_id,
+                turn_number=2,
+                turn_type="pre_scan",
+                symbol=None,
+                input_tokens=u2.input_tokens,
+                output_tokens=u2.output_tokens,
+                input_text=prompt,
+                output_text=raw_response,
+            )
+        except Exception as exc:
+            logger.critical("Turn 2 Claude call failed: %s", exc)
+            try:
+                send_loud(f"🚨 Turn 2 pre-scan failed — pipeline stopped: {exc}")
+            except Exception:
+                pass
+            raise
+
+    # 4. Response parsing & validation
+    try:
+        parsed = _parse_json(raw_response)
+        if not isinstance(parsed, dict) or "stock_assessments" not in parsed:
+            raise ValueError("Turn 2 response JSON missing 'stock_assessments'")
+    except Exception as exc:
+        logger.critical("Turn 2 response parsing failed: %s | raw=%s", exc, raw_response[:300])
+        try:
+            send_loud(f"🚨 Turn 2 response parse failed: {exc}")
+        except Exception:
+            pass
+        raise
+
+    stock_assessments = parsed.get("stock_assessments") or []
+    scan_summary = parsed.get("scan_summary") or {}
+    
+    input_symbols = {s["symbol"] for s in turn2_data["stocks"]}
+    assessed_symbols = {s.get("symbol") for s in stock_assessments if s.get("symbol")}
+
+    # Validate stock_assessments array length matches input stock count EXACTLY
+    if len(stock_assessments) != len(turn2_data["stocks"]):
+        missing = input_symbols - assessed_symbols
+        extra = assessed_symbols - input_symbols
+        msg = f"Turn 2 stock count mismatch! Input: {len(turn2_data['stocks'])}, Claude: {len(stock_assessments)}. Missing: {missing}, Extra: {extra}"
+        logger.critical(msg)
+        try:
+            send_loud(f"🚨 {msg}")
+        except Exception:
+            pass
+        raise ValueError(msg)
+
+    # Validate every symbol exists in input (no hallucinated symbols)
+    valid_assessments = []
+    for s in stock_assessments:
+        sym = s.get("symbol")
+        if sym not in input_symbols:
+            logger.warning("Dropping hallucinated symbol from Claude Turn 2 response: %s", sym)
+            continue
+        valid_assessments.append(s)
+
+    # Validate preliminary_direction and claude_forward_decision
+    final_validated_assessments = []
+    
+    # We resolve the full list of mandatory stocks including derived ones
+    from new_utils.stock_list import get_stock_list_for_analysis
+    base_stocks = get_stock_list_for_analysis()
+    derived_mandatory = [sym for sym, info in base_stocks.items() if info.get("mandate") is True]
+    mandatory_set = set(derived_mandatory) | set(mandatory_stocks or [])
+
+    for s in valid_assessments:
+        sym = s["symbol"]
+        is_mandatory = sym in mandatory_set
+        
+        direction = s.get("preliminary_direction")
+        if direction not in ("LONG", "SHORT"):
+            msg = f"Invalid direction '{direction}' for {sym}"
+            if is_mandatory:
+                logger.critical("%s. Mandatory stock defaulting to LONG.", msg)
+                s["preliminary_direction"] = "LONG"
+                s["reason"] = f"WARNING: {s.get('reason') or ''} [Invalid direction '{direction}' replaced with default LONG]"
+            else:
+                logger.warning("%s. Defaulting to NEUTRAL-skip.", msg)
+                s["preliminary_direction"] = "NEUTRAL-skip"
+                s["claude_forward_decision"] = "REJECT"
+
+        fwd_dec = s.get("claude_forward_decision")
+        if fwd_dec not in ("FORWARD", "REJECT"):
+            logger.warning("Invalid forward decision '%s' for %s. Defaulting to REJECT.", fwd_dec, sym)
+            s["claude_forward_decision"] = "REJECT"
+            
+        final_validated_assessments.append(s)
+
+    # Build compat list
+    compat_turn2_results = []
+    for s in final_validated_assessments:
+        compat_s = {
+            "symbol": s["symbol"],
+            "preliminary_direction": s["preliminary_direction"],
+            "direction": s["preliminary_direction"], # compatibility
+            "reason": s["reason"],
+            "pre_scan_reasoning": s["reason"], # compatibility
+            "claude_forward_decision": s["claude_forward_decision"],
+            "forward_to_deep": s["claude_forward_decision"] == "FORWARD", # compatibility
+            "priority": "HIGH" if s["claude_forward_decision"] == "FORWARD" else "LOW", # compatibility
+        }
+        compat_turn2_results.append(compat_s)
+
+    # 5. Python Post-Processing (Mandatory Override and Trimming)
+    claude_forwarded = [s for s in compat_turn2_results if s["claude_forward_decision"] == "FORWARD"]
+    
+    # Deduplicate and tag mandatory
+    seen_symbols = set()
+    final_forward_list = []
+    
+    # Process forwarded and mandatory
+    for s in compat_turn2_results:
+        sym = s["symbol"]
+        is_fwd = s["claude_forward_decision"] == "FORWARD"
+        is_mand = sym in mandatory_set
+        
+        if is_fwd or is_mand:
+            if sym not in seen_symbols:
+                seen_symbols.add(sym)
+                fwd_item = {
+                    "symbol": sym,
+                    "preliminary_direction": s["preliminary_direction"],
+                    "direction": s["preliminary_direction"],  # For Turn 3+ compatibility
+                    "reason": s["reason"],
+                    "pre_scan_reasoning": s["reason"], # For compat
+                    "is_mandatory": is_mand,
+                }
+                final_forward_list.append(fwd_item)
+
+    # Separate mandatory and non-mandatory forwarded
+    non_mandatory_fwd = []
+    mandatory_fwd = []
+    for item in final_forward_list:
+        if item["is_mandatory"]:
+            mandatory_fwd.append(item)
+        else:
+            non_mandatory_fwd.append(item)
+
+    pg = turn1_result.get("prescan_guidance") or {}
+    max_stocks_to_forward = pg.get("max_stocks_to_forward")
+    try:
+        max_stocks_to_forward = int(max_stocks_to_forward)
+    except (TypeError, ValueError):
+        max_stocks_to_forward = 10
+
+    prioritise_sectors = [s.upper() for s in (pg.get("prioritise_sectors") or [])]
+    sector_map = _load_sector_map()
+
+    trimmed_count = 0
+    if len(non_mandatory_fwd) > max_stocks_to_forward:
+        # Sort non-mandatory by sector priority (prioritized sectors first)
+        def sort_key(item):
+            sec = _get_sector(item["symbol"], sector_map).upper()
+            return 0 if sec in prioritise_sectors else 1
+            
+        non_mandatory_fwd.sort(key=sort_key)
+        kept_non_mandatory = non_mandatory_fwd[:max_stocks_to_forward]
+        trimmed_non_mandatory = non_mandatory_fwd[max_stocks_to_forward:]
+        trimmed_count = len(trimmed_non_mandatory)
+
+        for t in trimmed_non_mandatory:
+            logger.info("Trimming non-mandatory stock %s (sector: %s) because max_stocks_to_forward cap (%d) exceeded",
+                        t["symbol"], _get_sector(t["symbol"], sector_map), max_stocks_to_forward)
+
+        final_forward_list = mandatory_fwd + kept_non_mandatory
+    else:
+        final_forward_list = mandatory_fwd + non_mandatory_fwd
+
+    # Log final counts
+    final_total = len(final_forward_list)
+    final_mandatory = sum(1 for s in final_forward_list if s["is_mandatory"])
+    logger.info("Turn 2 post-processing: final forwarded = %d (incl. %d mandatory), trimmed = %d",
+                final_total, final_mandatory, trimmed_count)
+
+    # 6. Save to DB
+    session = get_analysis_session(session_id) or {}
+    stage_statuses = session.get("stage_statuses") or {}
+    if not isinstance(stage_statuses, dict):
+        stage_statuses = {}
+    stage_statuses["turn2"] = "COMPLETE"
+
+    update_analysis_session(session_id, {
+        "turn2_output": parsed,
+        "forward_list": final_forward_list,
+        "stage_statuses": stage_statuses
+    })
+
+    # 7. Telegram Notification
+    long_count = sum(1 for s in final_validated_assessments if s.get("preliminary_direction") == "LONG")
+    short_count = sum(1 for s in final_validated_assessments if s.get("preliminary_direction") == "SHORT")
+    notable_observations = scan_summary.get("notable_observations", "")
+    sess_date_str = session_date.strftime("%Y-%m-%d") if hasattr(session_date, "strftime") else str(session_date)
+
+    msg = (
+        f"🔍 Pre-Scan Complete — {sess_date_str}\n"
+        f"Scanned: {len(final_validated_assessments)} stocks\n"
+        f"Forwarded: {final_total}\n"
+        f"  ({final_mandatory} mandatory)\n"
+        f"LONG bias: {long_count} | SHORT bias: {short_count}\n"
+        f"{notable_observations}"
+    )
+    try:
+        send_silent(msg)
+    except Exception as exc:
+        logger.warning("Telegram notification after Turn 2 failed: %s", exc)
+
+    return final_forward_list, compat_turn2_results, cost_info
+
 def run_turn2_prescan(
+
     client: anthropic.Anthropic,
     session_id: str,
     session_date: date,
@@ -1431,37 +2133,37 @@ def run_turn_deep_analysis(
             })
 
     # Watchlist Lifecycle Management
-    if is_re:
-        if stage == "TRADE_READY" or (conviction >= 75 and stage != "SKIP"):
-            update_watchlist_staging(symbol, {"current_stage": "TRADE_READY", "updated_at": datetime.now(IST).isoformat()})
-            send_loud(f"🚀 <b>{symbol} graduated</b>\nWatch → <b>Trade Ready</b> (Conviction: {conviction})")
-            logger.info("Watchlist graduation: %s", symbol)
-        elif conviction >= 55:
-            # Maintain in watch, increment days
-            new_days = days_in + 1
-            if new_days > 10:
-                update_watchlist_staging(symbol, {"current_stage": "EXPIRED", "updated_at": datetime.now(IST).isoformat()})
-                send_silent(f"⏰ <b>{symbol} Watch expired</b>\nNo trigger in 10 days. Moved out of Watch.")
-            else:
-                update_watchlist_staging(symbol, {"days_in_stage": new_days, "updated_at": datetime.now(IST).isoformat()})
-                logger.info("Watchlist maintenance: %s (Day %d)", symbol, new_days)
-        else:
-            # Conviction dropped
-            update_watchlist_staging(symbol, {"current_stage": "DEGRADED", "updated_at": datetime.now(IST).isoformat()})
-            send_silent(f"📉 <b>{symbol} removed from Watch</b>\nSetup broke (Conviction dropped to {conviction}).")
-            logger.info("Watchlist degradation: %s", symbol)
-    else:
-        # New discovery — if it's WATCH or TRADE_READY, add to staging
-        if stage in ("WATCH", "TRADE_READY", "ON_RADAR"):
-            upsert_watchlist_staging({
-                "symbol":            symbol,
-                "current_stage":     stage,
-                "direction_bias":    analysis.get("direction"),
-                "days_in_stage":     0,
-                "first_flagged_date": str(session_date),
-                "updated_at":        datetime.now(IST).isoformat(),
-            })
-            logger.info("New watchlist discovery synced: %s stage=%s", symbol, stage)
+    # if is_re:
+    #     if stage == "TRADE_READY" or (conviction >= 75 and stage != "SKIP"):
+    #         update_watchlist_staging(symbol, {"current_stage": "TRADE_READY", "updated_at": datetime.now(IST).isoformat()})
+    #         send_loud(f"🚀 <b>{symbol} graduated</b>\nWatch → <b>Trade Ready</b> (Conviction: {conviction})")
+    #         logger.info("Watchlist graduation: %s", symbol)
+    #     elif conviction >= 55:
+    #         # Maintain in watch, increment days
+    #         new_days = days_in + 1
+    #         if new_days > 10:
+    #             update_watchlist_staging(symbol, {"current_stage": "EXPIRED", "updated_at": datetime.now(IST).isoformat()})
+    #             send_silent(f"⏰ <b>{symbol} Watch expired</b>\nNo trigger in 10 days. Moved out of Watch.")
+    #         else:
+    #             update_watchlist_staging(symbol, {"days_in_stage": new_days, "updated_at": datetime.now(IST).isoformat()})
+    #             logger.info("Watchlist maintenance: %s (Day %d)", symbol, new_days)
+    #     else:
+    #         # Conviction dropped
+    #         update_watchlist_staging(symbol, {"current_stage": "DEGRADED", "updated_at": datetime.now(IST).isoformat()})
+    #         send_silent(f"📉 <b>{symbol} removed from Watch</b>\nSetup broke (Conviction dropped to {conviction}).")
+    #         logger.info("Watchlist degradation: %s", symbol)
+    # else:
+    #     # New discovery — if it's WATCH or TRADE_READY, add to staging
+    #     if stage in ("WATCH", "TRADE_READY", "ON_RADAR"):
+    #         upsert_watchlist_staging({
+    #             "symbol":            symbol,
+    #             "current_stage":     stage,
+    #             "direction_bias":    analysis.get("direction"),
+    #             "days_in_stage":     0,
+    #             "first_flagged_date": str(session_date),
+    #             "updated_at":        datetime.now(IST).isoformat(),
+    #         })
+    #         logger.info("New watchlist discovery synced: %s stage=%s", symbol, stage)
 
     # Save to trade_setups if actionable
     if stage not in ("SKIP", None):
@@ -1634,7 +2336,6 @@ def run_claude_session(
     context_bundle: dict,
     level1_passed:  list[str],
     session_id:     str,
-    watchlist_priority: list[dict] | None = None,
 ) -> dict:
     """
     Execute the full multi-turn Claude session using modular turn-based functions.
@@ -1717,59 +2418,21 @@ def run_claude_session(
             f"({total_input + total_output} tokens used so far)."
         )
 
-    # # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────
-    # turn2_results, forwarded_stocks, messages, t2_cost = run_turn2_prescan(
-    #     client=client,
-    #     session_id=session_id,
-    #     session_date=session_date,
-    #     level1_passed=level1_passed,
-    #     messages=messages,
-    #     system_text=system_text,
-    # )
-    # turn_costs.append(t2_cost)
-    # total_input += t2_cost["input_tokens"]
-    # total_output += t2_cost["output_tokens"]
-    #
-    # try:
-    #     from new_notifications.telegram import send_prescan_complete
-    #     send_prescan_complete(str(session_date), len(forwarded_stocks), len(turn2_results))
-    # except Exception as _exc:
-    #     logger.warning("Prescan notification failed: %s", _exc)
-    #
-    # # Truncation / empty safety check
-    # n = len(turn2_results)
-    # if n == 0:
-    #     reason = "Pre-scan returned 0 stocks — likely JSON parse failure or truncation"
-    #     logger.error(reason)
-    #     cost_usd = round(total_input / 1_000_000 * 3.00 + total_output / 1_000_000 * 15.00, 6)
-    #     update_analysis_session(session_id, {
-    #         "claude_tokens_input":  total_input,
-    #         "claude_tokens_output": total_output,
-    #         "claude_cost_usd":      cost_usd,
-    #         "status":               "FAILED",
-    #         "stage_statuses": {
-    #             "claude_turn1":     "COMPLETE",
-    #             "claude_turn2":     "FAILED",
-    #             "failure_reason":   reason,
-    #             "turn2_out_tokens": t2_cost["output_tokens"],
-    #         },
-    #     })
-    #     _save_session_cost_json(session_id, session_date, turn_costs)
-    #     raise RuntimeError(reason)
-    # elif n < 5:
-    #     logger.warning("Pre-scan returned only %d stocks — possible truncation.", n)
-    #
-    # # Combine pre-scan forwarded stocks with priority watchlist stocks
-    # final_queue = forwarded_stocks[:]
-    # for wl_stock in (watchlist_priority or []):
-    #     if not any(fs["symbol"] == wl_stock["symbol"] for fs in forwarded_stocks):
-    #         final_queue.insert(0, wl_stock)
-    #     else:
-    #         for fs in final_queue:
-    #             if fs["symbol"] == wl_stock["symbol"]:
-    #                 fs["is_watchlist_reanalysis"] = True
-    #                 fs["days_in_stage"] = wl_stock.get("days_in_stage", 0)
-    #
+    # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────
+    final_forward_list, turn2_results, t2_cost = _run_turn2(
+        client=client,
+        session_id=session_id,
+        session_date=session_date,
+        turn1_result=turn1_result,
+        mandatory_stocks=[],
+    )
+    turn_costs.append(t2_cost)
+    total_input += t2_cost["input_tokens"]
+    total_output += t2_cost["output_tokens"]
+
+    # Combine pre-scan forwarded stocks with priority watchlist stocks
+    final_queue = final_forward_list[:]
+
     # # ── Turns 3+: Deep Analysis ───────────────────────────────────────────────
     # deep_results: list[dict] = []
     # trade_ready_list: list[dict] = []

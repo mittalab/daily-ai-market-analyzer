@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 IST = pytz.timezone("Asia/Kolkata")
 
 
-def run_pipeline(session_date: date) -> dict:
+def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None) -> dict:
     """
     Run the full nightly analysis pipeline for session_date.
 
@@ -48,7 +48,7 @@ def run_pipeline(session_date: date) -> dict:
     Non-critical stage errors (OI builder, single-stock data) are logged and
     the pipeline continues.
     """
-    session_id = f"SESSION_{session_date.strftime('%Y%m%d')}"
+    session_id = f"TEST_{session_date.strftime('%Y%m%d')}"
     started_at = datetime.now(IST).isoformat()
     # Resolve target symbols (Nifty 50 + active watchlist)
     symbols = get_stock_list_for_analysis()
@@ -186,7 +186,11 @@ def run_pipeline(session_date: date) -> dict:
 
     # ── Stage 5: Claude Session ───────────────────────────────────────────────
     logger.info("Stage 5: Claude multi-turn session (%d stocks)...", len(level1_passed))
-    claude_result = run_claude_session(context_bundle, level1_passed, session_id, watchlist_priority=watchlist_stocks)
+    claude_result = run_claude_session(
+        context_bundle,
+        level1_passed,
+        session_id,
+    )
     regime_result = claude_result["regime_result"]
     print(regime_result)
 
@@ -197,7 +201,7 @@ def run_pipeline(session_date: date) -> dict:
     # started_dt = datetime.fromisoformat(started_at)
     # actual_setups = get_row_count(
     #     "trade_setups",
-    #     {"setup_date": session_date},
+    #     {"setup_date": str(session_date)},
     #     created_after=started_dt
     # )
     # trade_ready   = claude_result.get("trade_ready", 0)
