@@ -23,8 +23,10 @@ function toYMD(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function getLastTradingDay(year: number, month: number, day: number, dow: number): string {
-  const back = dow === 0 ? 2 : dow === 1 ? 3 : 1;  // Sun→Fri, Mon→Fri, else −1
+// Returns the previous trading day (always goes back, never returns today)
+function prevTradingDay(year: number, month: number, day: number, dow: number): string {
+  // Mon(1)→Fri, Sun(0)→Fri, Sat(6)→Fri, Tue–Fri → day−1
+  const back = dow === 0 ? 2 : dow === 1 ? 3 : dow === 6 ? 1 : 1;
   const d = new Date(Date.UTC(year, month - 1, day - back));
   return toYMD(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 }
@@ -32,12 +34,22 @@ function getLastTradingDay(year: number, month: number, day: number, dow: number
 function computeStale(sessionDate: string | undefined): boolean {
   if (!sessionDate) return true;
   const { year, month, day, hour, dow } = getISTNow();
-  const isWeekend  = dow === 0 || dow === 6;
-  const isAfter11  = hour >= 23;
-  const expected   = !isWeekend && isAfter11
-    ? toYMD(year, month, day)
-    : getLastTradingDay(year, month, day, dow);
-  return sessionDate !== expected;
+  const isWeekend = dow === 0 || dow === 6;
+  const isAfter11 = hour >= 23;
+  const todayStr  = toYMD(year, month, day);
+  const prevStr   = prevTradingDay(year, month, day, dow);
+
+  if (!isWeekend && isAfter11) {
+    // After 11 PM on a trading day: pipeline must have run tonight
+    return sessionDate !== todayStr;
+  }
+  if (isWeekend) {
+    // Weekend: last trading session was Friday
+    return sessionDate !== prevStr;
+  }
+  // Weekday before 11 PM: pipeline may have run today OR only last night's
+  // data is available — accept either today or the previous trading day
+  return sessionDate !== todayStr && sessionDate !== prevStr;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -432,10 +444,11 @@ export default function TodayScreen() {
         <div className="mx-4 mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2">
           <span className="text-amber-500">⚠️</span>
           <p className="text-xs text-amber-700">
-            Data may be stale — last pipeline ran{' '}
             {todayData?.session_info?.hours_since_run != null
-              ? `${todayData.session_info.hours_since_run}h ago`
-              : 'over 24h ago'}
+              ? `Data may be stale — last pipeline ran ${todayData.session_info.hours_since_run}h ago`
+              : todayData?.market_context?.session_date
+                ? `Showing data from ${todayData.market_context.session_date} — pipeline has not run tonight`
+                : 'No analysis found — pipeline has not run yet'}
           </p>
         </div>
       )}
