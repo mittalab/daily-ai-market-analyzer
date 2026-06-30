@@ -162,6 +162,7 @@ _TURN1_REQUIRED_KEYS = [
     "execution_bias", "fii_dii_stance", "session_risk_level", "conviction_multiplier",
     "vix_assessment", "fii_dii_assessment", "sector_pictures", "directional_filters",
     "prescan_guidance", "nifty_price_structure", "index_key_levels", "risk_flags", "guidance",
+    "mentor_notes",
 ]
 
 _TURN1_REQUIRED_SECTORS = [
@@ -183,7 +184,7 @@ _TURN1_DEFAULT_SECTOR_PICTURE = {
     "trend": "SIDEWAYS", "momentum": "STABLE", "stance": "NEUTRAL", "strength": "WEAK",
     "structure": "RANGE",
     "key_levels": {"support": None, "resistance": None, "breakout_above": None, "breakdown_below": None},
-    "volume_note": "", "character": "", "trading_note": "",
+    "momentum_note": "", "character": "", "trading_note": "",
 }
 
 _TURN1_DEFAULTS = {
@@ -229,6 +230,13 @@ _TURN1_DEFAULTS = {
                                 "max_pain": None, "pcr_signal": "NEUTRAL", "levels_note": ""},
     "risk_flags":              [],
     "guidance":                {"favour": "No specific guidance.", "caution": "Exercise standard caution."},
+    "mentor_notes":            {
+        "todays_key_lesson": "",
+        "what_i_looked_at_first": "",
+        "pattern_to_watch": "",
+        "sector_rotation_insight": "",
+        "fii_dii_reading": "",
+    },
 }
 
 
@@ -706,7 +714,18 @@ Field value options (9 fields per sector):
   structure   : BREAKOUT | BREAKDOWN | RANGE | UPTREND_PULLBACK | DOWNTREND_RALLY
   key_levels  : object with 4 price numbers —
                 support, resistance, breakout_above, breakdown_below
-  volume_note : 1 sentence on volume character citing actual observations
+  momentum_note: 1 sentence on price momentum
+                 character from the OHLCV data.
+                 Since sector indices have no volume,
+                 assess momentum from: pace of price
+                 moves, consistency of direction,
+                 size of pullbacks vs advances,
+                 and candle character (strong closes
+                 vs weak closes, gap behaviour).
+                 e.g. 'Steady acceleration visible —
+                 each week closing higher with
+                 controlled pullback ranges suggesting
+                 institutional accumulation pace'
   character   : 1 sentence on price action citing actual price levels seen
                 e.g. "Broke out from 54000 to 58177 with consistent higher highs"
   trading_note: 1 sentence on stock selection implication for tonight
@@ -787,37 +806,37 @@ No text outside the JSON. No markdown fences.
   "sector_pictures": {{
     "BANKING": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "IT": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "AUTO": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "PHARMA": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "FMCG": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "METAL": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "ENERGY": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "FINSERV": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "INFRA": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "CONSUMER": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }},
+      "momentum_note": "", "character": "", "trading_note": "" }},
     "MEDIA": {{ "trend": "", "momentum": "", "stance": "", "strength": "", "structure": "",
       "key_levels": {{ "support": 0, "resistance": 0, "breakout_above": 0, "breakdown_below": 0 }},
-      "volume_note": "", "character": "", "trading_note": "" }}
+      "momentum_note": "", "character": "", "trading_note": "" }}
   }},
 
   "directional_filters": {{
@@ -948,6 +967,39 @@ No text outside the JSON. No markdown fences.
   "guidance": {{
     "favour": "1-2 sentences on best setups tonight",
     "caution": "1-2 sentences on what to avoid tonight"
+  }},
+
+  "mentor_notes": {{
+    "todays_key_lesson": string,
+    // The single most important market reading
+    // lesson from tonight's data for the user
+    // to internalise. Must be specific to tonight
+    // not generic market wisdom.
+    // Cite actual numbers from tonight's session.
+
+    "what_i_looked_at_first": string,
+    // Which data source gave the clearest signal
+    // tonight and exactly what it showed you.
+    // Helps user learn analytical prioritisation.
+
+    "pattern_to_watch": string,
+    // One specific price pattern or signal to
+    // track over the next 2-5 sessions.
+    // Must include specific price levels and
+    // volume thresholds where relevant.
+    // Teaches sequential thinking not snapshots.
+
+    "sector_rotation_insight": string,
+    // What tonight's sector relative performance
+    // reveals about broader market character.
+    // Must cite actual sector return numbers.
+    // Helps user read rotation as market signal.
+
+    "fii_dii_reading": string
+    // How to interpret tonight's institutional
+    // flow data and what it implies going forward.
+    // Must cite actual flow numbers.
+    // Teaches institutional flow analysis.
   }}
 }}"""
 
@@ -1092,22 +1144,22 @@ def _run_turn1(
 
     # Telegram silent notification
     try:
-        narrative = result.get("session_narrative", "")
-        first_sentence = narrative.split(".")[0] + "." if narrative else ""
-        vix_trend = (result.get("vix_assessment") or {}).get("trend", "")
-        vix_str   = f"{vix_current} ({vix_trend})" if vix_current else "n/a"
-        overall_structure = nps.get("overall_structure", "")
-        index_bias = trading_impl.get("index_bias", "")
-        msg = (
-            f"📊 Market Context — {session_date}\n"
-            f"Trend: {result.get('market_trend')} | Vol: {result.get('market_volatility')}\n"
-            f"Structure: {overall_structure}\n"
-            f"VIX: {vix_str}\n"
-            f"Index Bias: {index_bias}\n"
-            f"Risk Level: {result.get('session_risk_level')}\n"
-            f"{first_sentence}"
+        from new_notifications.telegram import send_turn1_complete
+        send_turn1_complete(
+            trade_date=str(session_date),
+            market_trend=result.get("market_trend", ""),
+            market_volatility=result.get("market_volatility", ""),
+            overall_structure=nps.get("overall_structure", ""),
+            index_bias=trading_impl.get("index_bias", ""),
+            session_risk_level=result.get("session_risk_level", ""),
+            conviction_multiplier=result.get("conviction_multiplier", 0.95),
+            vix_current=vix_current,
+            vix_trend=(result.get("vix_assessment") or {}).get("trend", ""),
+            execution_bias=result.get("execution_bias", ""),
+            session_narrative=result.get("session_narrative", ""),
+            risk_flags=result.get("risk_flags", []),
+            mentor_notes=result.get("mentor_notes", {}),
         )
-        send_silent(msg)
     except Exception as exc:
         logger.warning("Turn 1 Telegram notification failed: %s", exc)
 

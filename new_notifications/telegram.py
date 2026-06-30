@@ -308,6 +308,51 @@ def send_validation_complete(
     return send_silent(text)
 
 
+def send_turn1_complete(
+    trade_date: str,
+    market_trend: str,
+    market_volatility: str,
+    overall_structure: str,
+    index_bias: str,
+    session_risk_level: str,
+    conviction_multiplier: float,
+    vix_current: float | None,
+    vix_trend: str,
+    execution_bias: str,
+    session_narrative: str,
+    risk_flags: list,
+    mentor_notes: dict,
+) -> int | None:
+    vix_str = f"<code>{vix_current}</code> ({vix_trend})" if vix_current else "n/a"
+    cm_str  = f"{conviction_multiplier:.2f}x"
+
+    flags = risk_flags[:3] if risk_flags else []
+    flags_line = ("\n⚠️ " + " · ".join(f[:80] for f in flags)) if flags else ""
+
+    mn = mentor_notes or {}
+    lesson   = mn.get("todays_key_lesson",      "") or ""
+    looked   = mn.get("what_i_looked_at_first", "") or ""
+    rotation = mn.get("sector_rotation_insight","") or ""
+    fii_read = mn.get("fii_dii_reading",        "") or ""
+    pattern  = mn.get("pattern_to_watch",       "") or ""
+
+    text = (
+        f"📊 <b>Turn 1 Complete — {trade_date}</b>\n"
+        f"Trend: <code>{market_trend}</code> | Vol: <code>{market_volatility}</code> | "
+        f"Structure: <code>{overall_structure}</code>\n"
+        f"VIX: {vix_str} | Risk: <code>{session_risk_level}</code>\n"
+        f"Bias: <code>{execution_bias}</code> | Index: <code>{index_bias}</code> | "
+        f"Conviction: <code>{cm_str}</code>"
+        f"{flags_line}\n"
+        f"\n🎓 <b>Tonight's lesson:</b>\n{lesson}\n"
+        f"\n👁 <b>First signal:</b>\n{looked}\n"
+        f"\n🔄 <b>Sector rotation:</b>\n{rotation}\n"
+        f"\n💵 <b>FII/DII read:</b>\n{fii_read}\n"
+        f"\n📈 <b>Pattern to watch:</b>\n{pattern}"
+    )
+    return send_silent(text[:_MAX_LENGTH])
+
+
 def send_phase1_complete(trade_date: str, regime: str, execution_bias: str) -> int | None:
     text = (
         f"📊 <b>Phase 1 Complete — {trade_date}</b>\n"
