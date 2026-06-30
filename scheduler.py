@@ -237,10 +237,10 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     )
 
 
-    # 07:00 daily — morning brief + Kite token check
+    # 08:00 daily — morning brief + Kite token check
     scheduler.add_job(
         job_morning_brief_and_kite_check,
-        CronTrigger(hour=7, minute=0, **ist),
+        CronTrigger(hour=8, minute=0, **ist),
         id="morning_brief",
         name="Morning brief + Kite check",
         replace_existing=True,
