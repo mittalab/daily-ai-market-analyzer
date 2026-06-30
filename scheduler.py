@@ -15,6 +15,8 @@ from datetime import date, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from pipeline.orchestrator import run_pipeline
+
 logger = logging.getLogger(__name__)
 
 
@@ -267,10 +269,10 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         misfire_grace_time=600,
     )
 
-    # 30:00 Mon-Fri — full validation + Claude analysis
+    # 21:30 Mon-Fri — full validation + Claude analysis
     scheduler.add_job(
         job_analysis_pipeline,
-        CronTrigger(day_of_week="mon-fri", hour=20, minute=0, **ist),
+        CronTrigger(day_of_week="mon-fri", hour=21, minute=30, **ist),
         id="analysis_pipeline",
         name="Claude analysis",
         replace_existing=True,
@@ -294,4 +296,5 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
 
 
 if __name__ == "__main__":
-    job_evening_bhavcopy()
+    #job_evening_bhavcopy()
+    run_pipeline(date.today())
