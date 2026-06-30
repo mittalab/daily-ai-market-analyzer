@@ -131,6 +131,13 @@ function MarketAnalysisPanel({ turn }: { turn: DeepAnalysisTurn }) {
           Market Analysis{dateLabel ? ` · ${dateLabel}` : ''}
         </p>
         <div className="flex flex-wrap gap-1.5">
+          {/* 🟢 NEW NIFTY CLOSE VALUE CHIP */}
+          {ikl.current && (
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-green-600 text-white shadow-sm shrink-0">
+                NIFTY: {INR.format(ikl.current)}
+              </span>
+          )}
+
           {a.market_trend && (
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TREND_PILL[a.market_trend] || 'bg-gray-100 text-gray-700'}`}>
               {a.market_trend}
