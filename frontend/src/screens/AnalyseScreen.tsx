@@ -66,11 +66,17 @@ export default function AnalyseScreen() {
     symbolToSector[s.symbol] = s.sector;
   });
 
-  const filteredStocks = foStocks.filter(sym =>
-    sym.toLowerCase().includes(searchTerm.toLowerCase())
+  const nifty50SymbolsOrder = NIFTY50_STOCKS.map(s => s.symbol);
+
+  const filteredNifty50 = nifty50SymbolsOrder.filter(sym =>
+    foStocks.includes(sym) && sym.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const displayStocks = [...filteredStocks];
+  const filteredOthers = foStocks.filter(sym =>
+    !nifty50SymbolsOrder.includes(sym) && sym.toLowerCase().includes(searchTerm.toLowerCase())
+  ).sort();
+
+  const displayStocks = [...filteredNifty50, ...filteredOthers];
   if (selectedNifty && !displayStocks.includes(selectedNifty) && mode !== 'custom') {
     displayStocks.unshift(selectedNifty);
   }

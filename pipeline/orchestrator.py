@@ -190,6 +190,7 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None) 
         context_bundle,
         level1_passed,
         session_id,
+        mandatory_stocks=list(mandatory_stocks or []),
     )
     regime_result = claude_result["regime_result"]
     print(regime_result)

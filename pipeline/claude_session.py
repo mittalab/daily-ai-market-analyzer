@@ -1640,6 +1640,17 @@ def _build_turn2_prompt(turn2_data: dict) -> str:
     sections.append("Pre-Scan Guidance:")
     sections.append(f"- Max stocks to forward: {pg.get('max_stocks_to_forward')}")
     sections.append(f"- Preferred directions: {', '.join(pg.get('prefer_directions') or []) or 'None'}")
+    sections.append(
+        "  Note on preferred directions: this indicates tonight's macro LEAN based on index and "
+        "sector conditions — it is NOT a hard rule that suppresses the opposite direction. If a "
+        "stock shows genuinely strong SHORT characteristics (confirmed downtrend, volume confirming "
+        "the decline, weak/deteriorating structure) and is NOT in an avoid_shorts_in sector, you "
+        "should forward it as a SHORT candidate even though tonight's preference is LONG. Do not "
+        "reject a strong SHORT setup merely because it lacks a 'sector tailwind' — a HEADWIND sector "
+        "is itself the tailwind for a SHORT trade. Apply the same conviction bar to SHORT setups as "
+        "you do to LONG setups: strong individual data + permitted sector = forward it, regardless "
+        "of tonight's directional lean."
+    )
     sections.append(f"- Prioritise sectors: {', '.join(pg.get('prioritise_sectors') or []) or 'None'}")
     sections.append(f"- Deprioritise sectors: {', '.join(pg.get('deprioritise_sectors') or []) or 'None'}")
     sections.append(f"- Special instructions: {pg.get('special_instructions')}")
@@ -1667,7 +1678,11 @@ def _build_turn2_prompt(turn2_data: dict) -> str:
         "For each stock determine:\n\n"
         "1. preliminary_direction: LONG or SHORT\n"
         "   Base this on:\n"
-        "   - Sector stance and strength from tonight's context (TAILWIND sectors favour LONG, HEADWIND sectors favour SHORT)\n"
+        "   - Sector stance and strength from tonight's context: TAILWIND sectors favour LONG, "
+        "HEADWIND sectors favour SHORT. Treat these symmetrically — a HEADWIND sector is genuine "
+        "supporting evidence FOR a short setup, not a reason to avoid forwarding shorts. Do not let "
+        "tonight's prefer_directions guidance from Turn 1 suppress a well-supported SHORT call when "
+        "the sector and stock data both point that way and the sector is not in avoid_shorts_in.\n"
         "   - EMA position (ABOVE_BOTH supports LONG, BELOW_BOTH supports SHORT, MIXED needs sector context to break the tie)\n"
         "   - Volume ratio (>1.2 suggests conviction in the current move; <0.8 suggests weak participation)\n"
         "   - PCR if available (low PCR = bullish positioning, high PCR = bearish positioning, per the interpretation guide used in Turn 1)\n"
@@ -1873,13 +1888,21 @@ def _run_turn2(
         if is_fwd or is_mand:
             if sym not in seen_symbols:
                 seen_symbols.add(sym)
+                if is_mand and is_fwd:
+                    inclusion_reason = "BOTH"
+                elif is_mand:
+                    inclusion_reason = "MANDATORY_OVERRIDE"
+                else:
+                    inclusion_reason = "CLAUDE_FORWARD"
                 fwd_item = {
                     "symbol": sym,
                     "preliminary_direction": s["preliminary_direction"],
                     "direction": s["preliminary_direction"],  # For Turn 3+ compatibility
                     "reason": s["reason"],
-                    "pre_scan_reasoning": s["reason"], # For compat
+                    "pre_scan_reasoning": s["reason"],  # For compat
                     "is_mandatory": is_mand,
+                    "claude_forward_decision": s["claude_forward_decision"],
+                    "inclusion_reason": inclusion_reason,
                 }
                 final_forward_list.append(fwd_item)
 
@@ -1947,13 +1970,29 @@ def _run_turn2(
     notable_observations = scan_summary.get("notable_observations", "")
     sess_date_str = session_date.strftime("%Y-%m-%d") if hasattr(session_date, "strftime") else str(session_date)
 
+    claude_selected_count = sum(
+        1 for x in final_forward_list if x["inclusion_reason"] in ("CLAUDE_FORWARD", "BOTH")
+    )
+    mand_override_count = sum(
+        1 for x in final_forward_list if x["inclusion_reason"] == "MANDATORY_OVERRIDE"
+    )
+    override_symbols = [
+        x["symbol"] for x in final_forward_list if x["inclusion_reason"] == "MANDATORY_OVERRIDE"
+    ]
+    override_warning = (
+        f"\n⚠️ {mand_override_count} mandatory stock(s) forwarded despite Claude REJECT"
+        f" — review Turn 3+ output closely: {', '.join(override_symbols)}"
+    ) if mand_override_count else ""
+
     msg = (
         f"🔍 Pre-Scan Complete — {sess_date_str}\n"
         f"Scanned: {len(final_validated_assessments)} stocks\n"
         f"Forwarded: {final_total}\n"
-        f"  ({final_mandatory} mandatory)\n"
+        f"  ├ Claude-selected: {claude_selected_count}\n"
+        f"  └ Mandatory overrides: {mand_override_count}\n"
         f"LONG bias: {long_count} | SHORT bias: {short_count}\n"
         f"{notable_observations}"
+        f"{override_warning}"
     )
     try:
         send_silent(msg)
@@ -2333,9 +2372,10 @@ def _save_session_cost_json(
 # ── Main entry ────────────────────────────────────────────────────────────────
 
 def run_claude_session(
-    context_bundle: dict,
-    level1_passed:  list[str],
-    session_id:     str,
+    context_bundle:   dict,
+    level1_passed:    list[str],
+    session_id:       str,
+    mandatory_stocks: list[str] | None = None,
 ) -> dict:
     """
     Execute the full multi-turn Claude session using modular turn-based functions.
@@ -2424,7 +2464,7 @@ def run_claude_session(
         session_id=session_id,
         session_date=session_date,
         turn1_result=turn1_result,
-        mandatory_stocks=[],
+        mandatory_stocks=list(mandatory_stocks or []),
     )
     turn_costs.append(t2_cost)
     total_input += t2_cost["input_tokens"]
@@ -2550,4 +2590,8 @@ def run_claude_session(
     #     "cost_usd":            cost_usd,
     #     "regime_result":       regime_result,
     # }
-    return {}
+    return {
+        "turn1_result":  turn1_result,
+        "forward_list":  final_forward_list,
+        "regime_result": regime_result,
+    }
