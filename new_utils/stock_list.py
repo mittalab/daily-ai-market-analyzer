@@ -144,7 +144,6 @@ def get_stock_list_for_analysis(include_kite_trades: bool = True) -> dict[str, d
 # These stocks may still appear in the NFO instruments list during wind-down but
 # won't have mid/far-month contracts, causing perpetual validation failures.
 _FO_EXCLUSIONS: set[str] = {
-    "SAMMAANCAP",
 }
 
 

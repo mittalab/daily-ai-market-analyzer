@@ -101,3 +101,7 @@ export async function fetchChatContextText(): Promise<string> {
   }
   return res.text();
 }
+
+export function fetchFoStocks(): Promise<string[]> {
+  return apiFetch<string[]>('/api/fo-stocks');
+}

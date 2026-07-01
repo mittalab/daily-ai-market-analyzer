@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Badge from '../components/Badge';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
 import { NIFTY50_STOCKS } from '../data/sectorMap';
-import { addToWatchlist, runAnalysis } from '../api';
+import { addToWatchlist, runAnalysis, fetchFoStocks } from '../api';
 import type { AnalyseResponse, Direction } from '../types';
 
 const INR = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -45,6 +45,35 @@ export default function AnalyseScreen() {
   const [savedLedger, setSavedLedger]     = useState(false);
   const [savedWatch, setSavedWatch]       = useState(false);
   const [watchlistError, setWatchlistErr] = useState<string | null>(null);
+
+  const [foStocks, setFoStocks]       = useState<string[]>([]);
+  const [searchTerm, setSearchTerm]   = useState('');
+
+  useEffect(() => {
+    fetchFoStocks()
+      .then(data => {
+        setFoStocks(data);
+      })
+      .catch(err => {
+        console.error('Failed to load F&O stocks list:', err);
+        // Fallback to NIFTY50 symbols
+        setFoStocks(NIFTY50_STOCKS.map(s => s.symbol));
+      });
+  }, []);
+
+  const symbolToSector: Record<string, string> = {};
+  NIFTY50_STOCKS.forEach(s => {
+    symbolToSector[s.symbol] = s.sector;
+  });
+
+  const filteredStocks = foStocks.filter(sym =>
+    sym.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const displayStocks = [...filteredStocks];
+  if (selectedNifty && !displayStocks.includes(selectedNifty) && mode !== 'custom') {
+    displayStocks.unshift(selectedNifty);
+  }
 
   const effectiveSymbol = mode === 'custom' ? customInput.trim() : selectedNifty;
   const canRun = effectiveSymbol.length > 0 && !loading;
@@ -98,7 +127,17 @@ export default function AnalyseScreen() {
 
       {/* Stock selection */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Stock</label>
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Search Stock</label>
+          <input
+            type="text"
+            placeholder="Search F&O symbol (e.g. RELIANCE, TCS)..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full"
+          />
+        </div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Select Stock</label>
         <select
           value={mode === 'custom' ? '__custom__' : selectedNifty}
           onChange={e => {
@@ -112,9 +151,12 @@ export default function AnalyseScreen() {
           className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full bg-white"
         >
           <option value="" disabled>— Select a stock —</option>
-          {NIFTY50_STOCKS.map(s => (
-            <option key={s.symbol} value={s.symbol}>{s.symbol} — {s.sector}</option>
-          ))}
+          {displayStocks.map(sym => {
+            const sector = symbolToSector[sym] || 'F&O';
+            return (
+              <option key={sym} value={sym}>{sym} — {sector}</option>
+            );
+          })}
           <option value="__custom__">Other (custom symbol)</option>
         </select>
 

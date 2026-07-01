@@ -693,3 +693,36 @@ async def analyse_stock(req: AnalyseRequest) -> AnalyseResponse:
         duration_seconds=round(time.monotonic() - t_start, 2),
         setup_id=setup_id,
     )
+
+
+@router.get("/fo-stocks", response_model=list[str])
+async def get_fo_stocks():
+    """Return all stock symbols that have active F&O contracts."""
+    from new_utils.stock_list import fetch_kite_fo_stocks
+    try:
+        stocks = fetch_kite_fo_stocks()
+        if stocks:
+            return stocks
+    except Exception as e:
+        logger.warning("Failed to fetch F&O stocks from Kite: %s", e)
+
+    # Fallback 1: load symbols from sector_map.json
+    try:
+        from pipeline.claude_session import _load_sector_map
+        sector_map = _load_sector_map()
+        stocks = list(sector_map.get("stocks", {}).keys())
+        if stocks:
+            return sorted(stocks)
+    except Exception as e:
+        logger.warning("Failed to fetch F&O stocks from sector map fallback: %s", e)
+
+    # Fallback 2: load nifty50 symbols
+    try:
+        from new_data_ingestion.nse_bhavcopy import get_nifty50_symbols
+        symbols = list(get_nifty50_symbols())
+        if symbols:
+            return sorted(symbols)
+    except Exception:
+        pass
+
+    return []
