@@ -308,6 +308,17 @@ def send_token_reminder() -> int | None:
     return send_loud(text)
 
 
+def send_kite_login_reminder() -> int | None:
+    """LOUD — friendly morning reminder to generate today's Kite access token."""
+    text = (
+        "🌅 <b>Good Morning! Time to log in to Kite</b>\n"
+        "Kite token needs renewal for today.\n"
+        "Please perform Kite login now to generate a new active token:\n"
+        "👉 <a href=\"https://api.abhishekmittal.in/kite/refresh\">Refresh / Log In to Kite</a>"
+    )
+    return send_loud(text)
+
+
 def send_token_valid() -> int | None:
     """SILENT — token already valid, no action needed."""
     text = (

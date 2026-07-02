@@ -143,10 +143,12 @@ def job_morning_brief_and_kite_check() -> None:
 
 # ── Job 4 & 5: Intraday Kite token checks ─────────────────────────────────────
 
-def job_kite_check() -> None:
+def job_kite_check(is_morning: bool = False) -> None:
     """
     09:00, 11:00, and 13:00 Mon-Fri (trading day) — validate Kite token and send
     a LOUD Telegram reminder ONLY if the token is invalid. Silent on success.
+    - 9 AM check sends a positive reminder to login.
+    - 11 AM and 1 PM checks send a warning reminder.
     """
     today = date.today()
     if not is_trading_day(today):
@@ -154,13 +156,14 @@ def job_kite_check() -> None:
 
     try:
         from new_validation.data_validator import validate_kite_token
-        from new_notifications.telegram import send_token_reminder
+        from new_notifications.telegram import send_token_reminder, send_kite_login_reminder
         ok, msg = validate_kite_token()
-        if ok:
-            logger.info("Kite token check OK: %s", msg)
-        else:
+        if ok == False:
             logger.warning("Kite token check FAILED: %s — sending reminder", msg)
-            send_token_reminder()
+            if is_morning:
+                send_kite_login_reminder()
+            else:
+                send_token_reminder()
     except Exception as exc:
         logger.error("Kite token check error: %s", exc)
 
@@ -248,8 +251,9 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     scheduler.add_job(
         job_kite_check,
         CronTrigger(day_of_week="mon-fri", hour=9, minute=0, **ist),
+        args=[True],
         id="kite_check_9am",
-        name="Kite Check",
+        name="Kite Login",
         replace_existing=True,
         misfire_grace_time=600,
     )
