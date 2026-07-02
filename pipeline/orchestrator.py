@@ -58,6 +58,13 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None, 
     all_symbol_count = len(symbols)
     logger.info("Pipeline start: %s | %d symbols", session_id, all_symbol_count)
 
+    # Telegram notification for Pipeline start
+    try:
+        from new_notifications.telegram import send_pipeline_start
+        send_pipeline_start(str(session_date))
+    except Exception as exc:
+        logger.warning("Pipeline start Telegram notification failed: %s", exc)
+
     # ── Run Data Validation & Self-Healing first ──────────────────────────────
     from new_validation.run_validation import run_validation_now
     from database.queries import get_validation_state

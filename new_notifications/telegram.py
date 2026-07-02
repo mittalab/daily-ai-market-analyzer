@@ -385,6 +385,14 @@ def send_preflight_failed(reason: str, trade_date: str) -> int | None:
     return send_loud(text)
 
 
+def send_pipeline_start(trade_date: str) -> int | None:
+    text = (
+        f"🚀 <b>Analysis Pipeline Started — {trade_date}</b>\n"
+        f"Running nightly market validation, pre-scan checks and deep analysis"
+    )
+    return send_silent(text)
+
+
 def send_validation_start(trade_date: str, label: str = "Key Stocks") -> int | None:
     text = (
         f"🔍 <b>Validation Started — {trade_date}</b>\n"
