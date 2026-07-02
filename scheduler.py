@@ -170,7 +170,7 @@ def job_kite_check(is_morning: bool = False) -> None:
 
 # ── Job 6: 4 PM analysis pipeline ─────────────────────────────────────────────
 
-def job_analysis_pipeline() -> None:
+def job_analysis_pipeline(my_date: date | None = None) -> None:
     """
     20:00 Mon-Fri (trading day) — run full validation + Claude analysis.
 
@@ -187,7 +187,7 @@ def job_analysis_pipeline() -> None:
     import pytz
 
     IST = pytz.timezone("Asia/Kolkata")
-    today = datetime.now(IST).date()
+    today = my_date or datetime.now(IST).date()
 
     if not is_trading_day(today):
         logger.info("Analysis pipeline skipped — %s is not a trading day", today)
@@ -305,5 +305,8 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
 
 
 if __name__ == "__main__":
-    job_evening_bhavcopy()
+    from new_data_ingestion.nse_bhavcopy import last_trading_day
+    target_date = last_trading_day()
+    #job_evening_bhavcopy()
+    job_analysis_pipeline(target_date)
     #run_pipeline(date.today())

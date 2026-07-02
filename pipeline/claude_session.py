@@ -1960,7 +1960,6 @@ def _run_turn2(
     stage_statuses["turn2"] = "COMPLETE"
 
     update_analysis_session(session_id, {
-        "turn2_output": parsed,
         "forward_list": final_forward_list,
         "stage_statuses": stage_statuses
     })
@@ -2527,6 +2526,7 @@ def run_claude_session(
             "claude_cost_usd":      cost1_usd + cost2_usd,
             "status":               "ANALYSIS_COMPLETE",
             "market_regime":        regime_result.get("regime"),
+            "forward_list":         final_forward_list,
             "stage_statuses": {
                 "claude_turn1":          "COMPLETE",
                 "claude_turn2":          "COMPLETE",

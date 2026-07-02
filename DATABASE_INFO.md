@@ -34,6 +34,9 @@ to enable crash-resilient pipelines, longitudinal performance tracking, and rich
 | 012 | `012_widen_text_columns.sql` | Widen text columns for longer Claude outputs |
 | 013 | `013_add_regime_dimensions.sql` | Add market_trend, market_volatility, market_structure, execution_bias, fii_dii_stance to analysis_sessions and trade_setups |
 | 014 | `014_futures_snapshots.sql` | New futures_snapshots table — raw per-expiry futures from bhavcopy |
+| 015 | `015_system_config_interested_stocks.sql` | Add interested_stocks config key |
+| 016 | `016_turn1_output.sql` | Add Turn 1 classification columns to analysis_sessions |
+| 017 | `017_add_forward_list.sql` | Add forward_list JSONB column to analysis_sessions |
 
 ---
 
@@ -66,6 +69,7 @@ One row per nightly pipeline run. Acts as the master record for a session.
 | `claude_cost_usd` | NUMERIC | Total AI cost for the session |
 | `pipeline_duration_mins` | INT | Wall-clock time |
 | `prompt_versions` / `telegram_message_ids` / `errors` | JSONB | Audit metadata |
+| `forward_list` | JSONB | List of stock tickers forwarded from Turn 2 Pre-scan |
 | `started_at` / `completed_at` / `created_at` | TIMESTAMPTZ | Timestamps |
 
 ---
