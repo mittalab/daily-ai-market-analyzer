@@ -2544,6 +2544,7 @@ def run_claude_session(
         "forward_list":        final_forward_list,
         "total_input_tokens":  total_input,
         "total_output_tokens": total_output,
+        "cost_usd":            round(cost1_usd + cost2_usd, 6),
         "cost1_usd":            cost1_usd,
         "cost2_usd":            cost2_usd,
         "regime_result":       regime_result,
