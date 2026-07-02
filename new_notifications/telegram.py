@@ -463,7 +463,7 @@ def send_phase1_complete(
     fii_str = "N/A"
     if fii_net_flow_cr is not None:
         sign = "+" if fii_net_flow_cr >= 0 else "-"
-        fii_str = f"{sign} ₹{abs(fii_net_flow_cr):,.0f} Cr"
+        fii_str = f"{sign}₹{abs(fii_net_flow_cr):,.0f} Cr"
 
     # Format VIX emoji
     vix_emoji = ""
@@ -492,8 +492,8 @@ def send_phase1_complete(
 
     text = (
         f"📝 <b>Market Context Complete — {trade_date}</b>\n"
-        f"Trend: {safe_html(trend_str)} | Volatility: <code>{safe_html(vol_str)}</code> | Struct: <code>{safe_html(struct_str)}</code>\n"
-        f"Struct: <code>{safe_html(struct_str)}</code>\n"
+        f"Trend: {safe_html(trend_str)} | Volatility: <code>{safe_html(vol_str)}</code>\n"
+        f"Price Structure: <code>{safe_html(struct_str)}</code>\n"
         f"Bias: <code>{safe_html(execution_bias)}</code> | Nifty: <code>{nifty_str}</code> | VIX: <code>{vix_str}</code>{vix_emoji} | FII: <code>{fii_str}</code>\n"
         f"{lesson_block}"
         f"{pattern_block}\n"
