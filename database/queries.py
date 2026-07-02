@@ -84,6 +84,11 @@ def get_kite_token() -> dict | None:
     return resp.data[0] if resp.data else None
 
 
+def delete_kite_token() -> None:
+    """Delete the daily Kite access token row for the primary user."""
+    get_client().table("kite_tokens").delete().eq("user_id", "primary").execute()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # price_history
 # ─────────────────────────────────────────────────────────────────────────────

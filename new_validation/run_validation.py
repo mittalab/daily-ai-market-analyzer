@@ -821,9 +821,10 @@ if __name__ == "__main__":
         level=logging.DEBUG,
         format="%(asctime)s  %(levelname)-8s %(name)s — %(message)s",
     )
-    run_validation_now()
-    result = backfill_indices_for_dates([
-        {"date": "2026-06-29"},
-        {"date": "2026-06-25"},
-    ])
-    print(result)
+    run_validation_now_for_symbol("PAYTM", False)
+    # run_validation_now()
+    # result = backfill_indices_for_dates([
+    #     {"date": "2026-06-29"},
+    #     {"date": "2026-06-25"},
+    # ])
+    # print(result)

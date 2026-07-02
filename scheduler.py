@@ -111,12 +111,12 @@ def job_evening_bhavcopy() -> None:
         send_validation_complete(str(target_date), 0, 0, [f"ERROR: {str(exc)[:100]}"], label="F&O Universe")
 
 
-# ── Job 3: Morning brief + Kite token check ────────────────────────────────────
-
+# ── Job 3: Morning brief + Kite token deletion ────────────────────────────────
+ 
 def job_morning_brief_and_kite_check() -> None:
     """
-    07:00 daily — send the morning brief for the latest session, then check
-    the Kite token. Sends a LOUD reminder if the token is missing or expired.
+    07:00 daily — send the morning brief for the latest session, then delete
+    the Kite token. This guarantees a new token must be generated at 9 AM.
     """
     # Morning brief
     try:
@@ -132,25 +132,20 @@ def job_morning_brief_and_kite_check() -> None:
     except Exception as exc:
         logger.error("Morning brief failed: %s", exc)
 
-    # Kite token check
+    # Delete Kite token as part of 7 AM market run
     try:
-        from new_validation.data_validator import validate_kite_token
-        from new_notifications.telegram import send_token_reminder
-        ok, msg = validate_kite_token()
-        if ok:
-            logger.info("7 AM Kite check: token valid — %s", msg)
-        else:
-            logger.warning("7 AM Kite check: token INVALID — %s", msg)
-            send_token_reminder()
+        from database.queries import delete_kite_token
+        delete_kite_token()
+        logger.info("7 AM Kite check: Kite token successfully deleted from DB")
     except Exception as exc:
-        logger.error("7 AM Kite token check error: %s", exc)
+        logger.error("7 AM Kite token deletion failed: %s", exc)
 
 
 # ── Job 4 & 5: Intraday Kite token checks ─────────────────────────────────────
 
 def job_kite_check() -> None:
     """
-    09:00 and 13:00 Mon-Fri (trading day) — validate Kite token and send
+    09:00, 11:00, and 13:00 Mon-Fri (trading day) — validate Kite token and send
     a LOUD Telegram reminder ONLY if the token is invalid. Silent on success.
     """
     today = date.today()
@@ -239,12 +234,12 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     )
 
 
-    # 08:00 daily — morning brief + Kite token check
+    # 07:00 daily — morning brief + Kite token deletion
     scheduler.add_job(
         job_morning_brief_and_kite_check,
-        CronTrigger(hour=8, minute=0, **ist),
+        CronTrigger(hour=7, minute=0, **ist),
         id="morning_brief",
-        name="Morning brief + Kite check",
+        name="Morning brief + Kite deletion",
         replace_existing=True,
         misfire_grace_time=3600,
     )
@@ -254,6 +249,16 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         job_kite_check,
         CronTrigger(day_of_week="mon-fri", hour=9, minute=0, **ist),
         id="kite_check_9am",
+        name="Kite Check",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
+    # 11:00 Mon-Fri — Kite token check (loud only if invalid)
+    scheduler.add_job(
+        job_kite_check,
+        CronTrigger(day_of_week="mon-fri", hour=11, minute=0, **ist),
+        id="kite_check_11am",
         name="Kite Check",
         replace_existing=True,
         misfire_grace_time=600,
@@ -290,8 +295,8 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     )
 
     logger.info(
-        "Scheduler: 6 jobs registered "
-        "(keepalive, evening_bhavcopy, morning_brief, kite_check×2, analysis_pipeline)"
+        "Scheduler: 7 jobs registered "
+        "(keepalive, evening_bhavcopy, morning_brief, kite_check×3, analysis_pipeline)"
     )
 
 

@@ -356,6 +356,7 @@ def _build_turn1_data(session_date: date) -> dict:
     ]
 
     data_quality = "LIVE"
+    last_val = 0
     if fii_rows:
         last_val = fii_rows[-1].get("fii_net_cr")
         consecutive_same = 1
@@ -485,6 +486,7 @@ def _build_turn1_data(session_date: date) -> dict:
         "fii_dii": {
             "data_quality": data_quality,
             "flows_30d":    fii_dii_flows_30d,
+            "fii_net_cr":   last_val,
         },
         "sectors": sectors_data,
         "nifty_options": nifty_options,
@@ -1142,25 +1144,24 @@ def _run_turn1(
         "nifty_close":           data["nifty"]["indicators"]["current_price"],
         "vix_close":             vix_current,
         "stage_statuses":        {"turn1": "COMPLETE"},
+        "fii_net_flow_cr":      data["fii_dii"]["fii_net_cr"],
     })
 
-    # Telegram silent notification
+    # Telegram silent notification for Turn 1 Context Complete
     try:
-        from new_notifications.telegram import send_turn1_complete
-        send_turn1_complete(
+        from new_notifications.telegram import send_phase1_complete
+        turn1_cost = round(u1.input_tokens / 1_000_000 * 3.00 + u1.output_tokens / 1_000_000 * 15.00, 6)
+        send_phase1_complete(
             trade_date=str(session_date),
             market_trend=result.get("market_trend", ""),
             market_volatility=result.get("market_volatility", ""),
-            overall_structure=nps.get("overall_structure", ""),
-            index_bias=trading_impl.get("index_bias", ""),
-            session_risk_level=result.get("session_risk_level", ""),
-            conviction_multiplier=result.get("conviction_multiplier", 0.95),
-            vix_current=vix_current,
-            vix_trend=(result.get("vix_assessment") or {}).get("trend", ""),
+            market_structure=result.get("market_structure", ""),
             execution_bias=result.get("execution_bias", ""),
-            session_narrative=result.get("session_narrative", ""),
-            risk_flags=result.get("risk_flags", []),
-            mentor_notes=result.get("mentor_notes", {}),
+            nifty_close=data["nifty"]["indicators"]["current_price"],
+            vix=vix_current,
+            cost_usd=turn1_cost,
+            mentor_notes={},
+            #mentor_notes=result.get("mentor_notes", {}),
         )
     except Exception as exc:
         logger.warning("Turn 1 Telegram notification failed: %s", exc)
@@ -1965,39 +1966,15 @@ def _run_turn2(
     })
 
     # 7. Telegram Notification
-    long_count = sum(1 for s in final_validated_assessments if s.get("preliminary_direction") == "LONG")
-    short_count = sum(1 for s in final_validated_assessments if s.get("preliminary_direction") == "SHORT")
-    notable_observations = scan_summary.get("notable_observations", "")
-    sess_date_str = session_date.strftime("%Y-%m-%d") if hasattr(session_date, "strftime") else str(session_date)
-
-    claude_selected_count = sum(
-        1 for x in final_forward_list if x["inclusion_reason"] in ("CLAUDE_FORWARD", "BOTH")
-    )
-    mand_override_count = sum(
-        1 for x in final_forward_list if x["inclusion_reason"] == "MANDATORY_OVERRIDE"
-    )
-    override_symbols = [
-        x["symbol"] for x in final_forward_list if x["inclusion_reason"] == "MANDATORY_OVERRIDE"
-    ]
-    override_warning = (
-        f"\n⚠️ {mand_override_count} mandatory stock(s) forwarded despite Claude REJECT"
-        f" — review Turn 3+ output closely: {', '.join(override_symbols)}"
-    ) if mand_override_count else ""
-
-    msg = (
-        f"🔍 Pre-Scan Complete — {sess_date_str}\n"
-        f"Scanned: {len(final_validated_assessments)} stocks\n"
-        f"Forwarded: {final_total}\n"
-        f"  ├ Claude-selected: {claude_selected_count}\n"
-        f"  └ Mandatory overrides: {mand_override_count}\n"
-        f"LONG bias: {long_count} | SHORT bias: {short_count}\n"
-        f"{notable_observations}"
-        f"{override_warning}"
-    )
     try:
-        send_silent(msg)
+        from new_notifications.telegram import send_prescan_complete
+        send_prescan_complete(
+            trade_date=str(session_date),
+            forwarded_symbols=final_forward_list,
+            cost_usd=cost_info.get("total_cost_usd", 0.0),
+        )
     except Exception as exc:
-        logger.warning("Telegram notification after Turn 2 failed: %s", exc)
+        logger.warning("Turn 2 Telegram notification failed: %s", exc)
 
     return final_forward_list, compat_turn2_results, cost_info
 
@@ -2132,12 +2109,8 @@ def run_turn_deep_analysis(
     save_claude_turn(session_id, turn_num, "deep_analysis", symbol,
                      in_tok, out_tok, prompt, json.dumps(analysis))
 
-    # Send cost notification per turn
+    # Calculate cost per turn
     turn_cost = round(in_tok / 1_000_000 * 3.00 + out_tok / 1_000_000 * 15.00, 6)
-    try:
-        send_claude_cost(symbol, in_tok, out_tok, turn_cost)
-    except Exception as exc:
-        logger.warning("Failed to send Telegram cost notification: %s", exc)
 
     stage = analysis.get("stage", "SKIP")
     conviction = analysis.get("conviction_score", 0)
@@ -2437,15 +2410,7 @@ def run_claude_session(
         "risk_flags":        turn1_result.get("risk_flags", []),
     }
 
-    try:
-        from new_notifications.telegram import send_phase1_complete
-        send_phase1_complete(
-            str(session_date),
-            str(regime_result.get("regime", "UNKNOWN")),
-            str(regime_result.get("execution_bias", "UNKNOWN")),
-        )
-    except Exception as _exc:
-        logger.warning("Phase 1 notification failed: %s", _exc)
+
 
     # Re-build system prompt using the dynamically generated regime context
     context_bundle["regime"] = regime_result
@@ -2456,6 +2421,13 @@ def run_claude_session(
         raise RuntimeError(
             f"Token ceiling ({_TOKEN_CEILING}) would be exceeded entering Turn 2 "
             f"({total_input + total_output} tokens used so far)."
+        )
+
+
+    cost1_usd = round(
+        total_input  / 1_000_000 * 3.00 +
+        total_output / 1_000_000 * 15.00,
+        6,
         )
 
     # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────
@@ -2537,61 +2509,42 @@ def run_claude_session(
     #     send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped)
     # except Exception as _exc:
     #     logger.warning("Deep analysis complete notification failed: %s", _exc)
-    #
-    # update_analysis_session(session_id, {
-    #     "claude_tokens_input":  total_input,
-    #     "claude_tokens_output": total_output,
-    #     "claude_cost_usd":      cost_usd,
-    #     "status":               "ANALYSIS_COMPLETE",
-    #     "trade_ready_count":    trade_ready,
-    #     "watch_count":          watch,
-    #     "radar_count":          on_radar,
-    #     "stage_statuses": {
-    #         "claude_turn1":          "COMPLETE",
-    #         "claude_turn2":          "COMPLETE",
-    #         "deep_analysis":         "COMPLETE",
-    #         "prescan_total":         len(turn2_results),
-    #         "prescan_forwarded":     prescan_fwd,
-    #         "prescan_high_pri":      sum(1 for s in turn2_results if s.get("priority") == "HIGH"),
-    #         "deep_trade_ready":      trade_ready,
-    #         "deep_watch":            watch,
-    #         "deep_on_radar":         on_radar,
-    #         "deep_skip":             skipped,
-    #     },
-    #     "prompt_versions": _PROMPT_VERSIONS,
-    # })
-    #
-    # logger.info(
-    #     "Session complete: turns=%d in=%d out=%d cost=$%.4f | "
-    #     "TRADE_READY=%d WATCH=%d ON_RADAR=%d SKIP=%d",
-    #     2 + len(deep_results), total_input, total_output, cost_usd,
-    #     trade_ready, watch, on_radar, skipped,
-    # )
-    #
-    # _save_session_cost_json(
-    #     session_id=session_id,
-    #     session_date=session_date,
-    #     turn_costs=turn_costs,
-    #     regime=regime_result.get("regime") if regime_result else None,
-    #     monthly_spent_before=monthly_spent if isinstance(monthly_spent, float) else 0.0,
-    #     budget_usd=budget_usd,
-    #     usd_to_inr=float(config.get("usd_to_inr_rate", 84.0)),
-    #     deep_results=deep_results,
-    # )
-    #
-    # return {
-    #     "turn1_result":        turn1_result,
-    #     "turn2_results":       turn2_results,
-    #     "deep_results":        deep_results,
-    #     "trade_ready":         trade_ready,
-    #     "watch":               watch,
-    #     "total_input_tokens":  total_input,
-    #     "total_output_tokens": total_output,
-    #     "cost_usd":            cost_usd,
-    #     "regime_result":       regime_result,
-    # }
+
+    # Calculate cost of pre-scan run
+    cost2_usd = round(
+        t2_cost["input_tokens"]  / 1_000_000 * 3.00 +
+        t2_cost["output_tokens"] / 1_000_000 * 15.00,
+        6,
+    )
+
+    prescan_fwd = len(final_forward_list)
+
+    # Update session status in DB
+    try:
+        update_analysis_session(session_id, {
+            "claude_tokens_input":  total_input,
+            "claude_tokens_output": total_output,
+            "claude_cost_usd":      cost1_usd + cost2_usd,
+            "status":               "ANALYSIS_COMPLETE",
+            "market_regime":        regime_result.get("regime"),
+            "stage_statuses": {
+                "claude_turn1":          "COMPLETE",
+                "claude_turn2":          "COMPLETE",
+                "deep_analysis":         "SKIPPED",
+                "prescan_total":         len(turn2_results),
+                "prescan_forwarded":     prescan_fwd,
+            }
+        })
+    except Exception as exc:
+        logger.warning("Failed to update session status in DB: %s", exc)
+
     return {
-        "turn1_result":  turn1_result,
-        "forward_list":  final_forward_list,
-        "regime_result": regime_result,
+        "turn1_result":        turn1_result,
+        "turn2_results":       turn2_results,
+        "forward_list":        final_forward_list,
+        "total_input_tokens":  total_input,
+        "total_output_tokens": total_output,
+        "cost1_usd":            cost1_usd,
+        "cost2_usd":            cost2_usd,
+        "regime_result":       regime_result,
     }

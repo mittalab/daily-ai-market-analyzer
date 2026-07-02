@@ -11,9 +11,16 @@ HTML tags confirmed working: <b>, <i>, <code>
 NO nesting — <b><i>text</i></b> is unreliable.
 Use <code> for ALL prices and numbers (prevents phone number hyperlinking).
 """
+import html
 import logging
 import os
 import time
+
+def safe_html(text: str) -> str:
+    """Escape HTML special characters to prevent Telegram API formatting issues."""
+    if not text:
+        return ""
+    return html.escape(str(text))
 
 import requests
 from dotenv import load_dotenv
@@ -136,10 +143,19 @@ def send_claude_cost(symbol: str, input_tok: int, output_tok: int, cost_usd: flo
 
 def send_pipeline_complete(
     trade_date: str,
-    trade_ready: int,
-    watch: int,
+    trade_ready_count: int,
+    watch_count: int,
     duration_mins: int,
     cost_usd: float,
+    market_trend: str,
+    market_volatility: str,
+    market_structure: str,
+    execution_bias: str,
+    nifty_close: float | None,
+    vix: float | None,
+    fii_net_flow_cr: float | None,
+    trade_ready_symbols: list[str],
+    watch_symbols: list[str],
     monthly_spent_usd: float = 0.0,
     budget_usd: float = 50.0,
     usd_to_inr: float = 84.0,
@@ -151,25 +167,120 @@ def send_pipeline_complete(
     cost_inr    = round(cost_usd * usd_to_inr)
     url         = _get_dashboard_url()
 
+    # Format FII flow
+    fii_str = "N/A"
+    if fii_net_flow_cr is not None:
+        sign = "+" if fii_net_flow_cr >= 0 else ""
+        fii_str = f"{sign}₹{abs(fii_net_flow_cr):,.0f} Cr"
+
+    # Format VIX emoji
+    vix_emoji = ""
+    if vix is not None:
+        vix_emoji = " 🟢" if vix < 15 else " 🟡" if vix <= 20 else " 🔴"
+
+    nifty_str = f"{nifty_close:,.0f}" if nifty_close is not None else "N/A"
+    vix_str = f"{vix:.1f}" if vix is not None else "N/A"
+
+    # Format symbol lists (HTML escaped)
+    tr_list_str = ", ".join(f"<code>{safe_html(s)}</code>" for s in trade_ready_symbols) if trade_ready_symbols else "None"
+    wt_list_str = ", ".join(f"<code>{safe_html(s)}</code>" for s in watch_symbols) if watch_symbols else "None"
+
     warning_block = ""
     if context_warnings:
-        warning_block = "\n⚠️ Analysis ran with: " + " · ".join(context_warnings[:3])
+        safe_warnings = [safe_html(w) for w in context_warnings[:3]]
+        warning_block = f"\n\n⚠️ <i>Warnings: {'; '.join(safe_warnings)}</i>"
 
-    verified_suffix = f" (verified: {verified_in_db})" if verified_in_db is not None else ""
+    trend_str = market_trend.title() if market_trend else "Unknown"
+    vol_str = market_volatility.title() if market_volatility else "Normal"
+    struct_str = market_structure.title() if market_structure else "Wide"
 
     text = (
         f"✅ <b>Analysis Complete — {trade_date}</b>\n"
-        f"🟢 Trade Ready: <code>{trade_ready}</code> | "
-        f"🟡 Watch: <code>{watch}</code>{verified_suffix}\n"
-        f"Duration: <code>{duration_mins}min</code>\n"
+        f"Trend: <b>{safe_html(trend_str)}</b> | Vol: <code>{safe_html(vol_str)}</code> | Struct: <code>{safe_html(struct_str)}</code>\n"
+        f"Bias: <code>{safe_html(execution_bias)}</code> | Nifty: <code>{nifty_str}</code> | VIX: <code>{vix_str}</code>{vix_emoji} | FII: <code>{fii_str}</code>\n"
         f"\n"
-        f"💰 Session cost: <code>${cost_usd:.2f}</code> (<code>₹{cost_inr}</code>)\n"
-        f"📊 Month to date: <code>${monthly_spent_usd:.2f}</code> of "
-        f"<code>${budget_usd:.0f}</code> budget (<code>{budget_pct}%</code>)\n"
-        f"🔮 Est. sessions remaining: <code>{sessions_remaining}</code>"
+        f"🟢 <b>TRADE READY ({trade_ready_count})</b>: {tr_list_str}\n"
+        f"🟡 <b>WATCH ({watch_count})</b>: {wt_list_str}\n"
+        f"\n"
+        f"⏱ Duration: <code>{duration_mins}min</code>\n"
+        f"💰 Session Cost: <code>${cost_usd:.2f}</code> (<code>₹{cost_inr}</code>)\n"
+        f"📊 MTD Spend: <code>${monthly_spent_usd:.2f}</code> of <code>${budget_usd:.0f}</code> budget (<code>{budget_pct}%</code>)\n"
+        f"🔮 Est. Sessions Left: <code>{sessions_remaining}</code>"
         f"{warning_block}\n"
-        f"\nBrief arrives at <code>7:00 AM</code>\n"
-        f'📱 <a href="{url}">View Analysis</a>'
+        f"\n"
+        f'📱 <a href="{url}">View Dashboard</a>'
+    )
+    return send_silent(text)
+
+
+def send_prescan_pipeline_complete(
+    trade_date: str,
+    forwarded_symbols: list[dict],
+    duration_mins: int,
+    cost_usd: float,
+    market_trend: str,
+    market_volatility: str,
+    market_structure: str,
+    execution_bias: str,
+    nifty_close: float | None,
+    vix: float | None,
+    fii_net_flow_cr: float | None,
+    monthly_spent_usd: float = 0.0,
+    budget_usd: float = 50.0,
+    usd_to_inr: float = 84.0,
+    sessions_remaining: int = 0,
+    context_warnings: list | None = None,
+) -> int | None:
+    budget_pct  = round(monthly_spent_usd / budget_usd * 100, 1) if budget_usd > 0 else 0
+    cost_inr    = round(cost_usd * usd_to_inr)
+    url         = _get_dashboard_url()
+
+    # Format FII flow
+    fii_str = "N/A"
+    if fii_net_flow_cr is not None:
+        sign = "+" if fii_net_flow_cr >= 0 else ""
+        fii_str = f"{sign}₹{abs(fii_net_flow_cr):,.0f} Cr"
+
+    # Format VIX emoji
+    vix_emoji = ""
+    if vix is not None:
+        vix_emoji = " 🟢" if vix < 15 else " 🟡" if vix <= 20 else " 🔴"
+
+    nifty_str = f"{nifty_close:,.0f}" if nifty_close is not None else "N/A"
+    vix_str = f"{vix:.1f}" if vix is not None else "N/A"
+
+    # Group forwarded symbols by direction
+    longs = [s.get("symbol", "") for s in forwarded_symbols if s.get("direction") == "LONG"]
+    shorts = [s.get("symbol", "") for s in forwarded_symbols if s.get("direction") == "SHORT"]
+    
+    long_list_str = ", ".join(f"<code>{safe_html(s)}</code>" for s in longs) if longs else "None"
+    short_list_str = ", ".join(f"<code>{safe_html(s)}</code>" for s in shorts) if shorts else "None"
+
+    warning_block = ""
+    if context_warnings:
+        safe_warnings = [safe_html(w) for w in context_warnings[:3]]
+        warning_block = f"\n\n⚠️ <i>Warnings: {'; '.join(safe_warnings)}</i>"
+
+    trend_str = market_trend.title() if market_trend else "Unknown"
+    vol_str = market_volatility.title() if market_volatility else "Normal"
+    struct_str = market_structure.title() if market_structure else "Wide"
+
+    text = (
+        f"✅ <b>Pre-Scan Complete — {trade_date}</b>\n"
+        f"Trend: <b>{safe_html(trend_str)}</b> | Vol: <code>{safe_html(vol_str)}</code> | Struct: <code>{safe_html(struct_str)}</code>\n"
+        f"Bias: <code>{safe_html(execution_bias)}</code> | Nifty: <code>{nifty_str}</code> | VIX: <code>{vix_str}</code>{vix_emoji} | FII: <code>{fii_str}</code>\n"
+        f"\n"
+        f"🔍 <b>FORWARDED FOR DEEP SCAN ({len(forwarded_symbols)})</b>:\n"
+        f"🟢 <b>LONG ({len(longs)})</b>: {long_list_str}\n"
+        f"🔴 <b>SHORT ({len(shorts)})</b>: {short_list_str}\n"
+        f"\n"
+        f"⏱ Duration: <code>{duration_mins}min</code>\n"
+        f"💰 Session Cost: <code>${cost_usd:.2f}</code> (<code>₹{cost_inr}</code>)\n"
+        f"📊 MTD Spend: <code>${monthly_spent_usd:.2f}</code> of <code>${budget_usd:.0f}</code> budget (<code>{budget_pct}%</code>)\n"
+        f"🔮 Est. Sessions Left: <code>{sessions_remaining}</code>"
+        f"{warning_block}\n"
+        f"\n"
+        f'📱 <a href="{url}">View Dashboard</a>'
     )
     return send_silent(text)
 
@@ -308,64 +419,94 @@ def send_validation_complete(
     return send_silent(text)
 
 
-def send_turn1_complete(
+def send_phase1_complete(
     trade_date: str,
     market_trend: str,
     market_volatility: str,
-    overall_structure: str,
-    index_bias: str,
-    session_risk_level: str,
-    conviction_multiplier: float,
-    vix_current: float | None,
-    vix_trend: str,
+    market_structure: str,
     execution_bias: str,
-    session_narrative: str,
-    risk_flags: list,
-    mentor_notes: dict,
+    nifty_close: float | None,
+    vix: float | None,
+    cost_usd: float,
+    mentor_notes: dict | None = None,
 ) -> int | None:
-    vix_str = f"<code>{vix_current}</code> ({vix_trend})" if vix_current else "n/a"
-    cm_str  = f"{conviction_multiplier:.2f}x"
+    # Query FII net flow
+    fii_net_flow_cr = None
+    try:
+        from database.queries import get_latest_fii_dii
+        fii_row = get_latest_fii_dii()
+        if fii_row:
+            fii_net_flow_cr = fii_row.get("fii_net_cr")
+    except Exception:
+        pass
 
-    flags = risk_flags[:3] if risk_flags else []
-    flags_line = ("\n⚠️ " + " · ".join(f[:80] for f in flags)) if flags else ""
+    # Format FII flow
+    fii_str = "N/A"
+    if fii_net_flow_cr is not None:
+        sign = "+" if fii_net_flow_cr >= 0 else ""
+        fii_str = f"{sign}₹{abs(fii_net_flow_cr):,.0f} Cr"
 
+    # Format VIX emoji
+    vix_emoji = ""
+    if vix is not None:
+        vix_emoji = " 🟢" if vix < 15 else " 🟡" if vix <= 20 else " 🔴"
+
+    nifty_str = f"{nifty_close:,.0f}" if nifty_close is not None else "N/A"
+    vix_str = f"{vix:.1f}" if vix is not None else "N/A"
+
+    trend_str = market_trend.title() if market_trend else "Unknown"
+    vol_str = market_volatility.title() if market_volatility else "Normal"
+    struct_str = market_structure.title() if market_structure else "Wide"
+
+    # Extract dynamic notes
     mn = mentor_notes or {}
-    lesson   = mn.get("todays_key_lesson",      "") or ""
-    looked   = mn.get("what_i_looked_at_first", "") or ""
-    rotation = mn.get("sector_rotation_insight","") or ""
-    fii_read = mn.get("fii_dii_reading",        "") or ""
-    pattern  = mn.get("pattern_to_watch",       "") or ""
+    lesson = mn.get("todays_key_lesson", "")
+    pattern = mn.get("pattern_to_watch", "")
+    
+    lesson_block = ""
+    if lesson:
+        lesson_block = f"\n📖 <b>Key Lesson</b>: <i>{safe_html(lesson)}</i>"
+        
+    pattern_block = ""
+    if pattern:
+        pattern_block = f"\n💡 <b>Pattern to Watch</b>: <i>{safe_html(pattern)}</i>"
 
     text = (
-        f"📊 <b>Turn 1 Complete — {trade_date}</b>\n"
-        f"Trend: <code>{market_trend}</code> | Vol: <code>{market_volatility}</code> | "
-        f"Structure: <code>{overall_structure}</code>\n"
-        f"VIX: {vix_str} | Risk: <code>{session_risk_level}</code>\n"
-        f"Bias: <code>{execution_bias}</code> | Index: <code>{index_bias}</code> | "
-        f"Conviction: <code>{cm_str}</code>"
-        f"{flags_line}\n"
-        f"\n🎓 <b>Tonight's lesson:</b>\n{lesson}\n"
-        f"\n👁 <b>First signal:</b>\n{looked}\n"
-        f"\n🔄 <b>Sector rotation:</b>\n{rotation}\n"
-        f"\n💵 <b>FII/DII read:</b>\n{fii_read}\n"
-        f"\n📈 <b>Pattern to watch:</b>\n{pattern}"
+        f"📝 <b>Market Context Complete — {trade_date}</b>\n"
+        f"Trend: <b>{safe_html(trend_str)}</b> | Vol: <code>{safe_html(vol_str)}</code> | Struct: <code>{safe_html(struct_str)}</code>\n"
+        f"Bias: <code>{safe_html(execution_bias)}</code> | Nifty: <code>{nifty_str}</code> | VIX: <code>{vix_str}</code>{vix_emoji} | FII: <code>{fii_str}</code>\n"
+        f"{lesson_block}"
+        f"{pattern_block}\n"
+        f"\n"
+        f"💰 Cost: <code>${cost_usd:.2f}</code>"
     )
     return send_silent(text[:_MAX_LENGTH])
 
 
-def send_phase1_complete(trade_date: str, regime: str, execution_bias: str) -> int | None:
-    text = (
-        f"📊 <b>Phase 1 Complete — {trade_date}</b>\n"
-        f"Regime: <code>{regime}</code>\n"
-        f"Bias: <code>{execution_bias}</code>"
-    )
-    return send_silent(text)
+def send_prescan_complete(
+    trade_date: str,
+    forwarded_symbols: list[dict],
+    cost_usd: float,
+) -> int | None:
+    url = _get_dashboard_url()
 
+    # Group forwarded symbols by direction
+    longs = [s.get("symbol", "") for s in forwarded_symbols if s.get("direction") == "LONG"]
+    shorts = [s.get("symbol", "") for s in forwarded_symbols if s.get("direction") == "SHORT"]
+    
+    long_list_str = ", ".join(f"<code>{safe_html(s)}</code>" for s in longs) if longs else "None"
+    short_list_str = ", ".join(f"<code>{safe_html(s)}</code>" for s in shorts) if shorts else "None"
 
-def send_prescan_complete(trade_date: str, forwarded: int, total: int) -> int | None:
     text = (
-        f"🔎 <b>Pre-scan Complete — {trade_date}</b>\n"
-        f"Forwarded to deep analysis: <code>{forwarded}</code> / <code>{total}</code> stocks"
+        f"🔍 <b>Pre-Scan Complete — {trade_date}</b>\n"
+        f"\n"
+        f"<b>FORWARDED FOR DEEP SCAN ({len(forwarded_symbols)})</b>:\n"
+        f"🟢 <b>LONG ({len(longs)})</b>: {long_list_str}\n"
+        f"🔴 <b>SHORT ({len(shorts)})</b>: {short_list_str}\n"
+        f"\n"
+        f"💰 Cost: <code>${cost_usd:.2f}</code>\n"
+        f"\n"
+        f'📱 <a href="{url}">View Dashboard</a>'
     )
     return send_silent(text)
 

@@ -25,6 +25,7 @@ from database.queries import (
 )
 from new_notifications.telegram import (
     send_pipeline_complete,
+    send_prescan_pipeline_complete,
     send_validation_start,
     send_validation_complete,
 )
@@ -56,9 +57,6 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None, 
 
     all_symbol_count = len(symbols)
     logger.info("Pipeline start: %s | %d symbols", session_id, all_symbol_count)
-
-    # ── Validation start notification ─────────────────────────────────────────
-    send_validation_start(str(session_date))
 
     # ── Run Data Validation & Self-Healing first ──────────────────────────────
     from new_validation.run_validation import run_validation_now
@@ -162,28 +160,28 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None, 
     logger.info("Stage 4: Building context bundle...")
     context_bundle = build_context_bundle(session_date, session_id, regime_result=None)
 
-    # ── Stage 4.5: Watchlist Priority ─────────────────────────────────────────
-    # Fetch active watchlist stocks and prioritize for deep analysis
-    watchlist_stocks = []
-    try:
-        active_wl = get_watchlist()
-        # Filter for active ones (WATCH/ON_RADAR) within 10 days
-        watchlist_stocks = [
-            {
-                "symbol": r["symbol"],
-                "direction": r.get("direction_bias", "AUTO"),
-                "priority": "HIGH",
-                "forward_to_deep": True,
-                "is_watchlist_reanalysis": True,
-                "days_in_stage": r.get("days_in_stage", 0)
-            }
-            for r in active_wl
-            if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY", "MANUAL_ADD") and r.get("days_in_stage", 0) <= 10
-        ]
-        if watchlist_stocks:
-            logger.info("Watchlist re-analysis: %d stocks prioritized", len(watchlist_stocks))
-    except Exception as exc:
-        logger.warning("Failed to fetch watchlist for re-analysis: %s", exc)
+    # # ── Stage 4.5: Watchlist Priority ─────────────────────────────────────────
+    # # Fetch active watchlist stocks and prioritize for deep analysis
+    # watchlist_stocks = []
+    # try:
+    #     active_wl = get_watchlist()
+    #     # Filter for active ones (WATCH/ON_RADAR) within 10 days
+    #     watchlist_stocks = [
+    #         {
+    #             "symbol": r["symbol"],
+    #             "direction": r.get("direction_bias", "AUTO"),
+    #             "priority": "HIGH",
+    #             "forward_to_deep": True,
+    #             "is_watchlist_reanalysis": True,
+    #             "days_in_stage": r.get("days_in_stage", 0)
+    #         }
+    #         for r in active_wl
+    #         if r.get("current_stage") in ("WATCH", "ON_RADAR", "TRADE_READY", "MANUAL_ADD") and r.get("days_in_stage", 0) <= 10
+    #     ]
+    #     if watchlist_stocks:
+    #         logger.info("Watchlist re-analysis: %d stocks prioritized", len(watchlist_stocks))
+    # except Exception as exc:
+    #     logger.warning("Failed to fetch watchlist for re-analysis: %s", exc)exc
 
     # ── Stage 5: Claude Session ───────────────────────────────────────────────
     logger.info("Stage 5: Claude multi-turn session (%d stocks)...", len(level1_passed))
@@ -196,88 +194,121 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None, 
     regime_result = claude_result["regime_result"]
     print(regime_result)
 
-    # # ── Pipeline complete ─────────────────────────────────────────────────────
-    # # FIX: Ground-truth DB validation before final notification
-    # from database.queries import get_row_count
-    # # Verify setups were created AFTER the pipeline started
-    # started_dt = datetime.fromisoformat(started_at)
-    # actual_setups = get_row_count(
-    #     "trade_setups",
-    #     {"setup_date": str(session_date)},
-    #     created_after=started_dt
-    # )
-    # trade_ready   = claude_result.get("trade_ready", 0)
-    # watch         = claude_result.get("watch", 0)
-    #
-    # if actual_setups < (trade_ready + watch):
-    #     logger.warning(
-    #         "DB VALIDATION WARNING: Pipeline reported %d setups but only %d NEW setups found in DB",
-    #         trade_ready + watch, actual_setups
-    #     )
-    # else:
-    #     logger.info("DB VALIDATION OK: %d NEW setups verified in database", actual_setups)
-    #
-    # elapsed_min = int((datetime.now(IST) - started_dt).total_seconds() / 60)
-    #
-    # # Gather cost info and context warnings for notification
-    # monthly_spent      = 0.0
-    # budget_usd         = 50.0
-    # usd_to_inr         = 84.0
-    # sessions_remaining = 0
-    # context_warnings: list[str] = []
-    # try:
-    #     from database.queries import get_monthly_claude_spend, get_all_system_config as _cfg
-    #     _config    = _cfg()
-    #     budget_usd = float(_config.get("claude_monthly_budget_usd", 50.0))
-    #     usd_to_inr = float(_config.get("usd_to_inr_rate", 84.0))
-    #     monthly_spent = get_monthly_claude_spend()
-    #     remaining  = max(0.0, budget_usd - monthly_spent)
-    #     sess_cost  = claude_result["cost_usd"]
-    #     sessions_remaining = int(remaining / sess_cost) if sess_cost > 0 else 0
-    #
-    #     for dr in claude_result.get("deep_results", []):
-    #         sym = dr.get("symbol", "")
-    #         for note in dr.get("quality_notes", []):
-    #             if any(w in note.lower() for w in ("unavailable", "no options snapshot", "no oi", "no futures")):
-    #                 context_warnings.append(f"{sym}: {note[:40]}")
-    # except Exception:
-    #     pass
-    #
-    # send_pipeline_complete(
-    #     trade_date=str(session_date),
-    #     trade_ready=trade_ready,
-    #     watch=watch,
-    #     duration_mins=elapsed_min,
-    #     cost_usd=claude_result["cost_usd"],
-    #     monthly_spent_usd=monthly_spent,
-    #     budget_usd=budget_usd,
-    #     usd_to_inr=usd_to_inr,
-    #     sessions_remaining=sessions_remaining,
-    #     context_warnings=context_warnings[:3] or None,
-    #     verified_in_db=actual_setups
-    # )
-    #
-    # forwarded = sum(1 for s in claude_result["turn2_results"] if s.get("forward_to_deep"))
-    # logger.info(
-    #     "Pipeline complete: %s | cost=$%.4f | forwarded=%d",
-    #     session_id, claude_result["cost_usd"], forwarded,
-    # )
-    #
-    # return {
-    #     "session_id":          session_id,
-    #     "regime":              regime_result["regime"],
-    #     "level1_passed":       len(level1_passed),
-    #     "prescan_forwarded":   forwarded,
-    #     "trade_ready":         trade_ready,
-    #     "watch":               watch,
-    #     "deep_results":        claude_result.get("deep_results", []),
-    #     "turn1_result":        claude_result["turn1_result"],
-    #     "turn2_results":       claude_result["turn2_results"],
-    #     "total_input_tokens":  claude_result["total_input_tokens"],
-    #     "total_output_tokens": claude_result["total_output_tokens"],
-    #     "cost_usd":            claude_result["cost_usd"],
-    # }
-    return {}
+    # ── Pipeline complete ─────────────────────────────────────────────────────
+    # FIX: Ground-truth DB validation before final notification
+    from database.queries import get_row_count
+    # Verify setups were created AFTER the pipeline started
+    started_dt = datetime.fromisoformat(started_at)
+    actual_setups = get_row_count(
+        "trade_setups",
+        {"setup_date": str(session_date)},
+        created_after=started_dt
+    )
+
+    # Extract results and details for consolidated notification
+    deep_results = claude_result.get("deep_results", [])
+    
+    trade_ready_symbols = [
+        r.get("symbol") for r in deep_results if r.get("stage") == "TRADE_READY"
+    ]
+    watch_symbols = [
+        r.get("symbol") for r in deep_results if r.get("stage") == "WATCH"
+    ]
+    
+    trade_ready   = len(trade_ready_symbols)
+    watch         = len(watch_symbols)
+
+    if deep_results:
+        if actual_setups < (trade_ready + watch):
+            logger.warning(
+                "DB VALIDATION WARNING: Pipeline reported %d setups but only %d NEW setups found in DB",
+                trade_ready + watch, actual_setups
+            )
+        else:
+            logger.info("DB VALIDATION OK: %d NEW setups verified in database", actual_setups)
+
+    elapsed_min = int((datetime.now(IST) - started_dt).total_seconds() / 60)
+
+    # Gather cost info and context warnings for notification
+    monthly_spent      = 0.0
+    budget_usd         = 50.0
+    usd_to_inr         = 96.0
+    sessions_remaining = 0
+    context_warnings: list[str] = []
+    try:
+        from database.queries import get_monthly_claude_spend, get_all_system_config as _cfg
+        _config    = _cfg()
+        budget_usd = float(_config.get("claude_monthly_budget_usd", 50.0))
+        usd_to_inr = float(_config.get("usd_to_inr_rate", usd_to_inr))
+        monthly_spent = get_monthly_claude_spend()
+        remaining  = max(0.0, budget_usd - monthly_spent)
+        sess_cost  = claude_result["cost_usd"]
+        sessions_remaining = int(remaining / sess_cost) if sess_cost > 0 else 0
+
+        for dr in deep_results:
+            sym = dr.get("symbol", "")
+            for note in dr.get("quality_notes", []):
+                if any(w in note.lower() for w in ("unavailable", "no options snapshot", "no oi", "no futures")):
+                    context_warnings.append(f"{sym}: {note[:40]}")
+    except Exception:
+        pass
+
+    # Extract indicators from Turn 1 context
+    nifty_close = regime_result.get("nifty_close")
+    vix = regime_result.get("vix")
+    fii_net_flow_cr = None
+    try:
+        from database.queries import get_latest_fii_dii
+        fii_row = get_latest_fii_dii()
+        if fii_row:
+            fii_net_flow_cr = fii_row.get("fii_net_cr")
+    except Exception:
+        pass
+
+    if deep_results:
+        # Deep analysis complete notification
+        send_pipeline_complete(
+            trade_date=str(session_date),
+            trade_ready_count=trade_ready,
+            watch_count=watch,
+            duration_mins=elapsed_min,
+            cost_usd=claude_result["cost_usd"],
+            market_trend=regime_result.get("market_trend", "SIDEWAYS"),
+            market_volatility=regime_result.get("market_volatility", "NORMAL"),
+            market_structure=regime_result.get("market_structure", "WIDE"),
+            execution_bias=regime_result.get("execution_bias", "NEUTRAL"),
+            nifty_close=nifty_close,
+            vix=vix,
+            fii_net_flow_cr=fii_net_flow_cr,
+            trade_ready_symbols=trade_ready_symbols,
+            watch_symbols=watch_symbols,
+            monthly_spent_usd=monthly_spent,
+            budget_usd=budget_usd,
+            usd_to_inr=usd_to_inr,
+            sessions_remaining=sessions_remaining,
+            context_warnings=context_warnings[:3] or None,
+            verified_in_db=actual_setups
+        )
+
+    forwarded = sum(1 for s in claude_result["turn2_results"] if s.get("forward_to_deep"))
+    logger.info(
+        "Pipeline complete: %s | cost=$%.4f | forwarded=%d",
+        session_id, claude_result["cost_usd"], forwarded,
+    )
+
+    return {
+        "session_id":          session_id,
+        "regime":              regime_result["regime"],
+        "level1_passed":       len(level1_passed),
+        "prescan_forwarded":   forwarded,
+        "trade_ready":         trade_ready,
+        "watch":               watch,
+        "deep_results":        claude_result.get("deep_results", []),
+        "turn1_result":        claude_result["turn1_result"],
+        "turn2_results":       claude_result["turn2_results"],
+        "total_input_tokens":  claude_result["total_input_tokens"],
+        "total_output_tokens": claude_result["total_output_tokens"],
+    }
 
 
 def run_oi_series_for_indices() -> dict:
