@@ -6,6 +6,19 @@ import type { DeepAnalysisResponse, DeepAnalysisTurn } from '../types';
 
 const INR = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
 
+function extractDateFromSessionId(sessionId: string | null | undefined): string | null {
+  if (!sessionId) return null;
+  const match = sessionId.match(/[a-zA-Z]+_(\d{8})/);
+  if (match && match[1]) {
+    const yyyymmdd = match[1];
+    const yyyy = yyyymmdd.substring(0, 4);
+    const mm = yyyymmdd.substring(4, 6);
+    const dd = yyyymmdd.substring(6, 8);
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return null;
+}
+
 // ── Individual stock card (collapsed by default) ───────────────────────────────
 
 function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
@@ -251,12 +264,14 @@ export default function DeepAnalysisScreen() {
 
   const totalStocks = deepTurns.length;
 
+  const extractedDate = extractDateFromSessionId(data?.session_id) || data?.session_date;
+
   return (
     <div className="pb-20">
       <div className="px-4 pt-5 pb-3">
         <h1 className="text-xl font-semibold text-gray-900">Deep Analysis</h1>
         <p className="text-xs text-gray-500 mt-1">
-          {data?.session_date ? `Session: ${data.session_date}` : 'Latest session'}
+          {extractedDate ? `Session: ${extractedDate}` : 'Latest session'}
           {totalStocks > 0 ? ` · ${totalStocks} stocks` : ''}
         </p>
       </div>

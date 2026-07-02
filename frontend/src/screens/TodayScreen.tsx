@@ -19,6 +19,19 @@ function getISTNow() {
   };
 }
 
+function extractDateFromSessionId(sessionId: string | null | undefined): string | null {
+  if (!sessionId) return null;
+  const match = sessionId.match(/[a-zA-Z]+_(\d{8})/);
+  if (match && match[1]) {
+    const yyyymmdd = match[1];
+    const yyyy = yyyymmdd.substring(0, 4);
+    const mm = yyyymmdd.substring(4, 6);
+    const dd = yyyymmdd.substring(6, 8);
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return null;
+}
+
 function toYMD(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
@@ -91,7 +104,7 @@ const STANCE_CARD: Record<string, string> = {
   HEADWIND: 'bg-red-50 text-red-900 border-red-100',
 };
 
-function MarketAnalysisPanel({ turn }: { turn: DeepAnalysisTurn }) {
+function MarketAnalysisPanel({ turn, sessionDate }: { turn: DeepAnalysisTurn; sessionDate?: string }) {
   let a = turn.analysis;
   if (a?.error === 'JSON parse failure' && a.raw) {
     try {
@@ -111,9 +124,18 @@ function MarketAnalysisPanel({ turn }: { turn: DeepAnalysisTurn }) {
   const guidance = (a.guidance           as any) || {};
   const flags    = (a.risk_flags as string[]) || [];
 
-  const dateLabel = turn.completed_at
+  const formattedSessionDate = sessionDate ? (() => {
+    const parts = sessionDate.split('-');
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    }
+    return sessionDate;
+  })() : '';
+
+  const dateLabel = formattedSessionDate || (turn.completed_at
     ? new Date(turn.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-    : '';
+    : '');
 
   const mentorFields: [string, string][] = [
     ["Today's Key Lesson",   mentor.todays_key_lesson],
@@ -361,11 +383,11 @@ function MarketAnalysisPanel({ turn }: { turn: DeepAnalysisTurn }) {
 
 // ── Fallback simple market context (when no deep analysis available) ───────────
 
-function SimpleMarketContext({ ctx }: { ctx: NonNullable<TodayResponse['market_context']> }) {
+function SimpleMarketContext({ ctx, sessionDate }: { ctx: NonNullable<TodayResponse['market_context']>, sessionDate?: string }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-4">
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-        Market Context · {ctx.session_date}
+        Market Context · {sessionDate || ctx.session_date}
       </p>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -437,8 +459,10 @@ export default function TodayScreen() {
     );
   }
 
-  const ctx      = todayData?.market_context;
-  const isStale  = computeStale(ctx?.session_date);
+  const ctx               = todayData?.market_context;
+  const sessionDateFromId = extractDateFromSessionId(todayData?.session_info?.session_id);
+  const displayDate       = sessionDateFromId || ctx?.session_date;
+  const isStale           = computeStale(displayDate);
   const trCount  = todayData?.trade_ready?.length ?? 0;
   const wtCount  = todayData?.watch?.length ?? 0;
 
@@ -453,8 +477,8 @@ export default function TodayScreen() {
           <p className="text-xs text-amber-700">
             {todayData?.session_info?.hours_since_run != null
               ? `Data may be stale — last pipeline ran ${todayData.session_info.hours_since_run}h ago`
-              : todayData?.market_context?.session_date
-                ? `Showing data from ${todayData.market_context.session_date} — pipeline has not run tonight`
+              : displayDate
+                ? `Showing data from ${displayDate} — pipeline has not run tonight`
                 : 'No analysis found — pipeline has not run yet'}
           </p>
         </div>
@@ -462,9 +486,9 @@ export default function TodayScreen() {
 
       {/* Market analysis — rich panel if deep analysis available, else simple fallback */}
       {marketTurn ? (
-        <MarketAnalysisPanel turn={marketTurn} />
+        <MarketAnalysisPanel turn={marketTurn} sessionDate={displayDate} />
       ) : ctx ? (
-        <SimpleMarketContext ctx={ctx} />
+        <SimpleMarketContext ctx={ctx} sessionDate={displayDate} />
       ) : null}
 
       {/* Divider */}
