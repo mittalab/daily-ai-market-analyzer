@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 IST = pytz.timezone("Asia/Kolkata")
 
 
-def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None) -> dict:
+def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None, prefix: str | None = None) -> dict:
     """
     Run the full nightly analysis pipeline for session_date.
 
@@ -48,7 +48,8 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None) 
     Non-critical stage errors (OI builder, single-stock data) are logged and
     the pipeline continues.
     """
-    session_id = f"TEST_{session_date.strftime('%Y%m%d')}"
+    updated_prefix = f"{prefix}_" if prefix else ""
+    session_id = f"{updated_prefix}Session_{session_date.strftime('%Y%m%d')}"
     started_at = datetime.now(IST).isoformat()
     # Resolve target symbols (Nifty 50 + active watchlist)
     symbols = get_stock_list_for_analysis()
