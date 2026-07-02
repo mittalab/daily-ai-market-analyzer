@@ -109,14 +109,43 @@ def get_holiday_dates() -> set[date]:
     return {date.fromisoformat(d) for d in raw}
 
 
-def last_trading_day(ref: date | None = None, max_lookback: int = 10) -> date:
-    """Return the most recent trading day (weekday, not a holiday) on or before ref."""
-    dt       = ref or date.today()
+# def last_trading_day(ref: date | None = None, max_lookback: int = 10) -> date:
+#     """Return the most recent trading day (weekday, not a holiday) on or before ref."""
+#     dt       = ref or date.today()
+#     holidays = get_holiday_dates()
+#     for _ in range(max_lookback):
+#         if dt.weekday() < 5 and dt not in holidays:
+#             return dt
+#         dt -= timedelta(days=1)
+#     raise ValueError("No trading day found within lookback window")
+
+import pytz
+from datetime import date, datetime, time, timedelta
+
+def last_trading_day(ref: date | datetime | None = None, max_lookback: int = 10) -> date:
+    """Return the most recent trading day (weekday, not a holiday) on or before ref.
+
+    If the evaluation time (current or historical via datetime) is before
+    3:40 PM IST, the search window shifts to the previous day.
+    """
     holidays = get_holiday_dates()
+    ist_tz = pytz.timezone("Asia/Kolkata")
+
+    dt = ref
+    if ref is None:
+        # Live market tracking engine mode (Uses current time in IST)
+        now_ist = datetime.now(ist_tz)
+        if now_ist.time() < time(15, 40):
+            dt = (now_ist - timedelta(days=1)).date()
+        else:
+            dt = now_ist.date()
+
+    # Lookback loop execution engine
     for _ in range(max_lookback):
         if dt.weekday() < 5 and dt not in holidays:
             return dt
         dt -= timedelta(days=1)
+
     raise ValueError("No trading day found within lookback window")
 
 

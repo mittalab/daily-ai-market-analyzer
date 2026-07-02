@@ -18,6 +18,7 @@ Return shape of get_stock_list_for_analysis():
     }
 """
 import logging
+from datetime import time
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -143,8 +144,7 @@ def get_stock_list_for_analysis(include_kite_trades: bool = True) -> dict[str, d
 # Stocks exiting or recently exited the F&O segment — add here to skip validation.
 # These stocks may still appear in the NFO instruments list during wind-down but
 # won't have mid/far-month contracts, causing perpetual validation failures.
-_FO_EXCLUSIONS: set[str] = {
-}
+_FO_EXCLUSIONS: set[str] = set()
 
 
 def fetch_kite_fo_stocks() -> list[str]:
@@ -185,9 +185,9 @@ def fetch_kite_fo_stocks() -> list[str]:
             for inst in nfo_instruments
             if inst.get("name")
         }
-
+        nfo_list = nfo_underlyings.intersection(nse_stocks)
         # Keep only underlying names that are listed as active NSE equities
-        fo_stocks = sorted(nfo_underlyings.intersection(nse_stocks) - _FO_EXCLUSIONS)
+        fo_stocks = sorted(nfo_list - _FO_EXCLUSIONS)
         if _FO_EXCLUSIONS:
             logger.info("Found %d F&O stocks (%d excluded: %s)", len(fo_stocks), len(_FO_EXCLUSIONS), sorted(_FO_EXCLUSIONS))
         else:

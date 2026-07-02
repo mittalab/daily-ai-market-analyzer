@@ -63,7 +63,7 @@ def job_evening_bhavcopy() -> None:
       1. Validation started          (send_validation_start)
       2. Validation complete + fails (send_validation_complete)
     """
-    today = date.today()
+    #today = date.today()
     # if not is_trading_day(today):
     #     logger.info("Morning bhavcopy skipped — %s is not a trading day", today)
     #     return
@@ -71,7 +71,7 @@ def job_evening_bhavcopy() -> None:
     from new_data_ingestion.nse_bhavcopy import last_trading_day
     from new_notifications.telegram import send_validation_start, send_validation_complete
 
-    target_date = last_trading_day(today)
+    target_date = last_trading_day()
     logger.info("Morning bhavcopy: fetching equity + FO data for %s", target_date)
 
     send_validation_start(str(target_date), label="F&O Universe")
@@ -296,5 +296,5 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
 
 
 if __name__ == "__main__":
-    #job_evening_bhavcopy()
-    run_pipeline(date.today())
+    job_evening_bhavcopy()
+    #run_pipeline(date.today())
