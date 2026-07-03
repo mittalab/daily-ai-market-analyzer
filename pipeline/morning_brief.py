@@ -200,13 +200,16 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
             
             from new_notifications.telegram import safe_html
             lines.append(f"• <code>{safe_html(symbol)}</code> ({safe_html(direction)}, Conv: <code>{score}</code>){day_str}")
+
         if len(watch) > 5:
             lines.append(f"...and <code>{len(watch) - 5}</code> more on dashboard")
+
+        lines.append("")
+        lines.append(f"<b>{DIVIDER}</b>")
     # else:
     #     lines.append("🟡 No stocks on watch today")
 
-    lines.append("")
-    lines.append(f"<b>{DIVIDER}</b>")
+
     lines.append(f'📱 <a href="{get_dashboard_url()}">Full Analysis & Chart Context</a>')
 
     msg = "\n".join(lines)
