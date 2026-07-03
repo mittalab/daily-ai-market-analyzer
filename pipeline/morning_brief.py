@@ -70,7 +70,7 @@ def _fii_fmt(v) -> str:
     if v is None:
         return "N/A"
     cr = float(v)
-    sign = "+" if cr >= 0 else ""
+    sign = "+" if cr >= 0 else "-"
     return f"{sign}₹{abs(cr):,.0f} Cr"
 
 
@@ -155,7 +155,7 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
         if struct: context_parts.append(struct.title())
         context_str = " | ".join(context_parts) if context_parts else "N/A"
         
-        lines.append(f"Nifty: <code>{nifty_s}</code> | {context_str}")
+        lines.append(f"Nifty: <code>{nifty_s}</code> | {context_str}\n")
         lines.append(f"VIX: <code>{vix_s}</code> {_vix_emoji(vix)} | FII: <code>{_fii_fmt(fii_cr)}</code>")
     else:
         fii_cr = fii_row.get("fii_net_cr") if fii_row else None
@@ -173,9 +173,9 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
                 lines.append(f"<b>{DIVIDER}</b>")
     else:
         lines.append("<b>🔴 No Trade Ready setups today</b>")
-        trend = session.get("market_trend") if session else None
-        regime_line = trend.title() if trend else "Unknown Trend"
-        lines.append(f"Market conditions: {regime_line} — no setups from last night's scan.")
+        # trend = session.get("market_trend") if session else None
+        # regime_line = trend.title() if trend else "Unknown Trend"
+        # lines.append(f"Market conditions: {regime_line} — no setups from last night's scan.")
 
     lines.append(f"<b>{DIVIDER}</b>")
 
@@ -202,8 +202,8 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
             lines.append(f"• <code>{safe_html(symbol)}</code> ({safe_html(direction)}, Conv: <code>{score}</code>){day_str}")
         if len(watch) > 5:
             lines.append(f"...and <code>{len(watch) - 5}</code> more on dashboard")
-    else:
-        lines.append("🟡 No stocks on watch today")
+    # else:
+    #     lines.append("🟡 No stocks on watch today")
 
     lines.append("")
     lines.append(f"<b>{DIVIDER}</b>")
