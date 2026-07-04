@@ -199,3 +199,21 @@ export interface AnalyseResponse {
   duration_seconds: number;
   setup_id: string | null;
 }
+
+export interface IndicatorValRow {
+  system: number | null;
+  tradingview: number | null;
+  diff_pct: number | null;
+}
+
+export interface IndicatorValidation {
+  symbol: string;
+  date: string;
+  indicators: {
+    [key: string]: IndicatorValRow;
+  };
+  computation_method: string;
+  warnings: string[];
+  note: string;
+}
+

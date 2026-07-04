@@ -1,4 +1,4 @@
-import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse } from './types';
+import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse, IndicatorValidation } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -105,3 +105,12 @@ export async function fetchChatContextText(): Promise<string> {
 export function fetchFoStocks(): Promise<string[]> {
   return apiFetch<string[]>('/api/fo-stocks');
 }
+
+export function fetchIndicatorValidation(
+  symbol: string,
+  date?: string
+): Promise<IndicatorValidation> {
+  const query = date ? `?symbol=${symbol}&date=${date}` : `?symbol=${symbol}`;
+  return apiFetch<IndicatorValidation>(`/api/validate/indicators${query}`);
+}
+

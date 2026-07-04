@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { fetchSystemStatus } from '../api';
-import type { CostInfo, SessionTurn, SystemStatus } from '../types';
+import { useEffect, useState, useCallback } from 'react';
+import { fetchSystemStatus, fetchFoStocks, fetchIndicatorValidation } from '../api';
+import type { CostInfo, SessionTurn, SystemStatus, IndicatorValidation } from '../types';
 
 function StatusDot({ ok }: { ok: boolean }) {
   return (
@@ -136,6 +136,183 @@ function ContextQualitySection({ cq }: { cq: NonNullable<CostInfo['context_quali
   );
 }
 
+// ── Indicator Validation Section ──────────────────────────────────────────────
+
+function IndicatorValidationSection() {
+  const [stocks, setStocks] = useState<string[]>([]);
+  const [selectedStock, setSelectedStock] = useState('HDFCBANK');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [valData, setValData] = useState<IndicatorValidation | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tvInputs, setTvInputs] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetchFoStocks()
+      .then(setStocks)
+      .catch(err => console.error("Failed to load stocks:", err));
+  }, []);
+
+  const loadValidation = useCallback((symbol: string, dateStr?: string) => {
+    setLoading(true);
+    setError(null);
+    fetchIndicatorValidation(symbol, dateStr)
+      .then(data => {
+        setValData(data);
+        setSelectedDate(data.date);
+        setTvInputs({});
+      })
+      .catch(err => {
+        setError(err instanceof Error ? err.message : 'Failed to fetch validation data');
+        setValData(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (selectedStock) {
+      loadValidation(selectedStock, selectedDate || undefined);
+    }
+  }, [selectedStock, loadValidation]);
+
+  const handleStockChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedStock(e.target.value);
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedDate(e.target.value);
+    loadValidation(selectedStock, e.target.value);
+  };
+
+  const handleTvInputChange = (key: string, val: string) => {
+    setTvInputs(prev => ({ ...prev, [key]: val }));
+  };
+
+  const getDiffPct = (systemVal: number | null, tvStr: string): string => {
+    if (systemVal === null || !tvStr) return '—';
+    const tvVal = parseFloat(tvStr);
+    if (isNaN(tvVal) || systemVal === 0) return '—';
+    const diff = (Math.abs(systemVal - tvVal) / Math.abs(systemVal)) * 100;
+    return diff.toFixed(2) + '%';
+  };
+
+  const isDiffWarning = (systemVal: number | null, tvStr: string): boolean => {
+    if (systemVal === null || !tvStr) return false;
+    const tvVal = parseFloat(tvStr);
+    if (isNaN(tvVal) || systemVal === 0) return false;
+    const diff = (Math.abs(systemVal - tvVal) / Math.abs(systemVal)) * 100;
+    return diff > 1.0;
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+        🔍 Indicator Validation
+      </p>
+
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Select Stock</label>
+          <select
+            value={selectedStock}
+            onChange={handleStockChange}
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {stocks.length > 0 ? (
+              stocks.map(s => <option key={s} value={s}>{s}</option>)
+            ) : (
+              <option value="HDFCBANK">HDFCBANK</option>
+            )}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Date</label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={handleDateChange}
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-6">
+          <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mb-3">
+          {error}
+        </div>
+      )}
+
+      {valData && !loading && (
+        <div>
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-3 bg-gray-50 rounded-lg p-2">
+            <span>Method: <strong className="text-gray-700">{valData.computation_method}</strong></span>
+            {valData.warnings.length > 0 && (
+              <span className="text-amber-600 font-medium">⚠️ {valData.warnings[0]}</span>
+            )}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100 text-[11px] font-semibold text-gray-400 uppercase">
+                  <th className="py-2">Indicator</th>
+                  <th className="py-2 text-right">System</th>
+                  <th className="py-2 text-center w-24">TradingView</th>
+                  <th className="py-2 text-right">Diff%</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {Object.entries(valData.indicators).map(([key, item]) => {
+                  const tvVal = tvInputs[key] || '';
+                  const diffVal = getDiffPct(item.system, tvVal);
+                  const isWarning = isDiffWarning(item.system, tvVal);
+                  
+                  return (
+                    <tr key={key} className="text-sm">
+                      <td className="py-2 font-mono text-xs text-gray-600">{key}</td>
+                      <td className="py-2 text-right font-semibold text-gray-800">
+                        {item.system !== null ? item.system.toFixed(2) : '—'}
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="text"
+                          placeholder="Manual"
+                          value={tvVal}
+                          onChange={(e) => handleTvInputChange(key, e.target.value)}
+                          className="w-16 text-center border border-gray-200 rounded p-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-800"
+                        />
+                      </td>
+                      <td className={`py-2 text-right font-medium font-mono text-xs ${
+                        isWarning ? 'text-red-500 font-semibold' : 'text-gray-500'
+                      }`}>
+                        {diffVal}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-[10px] text-gray-400 text-center mt-3 italic">
+            Enter TradingView manual values to compute variance. Red indicates &gt; 1% deviation.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function PerformanceScreen() {
@@ -207,6 +384,9 @@ export default function PerformanceScreen() {
           🔑 Refresh Kite Token
         </a>
       </div>
+
+      {/* Indicator Validation Section */}
+      <IndicatorValidationSection />
 
       {/* Last pipeline */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">

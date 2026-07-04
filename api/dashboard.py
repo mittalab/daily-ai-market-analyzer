@@ -863,3 +863,18 @@ async def system_status():
         "scheduler_jobs":  jobs,
         "server_time_ist": datetime.now(IST).isoformat(),
     }
+
+
+@router.get("/validate/indicators", tags=["validation"])
+def validate_indicators(symbol: str, date: str | None = None):
+    """
+    Validation endpoint to compute stock indicators for a given date
+    to compare system computations side-by-side with TradingView.
+    """
+    try:
+        from indicators.validation import validate_indicators_vs_manual
+        return validate_indicators_vs_manual(symbol, date)
+    except Exception as exc:
+        logger.error("Indicator validation failed for %s on %s: %s", symbol, date, exc)
+        raise HTTPException(status_code=400, detail=str(exc))
+
