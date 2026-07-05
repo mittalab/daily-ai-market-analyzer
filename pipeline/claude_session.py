@@ -43,6 +43,7 @@ from indicators.technical import (
     calculate_ema,
     calculate_rsi,
     volume_ratio,
+    compute_stock_indicators,
 )
 from pipeline.deep_analysis import (
     DEEP_SYSTEM,
@@ -2024,6 +2025,366 @@ def run_turn2_prescan(
     forwarded_stocks.sort(key=lambda s: (s.get("priority") != "HIGH", s.get("priority") != "MEDIUM"))
 
     return turn2_results, forwarded_stocks, messages, cost_info
+
+
+def _build_turn3_data(
+    symbol: str,
+    session_date: date,
+    turn1_result: dict,
+    turn2_result: list[dict]
+) -> dict:
+    """
+    Assembles the complete data package for one stock (conforming to Section 1-8 of Turn 3 Spec).
+    """
+    logger.info("Assembling Turn 3 data package for %s on %s...", symbol, session_date)
+    
+    # ── Section 1: Stock Identity ─────────────────────────────────────────────
+    assessments = []
+    if isinstance(turn2_result, dict):
+        assessments = turn2_result.get("stock_assessments", []) or turn2_result.get("stocks", []) or []
+    elif isinstance(turn2_result, list):
+        assessments = turn2_result
+        
+    stock_assessment = next(
+        (a for a in assessments if a.get("symbol") == symbol),
+        None
+    )
+
+    print(stock_assessment)
+    is_mandatory = stock_assessment.get("is_mandatory", False) if stock_assessment else False
+    preliminary_direction = (
+        stock_assessment.get("preliminary_direction") 
+        or stock_assessment.get("direction") 
+        or "LONG"
+    ) if stock_assessment else "LONG"
+    
+    preliminary_reason = (
+        stock_assessment.get("reason") 
+        or stock_assessment.get("preliminary_reason") 
+        or ""
+    ) if stock_assessment else ""
+    
+    if not preliminary_reason:
+        logger.warning("preliminary_reason empty for %s — Turn 2 may not have included reason", symbol)
+        preliminary_reason = "No reason provided by Turn 2"
+    
+    from database.queries import get_recent_setups_for_symbol
+    prev_setups_raw = []
+    try:
+        prev_setups_raw = get_recent_setups_for_symbol(symbol, limit=3)
+    except Exception as exc:
+        logger.warning("Failed to query previous setups for %s: %s", symbol, exc)
+        
+    previous_setups = []
+    for s in prev_setups_raw:
+        previous_setups.append({
+            "setup_date": str(s.get("setup_date", "")),
+            "direction": s.get("direction"),
+            "conviction_score": s.get("conviction_score"),
+            "stage": s.get("stage"),
+            "setup_type": s.get("setup_type"),
+            "paper_outcome": s.get("paper_outcome")
+        })
+        
+    identity = {
+        "symbol": symbol,
+        "session_date": str(session_date),
+        "is_mandatory": is_mandatory,
+        "preliminary_direction": preliminary_direction,
+        "preliminary_reason": preliminary_reason,
+        "previous_setups": previous_setups
+    }
+    
+    # ── Section 2: Price History & Section 3: Pre-Computed Indicators ─────────
+    price_rows = []
+    try:
+        price_rows = get_price_history(symbol, days=250)
+    except Exception as exc:
+        logger.warning("Failed to query price history for %s: %s", symbol, exc)
+        
+    if not price_rows:
+        logger.error("Price history is empty for %s. Cannot build Turn 3 package.", symbol)
+        return {}
+        
+    df = pd.DataFrame(price_rows)
+    for col in ("open", "high", "low", "close", "volume"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["close"]).reset_index(drop=True)
+    
+    ohlcv_180d = []
+    for _, r in df.tail(180).iterrows():
+        ohlcv_180d.append({
+            "date": str(r["date"]),
+            "open": float(r["open"]),
+            "high": float(r["high"]),
+            "low": float(r["low"]),
+            "close": float(r["close"]),
+            "volume": int(r["volume"])
+        })
+        
+    indicators_result = {}
+    try:
+        indicators_result = compute_stock_indicators(df)
+    except Exception as exc:
+        logger.error("Failed to compute indicators for %s: %s", symbol, exc)
+        
+    volume_ratio_20d = indicators_result.get("volume_ratio_20d", 1.0)
+    
+    price_history = {
+        "ohlcv_180d": ohlcv_180d,
+        "volume_ratio_20d": volume_ratio_20d
+    }
+    
+    price = df['close'].iloc[-1]
+    ema20_val  = indicators_result.get('ema20')
+    ema50_val  = indicators_result.get('ema50')
+    ema180_val = indicators_result.get('ema180')
+
+    if (ema180_val is not None and ema20_val is not None and ema50_val is not None and
+        price > ema20_val and
+        price > ema50_val and
+        price > ema180_val):
+        ema_arrangement = "BULLISH"
+    elif (ema20_val is not None and ema50_val is not None and
+          price < ema20_val and
+          price < ema50_val):
+        ema_arrangement = "BEARISH"
+    else:
+        ema_arrangement = "MIXED"
+
+    indicators = {
+        "ema20": ema20_val,
+        "ema50": ema50_val,
+        "ema180": ema180_val,
+        "atr14": indicators_result.get("atr14"),
+        "atr_pct": indicators_result.get("atr_pct"),
+        "rsi14": indicators_result.get("rsi14"),
+        "macd_line": indicators_result.get("macd_line"),
+        "macd_signal": indicators_result.get("macd_signal"),
+        "macd_histogram": indicators_result.get("macd_histogram"),
+        "macd_histogram_direction": indicators_result.get("macd_histogram_direction", "SHRINKING"),
+        "rsi_last_20": indicators_result.get("rsi_last_20", []),
+        "macd_hist_last_20": indicators_result.get("macd_hist_last_20", []),
+        "price_vs_ema20": indicators_result.get("price_vs_ema20", "below"),
+        "price_vs_ema50": indicators_result.get("price_vs_ema50", "below"),
+        "price_vs_ema180": indicators_result.get("price_vs_ema180", "unavailable"),
+        "ema_arrangement": ema_arrangement
+    }
+    
+    # ── Section 4: Futures Data ───────────────────────────────────────────────
+    from database.queries import get_futures_series, get_continuous_oi, get_options_snapshot
+    
+    futures_available = False
+    futures_30d = []
+    basis_current = None
+    basis_trend = "STABLE"
+    rollover_phase = "NORMAL"
+    days_to_expiry = None
+    near_month_oi_trend = "STABLE"
+    
+    fut_rows = []
+    try:
+        fut_rows = get_futures_series(symbol, days=30)
+    except Exception as exc:
+        logger.warning("Failed to query futures series for %s: %s", symbol, exc)
+        
+    if fut_rows:
+        futures_available = True
+        for row in fut_rows:
+            futures_30d.append({
+                "date": row["date"],
+                "futures_price": row["futures_price"],
+                "futures_open": row.get("futures_open"),
+                "futures_high": row.get("futures_high"),
+                "futures_low": row.get("futures_low"),
+                "futures_volume": row.get("futures_volume"),
+                "basis": row["basis"],
+                "near_month_oi": row["near_month_oi"]
+            })
+            
+        basis_current = futures_30d[-1]["basis"]
+        rollover_phase = fut_rows[-1].get("rollover_phase", "NORMAL")
+        
+        if len(futures_30d) >= 5:
+            old_basis = futures_30d[-5]["basis"]
+            new_basis = futures_30d[-1]["basis"]
+            if old_basis is not None and new_basis is not None:
+                diff = new_basis - old_basis
+                if diff > 0.5:
+                    basis_trend = "EXPANDING"
+                elif diff < -0.5:
+                    basis_trend = "CONTRACTING"
+                    
+        if len(futures_30d) >= 5:
+            old_oi = futures_30d[-5]["near_month_oi"]
+            new_oi = futures_30d[-1]["near_month_oi"]
+            if old_oi and new_oi and old_oi > 0:
+                pct_change = (new_oi - old_oi) / old_oi * 100
+                if pct_change > 5.0:
+                    near_month_oi_trend = "INCREASING"
+                elif pct_change < -5.0:
+                    near_month_oi_trend = "DECREASING"
+                    
+    futures_data = {
+        "futures_available": futures_available,
+        "futures_30d": futures_30d,
+        "basis_current": basis_current,
+        "basis_trend": basis_trend,
+        "rollover_phase": rollover_phase,
+        "days_to_expiry": None,
+        "near_month_oi_trend": near_month_oi_trend
+    }
+    
+    # ── Section 5: Options Data ───────────────────────────────────────────────
+    options_available = False
+    pcr_near = None
+    max_pain = None
+    atm_strike = None
+    iv_available = False
+    iv_atm = None
+    options_note = ""
+    ce_walls = []
+    pe_walls = []
+    
+    oi_rows = []
+    try:
+        oi_rows = get_continuous_oi(symbol, days=30)
+    except Exception as exc:
+        logger.warning("Failed to query continuous OI series for %s: %s", symbol, exc)
+        
+    latest_oi = oi_rows[-1] if oi_rows else {}
+    near_expiry_str = latest_oi.get("near_expiry")
+    
+    if near_expiry_str:
+        try:
+            near_expiry_date = date.fromisoformat(near_expiry_str)
+            days_to_expiry = (near_expiry_date - session_date).days
+            futures_data["days_to_expiry"] = days_to_expiry
+        except Exception as exc:
+            logger.warning("Failed to compute DTE for %s: %s", symbol, exc)
+            
+        pcr_near = latest_oi.get("pcr_near")
+        max_pain = latest_oi.get("max_pain")
+        
+        options = []
+        try:
+            options = get_options_snapshot(symbol, session_date, date.fromisoformat(near_expiry_str))
+        except Exception as exc:
+            logger.warning("Failed to fetch options snapshot for %s: %s", symbol, exc)
+            
+        if options:
+            options_available = True
+            spot_price = float(df["close"].iloc[-1])
+            
+            strikes = list(set(float(r["strike"]) for r in options))
+            if strikes:
+                atm_strike = min(strikes, key=lambda s: abs(s - spot_price))
+                
+            ce_atm = [r for r in options if r.get("option_type") == "CE" and float(r["strike"]) == atm_strike]
+            if ce_atm and ce_atm[0].get("implied_volatility") is not None:
+                iv_atm = float(ce_atm[0]["implied_volatility"])
+                iv_available = True
+            else:
+                iv_available = any(r.get("implied_volatility") is not None for r in options)
+                
+            if not iv_available:
+                options_note = "IV unavailable — Kite fallback used. OI data available but IV null. Use VIX as vol proxy."
+                
+            try:
+                from pipeline.deep_analysis import oi_walls
+                walls = oi_walls(options, near_expiry_str, top_n=3)
+                ce_walls = walls.get("ce_walls", [])
+                pe_walls = walls.get("pe_walls", [])
+            except Exception as exc:
+                logger.warning("Failed to compute OI walls for %s: %s", symbol, exc)
+                
+    options_data = {
+        "options_available": options_available,
+        "pcr_near": pcr_near,
+        "max_pain": max_pain,
+        "atm_strike": atm_strike,
+        "iv_available": iv_available,
+        "iv_atm": iv_atm,
+        "options_note": options_note,
+        "ce_walls": ce_walls,
+        "pe_walls": pe_walls
+    }
+    
+    # ── Section 6: Sector Context ─────────────────────────────────────────────
+    stock_sector, _ = _sector_info(symbol)
+    sector_known = (stock_sector != "UNKNOWN")
+    
+    sector_picture = None
+    if sector_known:
+        sector_pictures = turn1_result.get("sector_pictures", {})
+        for k, v in sector_pictures.items():
+            if k.upper() == stock_sector.upper():
+                sector_picture = v
+                break
+                
+    sector_context = {
+        "sector_known": sector_known,
+        "stock_sector": stock_sector,
+        "sector_picture": sector_picture
+    }
+    
+    # ── Section 7: Market Context ─────────────────────────────────────────────
+    market_trend = turn1_result.get("market_trend", "SIDEWAYS")
+    market_volatility = turn1_result.get("market_volatility", "LOW")
+    execution_bias = turn1_result.get("execution_bias", "CAUTIOUS")
+    session_risk_level = turn1_result.get("session_risk_level", "MEDIUM")
+    conviction_multiplier = turn1_result.get("conviction_multiplier", 1.0)
+    
+    nifty_price_structure = turn1_result.get("nifty_price_structure", {})
+    if not nifty_price_structure:
+        nifty_price_structure = {
+            "overall_structure": turn1_result.get("market_structure", "RECOVERY"),
+            "trend_quality": turn1_result.get("trend_quality", "CONFLICTING"),
+            "trading_implication": {
+                "summary": turn1_result.get("trading_implication", {}).get("summary", ""),
+                "index_bias": turn1_result.get("trading_implication", {}).get("index_bias", "NEUTRAL"),
+                "conviction_adjustment": turn1_result.get("trading_implication", {}).get("conviction_adjustment", "NEUTRAL"),
+                "key_condition_to_watch": turn1_result.get("trading_implication", {}).get("key_condition_to_watch", "")
+            }
+        }
+        
+    market_context = {
+        "market_trend": market_trend,
+        "market_volatility": market_volatility,
+        "execution_bias": execution_bias,
+        "session_risk_level": session_risk_level,
+        "conviction_multiplier": conviction_multiplier,
+        "nifty_price_structure": nifty_price_structure,
+        "vix_assessment": turn1_result.get("vix_assessment", {}),
+        "fii_dii_assessment": turn1_result.get("fii_dii_assessment", {}),
+        "prescan_guidance": turn1_result.get("prescan_guidance", {})
+    }
+    
+    # ── Section 8: Turn 2 Context ─────────────────────────────────────────────
+    turn2_assessment = {
+        "symbol": symbol,
+        "preliminary_direction": preliminary_direction,
+        "reason": preliminary_reason,
+        "claude_forward_decision": "FORWARD",
+        "is_mandatory": is_mandatory,
+        "inclusion_reason": (stock_assessment.get("inclusion_reason") or "CLAUDE_FORWARD") if stock_assessment else "CLAUDE_FORWARD"
+    }
+    
+    package = {
+        "section1": identity,
+        "section2": price_history,
+        "section3": indicators,
+        "section4": futures_data,
+        "section5": options_data,
+        "section6": sector_context,
+        "section7": market_context,
+        "section8": {
+            "turn2_assessment": turn2_assessment
+        }
+    }
+    
+    return package
 
 
 # ── Turn 3+: Deep Analysis ────────────────────────────────────────────────────
