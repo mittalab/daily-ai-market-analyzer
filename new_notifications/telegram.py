@@ -538,13 +538,15 @@ def send_deep_analysis_complete(
     watch: int,
     on_radar: int,
     skipped: int,
+    cost_usd: float,
 ) -> int | None:
     text = (
         f"🧠 <b>Deep Analysis Complete — {trade_date}</b>\n"
-        f"🟢 Trade Ready: <code>{trade_ready}</code>  "
-        f"🟡 Watch: <code>{watch}</code>  "
-        f"🔵 On Radar: <code>{on_radar}</code>  "
-        f"⚪ Skipped: <code>{skipped}</code>"
+        f"🟢 Trade Ready: <code>{trade_ready}</code>\n"
+        f"🟡 Watch: <code>{watch}</code>\n"
+        f"🔵 On Radar: <code>{on_radar}</code>\n"
+        f"⚪ Skipped: <code>{skipped}</code>\n\n"
+        f"💰 Cost: <code>${cost_usd:.2f}</code>\n"
     )
     return send_silent(text)
 

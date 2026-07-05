@@ -2769,7 +2769,9 @@ def run_turn_deep_analysis(
     config: dict,
     turn_num: int,
     trade_ready_list: list[dict],
-    max_tokens: int = 3000,
+    max_tokens: int = 4000,
+    turn1_result: dict = None,
+    turn2_result: list[dict] = None,
 ) -> tuple[dict, dict]:
     """
     Execute a single stock's Deep Analysis (Turn 3+).
@@ -2784,7 +2786,23 @@ def run_turn_deep_analysis(
     quality_notes: list[str] = []
 
     try:
-        stock_pkg = build_stock_package(symbol, session_date, quality_notes)
+        if not turn1_result or not turn2_result:
+            from database.queries import get_claude_turn
+            if not turn1_result:
+                t1_row = get_claude_turn(session_id, 1)
+                turn1_result = json.loads(t1_row["output_text"]) if t1_row else {}
+            if not turn2_result:
+                t2_row = get_claude_turn(session_id, 2)
+                if t2_row:
+                    turn2_res_raw = json.loads(t2_row["output_text"])
+                    if isinstance(turn2_res_raw, dict):
+                        turn2_result = turn2_res_raw.get("stock_assessments", []) or turn2_res_raw.get("stocks", []) or []
+                    else:
+                        turn2_result = turn2_res_raw
+                else:
+                    turn2_result = []
+
+        stock_pkg = _build_turn3_data(symbol, session_date, turn1_result, turn2_result)
     except Exception as exc:
         logger.error("Build stock package failed for %s: %s", symbol, exc)
         return {
@@ -2806,7 +2824,7 @@ def run_turn_deep_analysis(
     # Add watchlist re-analysis context to prompt
     custom_instructions = ""
     if is_re:
-        prev_setups = stock_pkg.get("previous_setups", [])
+        prev_setups = stock_pkg.get("section1", {}).get("previous_setups", [])
         prev_score = prev_setups[0].get("conviction_score", "??") if prev_setups else "??"
         prev_type  = prev_setups[0].get("setup_type", "??") if prev_setups else "??"
         custom_instructions = (
@@ -2815,12 +2833,12 @@ def run_turn_deep_analysis(
             "Re-evaluate with today's data. Has the setup confirmed or broken down?"
         )
 
-    prompt = build_deep_prompt(stock_pkg, index_ctx, direction)
+    prompt = _build_turn3_prompt(stock_pkg)
     if custom_instructions:
         prompt += custom_instructions
 
     try:
-        analysis, in_tok, out_tok = call_claude_deep(client, prompt)
+        analysis, in_tok, out_tok = call_claude_deep(client, prompt, max_tokens=max_tokens)
     except Exception as exc:
         logger.error("Deep analysis Claude call failed for %s: %s", symbol, exc)
         return {
@@ -2832,7 +2850,7 @@ def run_turn_deep_analysis(
 
     # Position sizing validation
     analysis["symbol"] = symbol
-    analysis = validate_position_sizing(analysis, config)
+    analysis = _validate_position_sizing_turn3(analysis, config)
 
     save_claude_turn(session_id, turn_num, "deep_analysis", symbol,
                      in_tok, out_tok, prompt, json.dumps(analysis))
@@ -2917,6 +2935,7 @@ def run_turn_deep_analysis(
                 "setup_type":       analysis.get("setup_type"),
                 "setup_maturity":   analysis.get("setup_maturity"),
                 "conviction_score": analysis.get("conviction_score"),
+                "instrument":       analysis.get("instrument_recommendation"),
                 "strike":           analysis.get("strike"),
                 "option_type":      analysis.get("option_type"),
                 "expiry_date":      analysis.get("expiry_date"),
@@ -3170,80 +3189,97 @@ def run_claude_session(
     total_input += t2_cost["input_tokens"]
     total_output += t2_cost["output_tokens"]
 
-    # Combine pre-scan forwarded stocks with priority watchlist stocks
-    final_queue = final_forward_list[:]
-
-    # # ── Turns 3+: Deep Analysis ───────────────────────────────────────────────
-    # deep_results: list[dict] = []
-    # trade_ready_list: list[dict] = []
-    #
-    # # Pack the index dimensions explicitly for single stock runs
-    # index_ctx = {
-    #     "regime":            regime_result.get("regime")      if regime_result else "UNKNOWN",
-    #     "market_trend":      regime_result.get("market_trend") if regime_result else "UNKNOWN",
-    #     "market_volatility":  regime_result.get("market_volatility") if regime_result else "UNKNOWN",
-    #     "market_structure":   regime_result.get("market_structure") if regime_result else "UNKNOWN",
-    #     "execution_bias":     regime_result.get("execution_bias") if regime_result else "UNKNOWN",
-    #     "fii_dii_stance":     regime_result.get("fii_dii_stance") if regime_result else "UNKNOWN",
-    #     "nifty_close":       regime_result.get("nifty_close") if regime_result else None,
-    #     "vix":               regime_result.get("vix")         if regime_result else None,
-    #     "ema20":             regime_result.get("ema20")        if regime_result else None,
-    #     "ema50":             regime_result.get("ema50")        if regime_result else None,
-    #     "ret20d_pct":        regime_result.get("ret20d")       if regime_result else None,
-    # }
-    #
-    # for i, prescan_stock in enumerate(final_queue):
-    #     symbol    = prescan_stock.get("symbol", "")
-    #     direction = prescan_stock.get("direction", "AUTO")
-    #     is_re     = prescan_stock.get("is_watchlist_reanalysis", False)
-    #     days_in   = prescan_stock.get("days_in_stage", 0)
-    #     turn_num  = 3 + i
-    #
-    #     if not symbol:
-    #         continue
-    #
-    #     deep_res, deep_cost = run_turn_deep_analysis(
-    #         client=client,
-    #         session_id=session_id,
-    #         session_date=session_date,
-    #         symbol=symbol,
-    #         direction=direction,
-    #         is_re=is_re,
-    #         days_in=days_in,
-    #         index_ctx=index_ctx,
-    #         config=config,
-    #         turn_num=turn_num,
-    #         trade_ready_list=trade_ready_list,
-    #     )
-    #     deep_results.append(deep_res)
-    #     turn_costs.append(deep_cost)
-    #     total_input += deep_cost["input_tokens"]
-    #     total_output += deep_cost["output_tokens"]
-    #
-    # cost_usd = round(
-    #     total_input  / 1_000_000 * 3.00 +
-    #     total_output / 1_000_000 * 15.00,
-    #     6,
-    # )
-    #
-    # trade_ready = sum(1 for d in deep_results if d.get("stage") == "TRADE_READY")
-    # watch       = sum(1 for d in deep_results if d.get("stage") == "WATCH")
-    # on_radar    = sum(1 for d in deep_results if d.get("stage") == "ON_RADAR")
-    # skipped     = sum(1 for d in deep_results if d.get("stage") == "SKIP")
-    # prescan_fwd = sum(1 for s in turn2_results if s.get("forward_to_deep"))
-    #
-    # try:
-    #     from new_notifications.telegram import send_deep_analysis_complete
-    #     send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped)
-    # except Exception as _exc:
-    #     logger.warning("Deep analysis complete notification failed: %s", _exc)
-
     # Calculate cost of pre-scan run
     cost2_usd = round(
         t2_cost["input_tokens"]  / 1_000_000 * 3.00 +
         t2_cost["output_tokens"] / 1_000_000 * 15.00,
         6,
     )
+
+    # Combine pre-scan forwarded stocks with priority watchlist stocks
+    final_queue = final_forward_list[:]
+
+    deep_results: list[dict] = []
+    trade_ready_list: list[dict] = []
+
+    # Pack the index dimensions explicitly for single stock runs
+    index_ctx = {
+        "regime":            regime_result.get("regime")      if regime_result else "UNKNOWN",
+        "market_trend":      regime_result.get("market_trend") if regime_result else "UNKNOWN",
+        "market_volatility":  regime_result.get("market_volatility") if regime_result else "UNKNOWN",
+        "market_structure":   regime_result.get("market_structure") if regime_result else "UNKNOWN",
+        "execution_bias":     regime_result.get("execution_bias") if regime_result else "UNKNOWN",
+        "fii_dii_stance":     regime_result.get("fii_dii_stance") if regime_result else "UNKNOWN",
+        "nifty_close":       regime_result.get("nifty_close") if regime_result else None,
+        "vix":               regime_result.get("vix")         if regime_result else None,
+        "ema20":             regime_result.get("ema20")        if regime_result else None,
+        "ema50":             regime_result.get("ema50")        if regime_result else None,
+        "ret20d_pct":        regime_result.get("ret20d")       if regime_result else None,
+    }
+
+    total_turn3_input = 0
+    total_turn3_output = 0
+
+    for i, prescan_stock in enumerate(final_queue):
+        symbol    = prescan_stock.get("symbol", "")
+        direction = prescan_stock.get("direction", "AUTO")
+        is_re     = prescan_stock.get("is_watchlist_reanalysis", False)
+        days_in   = prescan_stock.get("days_in_stage", 0)
+        turn_num  = 3 + i
+
+        if not symbol:
+            continue
+
+        deep_res, deep_cost = run_turn_deep_analysis(
+            client=client,
+            session_id=session_id,
+            session_date=session_date,
+            symbol=symbol,
+            direction=direction,
+            is_re=is_re,
+            days_in=days_in,
+            index_ctx=index_ctx,
+            config=config,
+            turn_num=turn_num,
+            trade_ready_list=trade_ready_list,
+            turn1_result=turn1_result,
+            turn2_result=turn2_results,
+            max_tokens=10000,
+        )
+        deep_results.append(deep_res)
+        turn_costs.append(deep_cost)
+
+        total_turn3_input += deep_cost["input_tokens"]
+        total_turn3_output += deep_cost["output_tokens"]
+
+        total_input += deep_cost["input_tokens"]
+        total_output += deep_cost["output_tokens"]
+
+    cost_usd = round(
+        total_input  / 1_000_000 * 3.00 +
+        total_output / 1_000_000 * 15.00,
+        6,
+    )
+
+    cost3_usd = round(
+        total_turn3_input  / 1_000_000 * 3.00 +
+        total_turn3_output / 1_000_000 * 15.00,
+        6,
+    )
+
+    trade_ready = sum(1 for d in deep_results if d.get("stage") == "TRADE_READY")
+    watch       = sum(1 for d in deep_results if d.get("stage") == "WATCH")
+    on_radar    = sum(1 for d in deep_results if d.get("stage") == "ON_RADAR")
+    skipped     = sum(1 for d in deep_results if d.get("stage") == "SKIP")
+    prescan_fwd = sum(1 for s in turn2_results if s.get("forward_to_deep"))
+
+    try:
+        from new_notifications.telegram import send_deep_analysis_complete
+        send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped, cost3_usd)
+    except Exception as _exc:
+        logger.warning("Deep analysis complete notification failed: %s", _exc)
+
+
 
     prescan_fwd = len(final_forward_list)
 
@@ -3252,14 +3288,14 @@ def run_claude_session(
         update_analysis_session(session_id, {
             "claude_tokens_input":  total_input,
             "claude_tokens_output": total_output,
-            "claude_cost_usd":      cost1_usd + cost2_usd,
+            "claude_cost_usd":      cost_usd,
             "status":               "ANALYSIS_COMPLETE",
             "market_regime":        regime_result.get("regime"),
             "forward_list":         final_forward_list,
             "stage_statuses": {
                 "claude_turn1":          "COMPLETE",
                 "claude_turn2":          "COMPLETE",
-                "deep_analysis":         "SKIPPED",
+                "deep_analysis":         "COMPLETE",
                 "prescan_total":         len(turn2_results),
                 "prescan_forwarded":     prescan_fwd,
             }
@@ -3270,11 +3306,13 @@ def run_claude_session(
     return {
         "turn1_result":        turn1_result,
         "turn2_results":       turn2_results,
+        "deep_results":        deep_results,
         "forward_list":        final_forward_list,
         "total_input_tokens":  total_input,
         "total_output_tokens": total_output,
-        "cost_usd":            round(cost1_usd + cost2_usd, 6),
+        "cost_usd":            cost_usd,
         "cost1_usd":            cost1_usd,
         "cost2_usd":            cost2_usd,
+        "cost3_usd":            cost3_usd,
         "regime_result":       regime_result,
     }

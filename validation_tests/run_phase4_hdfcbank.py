@@ -68,14 +68,15 @@ def run_phase4():
         return
         
     prompt = _build_turn3_prompt(package)
-    
+    print("CLAUDE INPUT PROMPT")
+    print(prompt)
     # 4. Call Claude
     print("Calling Claude deep analysis API model (please wait)...")
     try:
         from pipeline.deep_analysis import _MODEL, DEEP_SYSTEM
         resp = client.messages.create(
             model=_MODEL,
-            max_tokens=4000,
+            max_tokens=8000,
             system=[{
                 "type": "text",
                 "text": DEEP_SYSTEM,
@@ -85,7 +86,7 @@ def run_phase4():
         )
         raw = resp.content[0].text
         print("\n--- Raw Claude Response ---")
-        print(raw)
+        print(raw.encode('ascii', errors='replace').decode('ascii'))
         
         # Parse it
         t = raw.strip()
@@ -109,12 +110,12 @@ def run_phase4():
     
     # 6. Output formatted response
     print("\n--- Claude JSON Response ---")
-    print(json.dumps(analysis, indent=2))
+    print(json.dumps(analysis, indent=2).encode('ascii', errors='replace').decode('ascii'))
     
     # Save the output to a text file for record
     out_file = "hdfc_turn3_response.json"
-    with open(out_file, "w") as f:
-        json.dump(analysis, f, indent=2)
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump(analysis, f, indent=2, ensure_ascii=False)
     print(f"\nResponse saved to {out_file}")
 
 if __name__ == "__main__":

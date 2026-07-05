@@ -1,0 +1,113 @@
+{
+  "symbol": "HDFCBANK",
+  "direction": "LONG",
+  "stage": "WATCH",
+  "conviction_score": 63,
+  "adjusted_score": 61.11,
+  "conviction_multiplier_applied": 0.97,
+  "setup_summary": {
+    "pattern_name": "Post-Breakout Consolidation / Bull Flag",
+    "pattern_status": "FORMING",
+    "key_candle": "Inside Bar / Narrow Range Candle",
+    "key_candle_location": "AT_SUPPORT",
+    "key_candle_significance": "MEDIUM"
+  },
+  "key_levels": {
+    "support_zone_low": 793.0,
+    "support_zone_high": 800.0,
+    "support_basis": "EMA20 at 783.93, EMA50 at 784.21, recent swing lows 793.3 (29-Jun), 793.5 (01-Jul), 794.0 (02-Jul) and max pain anchor at 800 — price is consolidating in the 793-800 band above both EMAs",
+    "resistance_1": 807.0,
+    "resistance_1_basis": "Intraday highs from 02-Jul (805.45), 30-Jun (806.1), 01-Jul (802.25) and today's high of 807.0 — minor supply cluster 805-807",
+    "resistance_2": 816.1,
+    "resistance_2_basis": "Prior swing high on 08-Apr-2026 close at 816.10; also aligns with the April recovery high cluster around 811-817",
+    "stop_loss": 791.0,
+    "stop_loss_basis": "Below the 793.0-793.5 recent swing low cluster (29-Jun low 793.3, 01-Jul open 793.5) — SL at 791.0 gives 2+ point buffer below structural support and is approximately 0.69x ATR14 (ATR=15.19, SL distance from entry mid ~10.5 pts), just below the 0.75x threshold but structurally well-defined at the base of the consolidation zone"
+  },
+  "trade_parameters": {
+    "entry_low": 799.0,
+    "entry_high": 803.0,
+    "entry_mid": 801.0,
+    "target_1": 808.0,
+    "target_2": 816.0,
+    "rr_t1": 1.0,
+    "rr_t2": 2.38
+  },
+  "options_setup": {
+    "strike": 800.0,
+    "option_type": "CE",
+    "expiry": "2026-07-29",
+    "days_to_expiry": 25,
+    "entry_premium_low": 18.0,
+    "entry_premium_high": 24.0,
+    "sl_pct": 40,
+    "sl_premium": 11.0,
+    "target_1_premium": 30.0,
+    "target_2_premium": 42.0,
+    "iv_note": "IV unavailable — using VIX at 11.80 as proxy. VIX is at a 30-day extreme low indicating significantly compressed option premiums. Buying ATM 800 CE for a ~7-8 pt move in the underlying (T1) may be inefficient due to low volatility. Recommend buying ITM 790 CE or debit spread (800 CE / 820 CE bull call spread) to reduce premium cost. Target the 29-Jul monthly expiry (25 DTE) to avoid theta burn and capture the full 2-5 day swing without excessive time decay pressure. Budget premium should not exceed 1.5% of capital (Rs 7,500).",
+    "lots": 2,
+    "risk_inr": 11000.0,
+    "risk_pct_capital": 2.2,
+    "rr_t1": 0.9,
+    "rr_t2": 2.1
+  },
+  "fut_setup": {
+    "entry_low": 800.0,
+    "entry_high": 806.0,
+    "stop_loss": 791.0,
+    "target_1": 808.0,
+    "target_2": 816.0,
+    "lots": null,
+    "lot_size": null,
+    "risk_inr": null,
+    "risk_pct_capital": null
+  },
+  "instrument_recommendation": "OPTIONS",
+  "instrument_reason": "With 25 DTE on the July monthly expiry and VIX compressed at 11.80, options are viable but expensive relative to move size. Recommend 800 CE or a bull call spread (800/820 CE) on the 29-Jul expiry to keep risk defined within the 2-3% capital rule (~Rs 10,000-15,000 maximum outlay). Futures basis is positive (+4.0) and expanding, which confirms bullish rollover sentiment and could support a futures trade for more direct delta exposure, but the limited swing target of ~15 pts (T2) versus lot size capital requirements makes options the preferred instrument for this capital base. Avoid current week (07-Jul) options — they expire in 2 days with severe theta burn.",
+  "hard_gate_triggered": false,
+  "hard_gate_reason": null,
+  "scoring_breakdown": {
+    "dimension_1": {
+      "score": 34,
+      "max": 55,
+      "pct": 61.8
+    },
+    "dimension_2": {
+      "score": 18,
+      "max": 25,
+      "pct": 72.0
+    },
+    "dimension_3": {
+      "score": 8,
+      "max": 15,
+      "pct": 53.3
+    },
+    "dimension_4": {
+      "score": 3,
+      "max": 5,
+      "pct": 60.0
+    },
+    "raw_total": 63,
+    "adjusted_total": 61.11
+  },
+  "dimension_1_narrative": "S/R ZONES (9/15): HDFCBANK has been consolidating in the 793-806 zone over the past six sessions (29-Jun through 03-Jul). The critical support confluence is at 793-800: the 29-Jun intraday low was 793.3, the 01-Jul open was 793.5, the 02-Jul low was 794.0, and today's low was 798.55 — these cluster tightly just above both EMA20 (783.93) and EMA50 (784.21). EMA dynamic support is approximately 13-17 points below current price and not immediately confluent with today's price action, reducing the S/R score. The 800 max pain level and the 800 CE/PE wall coincidence adds a gravitational magnet quality. The major resistance cluster from the 08-Apr high (816.10) is a valid structural upper bound. Single-point horizontal S/R from multiple recent dates confirms a 793-800 base but lacks EMA confluence at that exact zone, warranting a mid-range score. CHART PATTERNS (7/13): The price action from 25-Jun (796.30 close) through 03-Jul (801.50 close) describes a textbook post-breakout flag/consolidation. The stock ran from 738.65 (08-Jun low) to 805.9 (30-Jun high) — a 8.98% surge — before entering a tight 6-session range between 793.5 and 807.0, forming higher lows (793.3 on 29-Jun, 793.5 on 01-Jul, 794.0 on 02-Jul, 798.55 today). This is a forming bull flag with the pole being the 12-Jun to 30-Jun surge. The flag is not yet resolved upward — today's close at 801.50 is still mid-flag — which limits the score to 'forming' category. BUYER/SELLER ANALYSIS (8/12): Examining last 5 candles: (1) 29-Jun: Open 800, High 805.9, Low 793.3, Close 797.35 — wide range, close near mid, mixed. (2) 30-Jun: Open 806.1, High 806.1, Low 792.75, Close 797.95 — open was the high (bearish character), but close held above 793 support. (3) 01-Jul: Open 793.5, High 802.25, Low 793.5, Close 796.15 — open was the low (bullish reversal), buyers controlled. (4) 02-Jul: Open 795.0, High 805.45, Low 794.0, Close 795.0 — close at open level, slight indecision but held support. (5) 03-Jul (today): Open 803.0, High 807.0, Low 798.55, Close 801.50 — bullish candle, close in upper half, buyers controlled. Net assessment: buyers are asserting at the 793-800 base with two of five candles showing open-at-low (bullish) character. Mild buyer control. CANDLESTICK PATTERNS (5/8): Today's 03-Jul candle is a modest bullish candle: open 803, high 807, low 798.55, close 801.50. The candle body is ~(801.50-803) = -1.5 pts if using open-close, but price closed above the open of prior sessions. More importantly, the 01-Jul session was an inside bullish reversal bar (open = low 793.5, closed at 796.15 in upper 30% of range) at the structural support base — this qualifies as a low-to-medium significance bullish signal at support. The 03-Jul candle shows buying interest above 798.55 but is not a named high-conviction pattern (no hammer, no engulfing). Score reflects medium-low significance. RSI + MACD (3/4): RSI at 60.80 is in a healthy uptrend — rising from oversold territory of 38.22 (10-Jun) to current 60.8 over 20 sessions in a steady staircase: 42, 54.8, 56.6, 59.3, 60.1, 64.1, then mild pullback to 51.76, then reclimbing to 60.80. No RSI divergence — price and RSI are directionally aligned. MACD histogram: The histogram has been consistently positive since the 12-Jun breakout (1.84 on 15-Jun, peaking at 6.67 on 25-Jun, now at 2.56) — the shrinking histogram is a concern as it signals waning momentum (histogram direction: SHRINKING), but the MACD line (8.67) remains above signal (6.12) confirming the underlying trend is still up. Deduct 1 pt for histogram shrinkage. VOLUME (2/3): Volume ratio of 0.83x over 20 days is below average. Today's volume (25.3M) is below recent sessions (45M on 25-Jun, 45M on 29-Jun, 45M on 30-Jun). The rally from 08-Jun has been on declining volume — the strong surge days (12-Jun: 36M, 15-Jun: 39M, 18-Jun: 41M) showed decent participation but recent consolidation days (01-Jul: 26M, 03-Jul: 25M) are thin. Volume does not confirm continuation — neutral at best.",
+  "dimension_2_narrative": "STOP LOSS QUALITY (7/10): The SL is placed at 791.0, below the 793.0-793.5 recent swing low cluster that has held across four consecutive sessions (29-Jun through 02-Jul lows). The structural invalidation is clear: a close below 793 would break the bull flag base and signal distribution resumption. SL distance from entry mid (801.0) = 10 points, or 1.25%. In ATR terms: ATR14 = 15.19; SL distance = 10 pts = 0.66x ATR. This is slightly below the ideal sweet spot of 0.75x-1.5x ATR, suggesting the SL is modestly tight. The 793 cluster support is the defining structural level, not an arbitrary price, so the logic is sound even if ATR distance is at the lower boundary. Score deducted 2 pts for being just below the ATR sweet spot. STRUCTURAL LOGIC: Closing below 793 on any session would mean the consolidation base is breached and the stock would likely retest the EMA20/EMA50 zone at 783-784, which is the next major support. The stop at 791 gives a 2-point buffer below the 793 cluster, appropriate. TARGET LOGIC (8/8): T1 at 808 is the immediate resistance of the flag (30-Jun high 806.1, 02-Jul high 805.45, today's high 807) — a clean breakout would target 808+ first. T2 at 816 aligns with the April swing high cluster (08-Apr close 816.10, 15-Apr close 809.90, 21-Apr close 811.75) providing a major structural ceiling. Both targets are at identifiable S/R levels. R:R T1 = (808-801)/(801-791) = 7/10 = 0.70 (below 1:1 but T1 is a partial profit target). R:R T2 = (816-801)/(801-791) = 15/10 = 1.5:1 — this meets the minimum 1:1.5 requirement, avoiding Gate 2 trigger but is at the floor. R:R scored accordingly. ENTRY ZONE QUALITY (4/5): Entry zone 799-803 is tight (~0.5% width), anchored at the upper end of the 793-800 consolidation base and below the 805-807 resistance cluster. It represents an ideal buy-the-breakout entry as price pushes above the 800 max pain level. The zone has EMA confluence below (EMA20 at 783.9, EMA50 at 784.2) providing downside structural anchoring. Confluence is good but EMAs are 17+ pts away, reducing score by 1. R:R RATIO SCORE (1/2): R:R at T2 = 1.50:1, meets minimum threshold but does not qualify for >= 2.0 bonus score.",
+  "dimension_3_narrative": "INDEX CONTEXT (4/8): Nifty is in a SIDEWAYS/RECOVERY phase with an execution bias of FAVOUR_LONGS but pressing against the 24300-24534 resistance confluence. Today's Nifty candle (open=high at 24378, close 24271) shows early resistance absorption at the supply cluster — this is a neutral-to-mildly-negative index signal for aggressive long entries. The index_bias from the Nifty price structure analysis is NEUTRAL, mapping to 4-5 pts on the index context scale. The MIXED EMA arrangement (price above EMA20/EMA50 but below EMA180) and proximity to major resistance cap the index contribution. FII buying today (+1355 cr) is the first positive print in weeks but one session is insufficient — the DII flip to selling (-1954 cr) adds uncertainty. Score: 4 pts reflecting NEUTRAL index bias with mild headwinds from proximity to resistance. SECTOR CONTEXT (4/7): Banking sector is rated TAILWIND MODERATE with UPTREND_PULLBACK structure — this is the ideal sector for swing longs as the post-breakout digestion above 57200 (Banknifty support) provides a well-defined risk framework. The sector is the 20-day outperformer vs Nifty (+2.45%) confirming institutional preference for banking names. HDFCBANK's 20-day return: from close on ~05-Jun (~753) to today's 801.50 = +6.4%, which compares favorably against the Banknifty's ~+2.45% sector return. HDFCBANK is outperforming the banking sector by more than 2%, warranting a +1 relative strength bonus. Sector base score: 4 (Tailwind Moderate) + 1 (RS outperformance) — but the momentum is described as DECELERATING and the sector is struggling above 58400, applying a mild negative adjustment. Final sector score: 4 pts.",
+  "dimension_4_narrative": "FUTURES BASIS (2/2): Current futures basis is +4.0 (futures at 805.5 vs spot at 801.5), and the trend is EXPANDING. A positive and expanding basis confirms bullish futures positioning — participants are willing to pay a premium for forward exposure, indicating net long conviction in the derivatives market. This is a clean bullish signal for the LONG direction. NEAR MONTH OI is INCREASING (from 115.6M on 25-Jun to 328.3M on 03-Jul following the July series rollover), suggesting fresh long positions are being added in the new series — supportive of the LONG thesis. PCR CONTEXT (1/2): PCR near month = 0.6644, which is below the 0.7 contrarian BEARISH threshold per the operating rules (PCR < 0.7 = contrarian BEARISH). The rules state PCR below 0.7 signals elevated bullish option positioning — this is a contra-bearish signal, meaning the crowd is heavily positioned for upside via calls, which historically increases the probability of a pullback or underwhelming rally. The CE wall at 800 (25,501 OI) is the largest call concentration at exactly the current ATM level, suggesting significant supply/max pain anchoring at 800. The PE support at 800 (13,850 OI) is meaningful but half the CE OI, confirming the call-heavy skew. Score deducted 1 pt for the PCR bearish contrarian signal. ROLLOVER + DTE (0/1): DTE is 25 trading days — well above the 6 trading day minimum, no hard gate triggered for DTE. However, given the low VIX (11.80) and compressed premiums, the options setup carries execution risk from a premium perspective. Rollover phase is NORMAL with the new July series building OI. Score: 0 pts because while DTE is fine, the PCR and options wall structure create friction, and the normal rollover with increasing OI doesn't warrant extra credit beyond the DTE compliance.",
+  "mentor_notes": "This setup teaches the 'post-breakout bull flag entry' pattern — one of the highest-probability swing setups in trending stocks. HDFCBANK completed a powerful surge from 738.65 (08-Jun) to 806.1 (30-Jun), then entered a controlled 6-session consolidation between 793-807, forming a tight range with progressively higher intraday lows. The visual cues to verify: (1) The flag's lower boundary (793-794) held across four consecutive sessions — each dip was bought, showing accumulation. (2) Volume dried up during the flag (~25-26M/day vs 41-45M during the surge) — classic 'flag on low volume' confirming distribution is absent. (3) Today's close at 801.50 in the upper third of the day's range shows intraday buyers remain in control. The key teaching: entries in the upper portion of a tight consolidation zone (near 800-803) after a strong momentum surge offer asymmetric risk — if the flag fails, the stop is defined at the base (793); if it resolves upward, the measured move target is the flag pole length (~67 pts) added to the breakout (~807), implying a mechanical target of ~874 in the longer swing, though our conservative T2 of 816 captures only the immediate structural resistance. The PCR < 0.7 warning is critical education: heavy call buying relative to puts often signals crowded bullish positioning that must be digested before price moves higher — this is why the setup is WATCH and not TRADE_READY.",
+  "why_could_be_wrong": "1. BULL FLAG FAILURE AT 800 CE WALL: The 800 strike has 25,501 CE OI — the largest call wall at the exact ATM level. If sellers defend this level aggressively on the open, HDFCBANK could reject at 805-807 and close below 800 on 04-Jul. A close below 798 (below today's low of 798.55) would signal the flag is resolving downward and would trigger SL review. Specific invalidation: close below 793.0 on volume above 40M confirms flag breakdown. 2. NIFTY BREAKS BELOW 24270 ON SUPPLY ZONE FAILURE: If tomorrow's Nifty session confirms today's shooting star and breaks below 24050 (EMA20 support), banking stocks will face sector-wide selling as FIIs accelerate net selling. HDFCBANK, given its correlation with the index, would likely test the EMA20/EMA50 cluster at 783-784 directly, bypassing the 793 flag base entirely. Specific invalidation: Nifty close below 23878 (EMA50) triggers this scenario; HDFCBANK would likely reach 778-780 in that case. 3. OI BUILDUP IN 800 PE SIGNALS DISTRIBUTION NOT SUPPORT: The 800 PE with 13,850 OI alongside the heavy 800 CE wall (25,501) creates a max pain trap at exactly 800 — market makers have incentive to pin price near 800 at expiry. If institutional participants are selling covered calls at 820 and buying protection at 780, the effective range for HDFCBANK through July expiry may be 780-820 with gravitational pull toward 800. In this scenario, T2 at 816 becomes unachievable as price oscillates between 793-807 without a directional resolution — the trade bleeds theta premium without hitting targets. Specific invalidation: HDFCBANK unable to close above 807 within 3 sessions of entry signals the consolidation is range-bound rather than a flag.",
+  "key_thing_to_watch": "Watch whether HDFCBANK sustains a CLOSE above 807.0 tomorrow (04-Jul) on volume exceeding 35 million shares — this would confirm the bull flag is resolving upward through the 805-807 resistance cluster with sufficient participation, triggering the full long setup with T1 at 808 and T2 at 816. Simultaneously, monitor Nifty's ability to hold above 24270 on the open (today's close) — a gap-down open below 24150 would invalidate the banking sector tailwind assumption and require cancellation of any HDFCBANK long entry regardless of the stock's individual chart.",
+  "rejection_reason": null,
+  "lot_size": 550,
+  "strike": 800.0,
+  "option_type": "CE",
+  "expiry_date": "2026-07-29",
+  "entry_premium_low": 18.0,
+  "entry_premium_high": 24.0,
+  "stop_loss_premium": 11.0,
+  "target_1_premium": 30.0,
+  "target_2_premium": 42.0,
+  "lots": 2,
+  "max_risk_inr": 11000.0,
+  "risk_pct_capital": 2.2,
+  "risk_reward": 2.1
+}
