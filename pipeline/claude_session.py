@@ -2410,6 +2410,23 @@ def _build_turn3_prompt(data_package: dict) -> str:
     options_compact = json.dumps(sec5, separators=(',', ':')) if sec5["options_available"] else "{}"
     previous_setups_compact = json.dumps(sec1["previous_setups"], separators=(',', ':'))
     
+    # Format Sector Context
+    sector_pic = sec6["sector_picture"]
+    if sec6["sector_known"] and sector_pic:
+        sector_picture_text = f"""- Sector: {sec6["stock_sector"]}
+- Stance: {sector_pic.get("stance", "UNKNOWN")}
+- Trend: {sector_pic.get("trend", "UNKNOWN")}
+- Momentum: {sector_pic.get("momentum", "UNKNOWN")}
+- Strength: {sector_pic.get("strength", "UNKNOWN")}
+- Structure: {sector_pic.get("structure", "UNKNOWN")}
+- Support Level: {sector_pic.get("key_levels", {}).get("support", "N/A")}
+- Resistance Level: {sector_pic.get("key_levels", {}).get("resistance", "N/A")}
+- Momentum Analysis: {sector_pic.get("momentum_note", "N/A")}
+- Character & Behaviour: {sector_pic.get("character", "N/A")}
+- Trading Note: {sector_pic.get("trading_note", "N/A")}"""
+    else:
+        sector_picture_text = f"- Sector: {sec6['stock_sector']}\n- Sector analysis details: UNKNOWN"
+
     prompt = f"""[SECTION A: ROLE AND TASK DEFINITION]
 You are a highly experienced hedge fund manager and swing trading mentor specializing in the Indian F&O (Futures & Options) markets. Your task is to perform a meticulous deep analysis on {symbol} for the session date {sec1["session_date"]}.
 
@@ -2435,8 +2452,7 @@ You must apply the 100-point Conviction Scoring Framework and enforce all operat
 - Prescan Guidance: {json.dumps(sec7["prescan_guidance"], separators=(',', ':'))}
 
 - Sector Context:
-  - Sector: {sec6["stock_sector"]}
-  - Stance details: {json.dumps(sec6["sector_picture"], separators=(',', ':')) if sec6["sector_known"] else "UNKNOWN"}
+{sector_picture_text}
 
 [SECTION D: PRICE DATA]
 - 180 Days OHLCV Time Series:
@@ -2468,7 +2484,7 @@ You must apply the 100-point Conviction Scoring Framework and enforce all operat
 {options_compact}
 
 [SECTION F: SCORING INSTRUCTIONS]
-Evaluate the stock setup across 4 dimensions (100 Points Total) using the following rubrics.
+Evaluate the stock setup across 4 dimensions (100 Points Total) using the following rubrics:
 
 1. Dimension 1: Price Structure (55 pts)
    - S/R Zones (15 pts): EMA dynamic support + horizontal swing levels confluence. 14-15 = major confluence, 10-13 = clear S/R from 2 sources, 6-9 = single level, 2-5 = weak, 0-1 = no basis.
@@ -2503,11 +2519,12 @@ Apply thresholds on adjusted_score to set the initial stage:
 - ON_RADAR    : adjusted_score 35-51
 - REJECT      : adjusted_score < 35 OR any hard gate triggered
 
-ENFORCE HARD GATES (Force stage=REJECT if triggered):
-- GATE 1: No structural SL identified.
-- GATE 2: R:R < 1:1.5 at Target 2.
-- GATE 3: DTE < 6 trading days (disqualifies OPTIONS instrument only. FUT setup may still be valid).
-- GATE 4: Price chart directly contradicts Turn 2 direction hypothesis and you find no alternative valid direction.
+[HARD GATES]
+Enforce operational hard gates. Any trigger of these gates forces the stage to REJECT immediately, bypassing the score:
+- GATE 1: No structural SL identified -> REJECT
+- GATE 2: R:R < 1:1.5 at Target 2 -> REJECT
+- GATE 3: DTE < 6 trading days -> Options instruments REJECT (Futures instrument is still allowed)
+- GATE 4: Price chart directly contradicts Turn 2 direction hypothesis and no alternative valid direction is found -> REJECT
 
 [SECTION G: OUTPUT SPECIFICATION]
 Provide your analysis ONLY as a single valid JSON object. Do not include any markdown styling, conversational text, introduction, or wrap it in anything other than the JSON format.
