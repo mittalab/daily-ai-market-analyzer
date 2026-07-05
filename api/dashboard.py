@@ -267,8 +267,8 @@ async def get_active_trades():
         setup_row = setups_dict.get(sym)
         
         # Only include if we have a real deep analysis turn (today_turns) or a database setup (setups_dict)
-        # if not turn_row and not setup_row:
-        #     continue
+        if not turn_row and not setup_row:
+            continue
             
         analysis = {}
         completed_at = None
