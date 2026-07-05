@@ -92,29 +92,82 @@ def _get_session_for_date(session_date: date) -> dict | None:
 
 
 def _build_setup_block_crisp(n: int, s: dict) -> str:
-    """Format a single TRADE_READY setup in a crisp, 3-line Telegram block."""
+    """Format a single TRADE_READY setup with full details per Turn 3+ spec."""
     symbol     = s.get("symbol", "?")
-    strike     = s.get("strike")
-    opt_type   = s.get("option_type", "")
     direction  = s.get("direction", "")
-    conviction = s.get("conviction_score", "?")
+    score      = s.get("conviction_score", "?")
     setup_type = s.get("setup_type", "Setup")
-    entry_low  = _fmt_price(s.get("entry_zone_low"))
-    entry_high = _fmt_price(s.get("entry_zone_high"))
-    sl         = _fmt_price(s.get("stop_loss_premium"))
-    t1         = _fmt_price(s.get("target_1_premium"))
-    t2         = _fmt_price(s.get("target_2_premium"))
+    instrument = s.get("instrument") or "OPTIONS"
     
-    strike_str = f" {int(strike)}" if strike else ""
-    opt_str = f" {opt_type}" if opt_type else ""
-    
+    entry_low  = s.get("entry_zone_low")
+    entry_high = s.get("entry_zone_high")
+    sl         = s.get("stop_loss_premium")
+    t1         = s.get("target_1_premium")
+    t2         = s.get("target_2_premium")
+    lots       = s.get("lots")
+    max_risk   = s.get("max_risk_inr")
+    capital    = 500000.0
+    risk_pct   = round((float(max_risk) / capital) * 100, 2) if max_risk else 0.0
+
+    # Calculate R:R ratios
+    rr_t1_str = ""
+    rr_t2_str = ""
+    if entry_low is not None and entry_high is not None and sl is not None:
+        entry_mid = (float(entry_low) + float(entry_high)) / 2.0
+        risk_unit = entry_mid - float(sl)
+        if risk_unit > 0:
+            if t1 is not None:
+                rr_t1 = (float(t1) - entry_mid) / risk_unit
+                rr_t1_str = f" (RR 1:{rr_t1:.1f})"
+            if t2 is not None:
+                rr_t2 = (float(t2) - entry_mid) / risk_unit
+                rr_t2_str = f" (RR 1:{rr_t2:.1f})"
+
+    mentor_note = s.get("mentor_explanation") or ""
+    if mentor_note:
+        mentor_note = mentor_note.split(".")[0] + "."
+        if len(mentor_note) > 120:
+            mentor_note = mentor_note[:117] + "..."
+            
     from new_notifications.telegram import safe_html
     
     lines = [
-        f"<b>{n}. {safe_html(symbol)}{strike_str}{opt_str} | {safe_html(direction)}</b>",
-        f"Conv: <code>{conviction}</code> | {safe_html(setup_type)}",
-        f"Entry: <code>₹{entry_low}–{entry_high}</code> | T1/T2: <code>₹{t1}/{t2}</code> | SL: <code>₹{sl}</code>"
+        f"<b>{n}. {safe_html(symbol)} — {safe_html(direction)} — {score}/100</b>",
     ]
+    
+    if mentor_note:
+        lines.append(f"Setup: {safe_html(mentor_note)}")
+    else:
+        lines.append(f"Setup: {safe_html(setup_type)}")
+        
+    entry_low_str  = _fmt_price(entry_low)
+    entry_high_str = _fmt_price(entry_high)
+    sl_str         = _fmt_price(sl)
+    t1_str         = _fmt_price(t1)
+    t2_str         = _fmt_price(t2)
+    
+    if instrument == "OPTIONS":
+        strike   = s.get("strike")
+        opt_type = s.get("option_type")
+        expiry   = s.get("expiry_date")
+        
+        strike_val   = f"{int(strike)}" if strike else ""
+        opt_type_val = f"{opt_type}" if opt_type else ""
+        expiry_val   = f" {expiry}" if expiry else ""
+        
+        lines.append(f"Entry: <code>₹{entry_low_str}–{entry_high_str}</code> | SL: <code>₹{sl_str}</code>")
+        lines.append(f"T1: <code>₹{t1_str}</code>{rr_t1_str} | T2: <code>₹{t2_str}</code>{rr_t2_str}")
+        lines.append(f"OPTIONS: <code>{strike_val} {opt_type_val}{expiry_val} | ₹{entry_low_str}-{entry_high_str}</code>")
+        if max_risk:
+            lines.append(f"Risk: {safe_html(_fmt_inr(max_risk))} ({risk_pct}% capital) | {lots} lots")
+        lines.append(f"Instrument: OPTIONS — Defined premium risk")
+    else:
+        lines.append(f"Entry: <code>₹{entry_low_str}–{entry_high_str}</code> | SL: <code>₹{sl_str}</code>")
+        lines.append(f"T1: <code>₹{t1_str}</code>{rr_t1_str} | T2: <code>₹{t2_str}</code>{rr_t2_str}")
+        if max_risk:
+            lines.append(f"Risk: {safe_html(_fmt_inr(max_risk))} ({risk_pct}% capital) | {lots} lots")
+        lines.append(f"Instrument: FUTURES — Margin defined position")
+        
     return "\n".join(lines)
 
 
@@ -127,8 +180,11 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
     day_str = brief_date.strftime("%a, %d %b %Y")
 
     setups     = get_trade_setups_by_date(session_date)
-    trade_ready = [s for s in setups if s.get("stage") == "TRADE_READY"]
-    watch       = [s for s in setups if s.get("stage") == "WATCH"]
+    # Sort trade ready setups by conviction score descending
+    trade_ready = sorted([s for s in setups if s.get("stage") == "TRADE_READY"], 
+                         key=lambda x: x.get("conviction_score") or 0, reverse=True)
+    watch       = sorted([s for s in setups if s.get("stage") == "WATCH"],
+                         key=lambda x: x.get("conviction_score") or 0, reverse=True)
 
     session = _get_session_for_date(session_date)
     fii_row = get_latest_fii_dii()
@@ -173,9 +229,6 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
                 lines.append(f"<b>{DIVIDER}</b>")
     else:
         lines.append("<b>🔴 No Trade Ready setups today</b>")
-        # trend = session.get("market_trend") if session else None
-        # regime_line = trend.title() if trend else "Unknown Trend"
-        # lines.append(f"Market conditions: {regime_line} — no setups from last night's scan.")
 
     lines.append(f"<b>{DIVIDER}</b>")
 
@@ -192,6 +245,7 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
             symbol    = s.get("symbol", "?")
             direction = s.get("direction", "")
             score     = s.get("conviction_score", 0)
+            reason    = s.get("setup_type") or "Setup under review"
             
             # Determine days in watch
             meta = wl_meta.get(symbol, {})
@@ -199,18 +253,26 @@ def generate_morning_brief(session_date: date) -> tuple[str, str]:
             day_str = f" (D{days_in})" if days_in > 0 else ""
             
             from new_notifications.telegram import safe_html
-            lines.append(f"• <code>{safe_html(symbol)}</code> ({safe_html(direction)}, Conv: <code>{score}</code>){day_str}")
+            lines.append(f"• <code>{safe_html(symbol)}</code> ({safe_html(direction)}, Conv: <code>{score}</code>){day_str} — {safe_html(reason)}")
 
         if len(watch) > 5:
             lines.append(f"...and <code>{len(watch) - 5}</code> more on dashboard")
 
         lines.append("")
         lines.append(f"<b>{DIVIDER}</b>")
-    # else:
-    #     lines.append("🟡 No stocks on watch today")
 
-
-    lines.append(f'📱 <a href="{get_dashboard_url()}">Full Analysis & Chart Context</a>')
+    # Accumulate and show total session cost and counts
+    try:
+        # Fetch the token stats from current session to display costs
+        s_id = session_date.strftime("Session_%Y%m%d")
+        resp = get_client().table("analysis_sessions").select("claude_cost_usd").eq("session_id", s_id).execute()
+        cost_val = resp.data[0].get("claude_cost_usd") if resp.data else None
+    except Exception:
+        cost_val = None
+        
+    cost_str = f"${float(cost_val):.2f}" if cost_val else "N/A"
+    lines.append(f"📊 Session cost: {cost_str} | {len(setups)} stocks analysed")
+    lines.append(f'📱 Dashboard: <a href="{get_dashboard_url()}">trading.abhishekmittal.in</a>')
 
     msg = "\n".join(lines)
     logger.info(

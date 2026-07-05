@@ -150,9 +150,9 @@ def job_kite_check(is_morning: bool = False) -> None:
     - 9 AM check sends a positive reminder to login.
     - 11 AM and 1 PM checks send a warning reminder.
     """
-    today = date.today()
-    if not is_trading_day(today):
-        return
+    # today = date.today()
+    # if not is_trading_day(today):
+    #     return
 
     try:
         from new_validation.data_validator import validate_kite_token
