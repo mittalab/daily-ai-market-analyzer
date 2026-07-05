@@ -2387,6 +2387,215 @@ def _build_turn3_data(
     return package
 
 
+def _build_turn3_prompt(data_package: dict) -> str:
+    """
+    Assembles the plain-text Claude prompt from the data package conforming to Turn 3 Spec.
+    """
+    sec1 = data_package["section1"]
+    sec2 = data_package["section2"]
+    sec3 = data_package["section3"]
+    sec4 = data_package["section4"]
+    sec5 = data_package["section5"]
+    sec6 = data_package["section6"]
+    sec7 = data_package["section7"]
+    sec8 = data_package["section8"]["turn2_assessment"]
+    
+    symbol = sec1["symbol"]
+    direction = sec1["preliminary_direction"]
+    is_mandatory_str = "YES (Mandatory stock analysis)" if sec1["is_mandatory"] else "NO"
+    
+    # Format lists/dicts compactly to stay well under token limits
+    ohlcv_compact = json.dumps(sec2["ohlcv_180d"], separators=(',', ':'))
+    futures_compact = json.dumps(sec4["futures_30d"], separators=(',', ':')) if sec4["futures_available"] else "[]"
+    options_compact = json.dumps(sec5, separators=(',', ':')) if sec5["options_available"] else "{}"
+    previous_setups_compact = json.dumps(sec1["previous_setups"], separators=(',', ':'))
+    
+    prompt = f"""[SECTION A: ROLE AND TASK DEFINITION]
+You are a highly experienced hedge fund manager and swing trading mentor specializing in the Indian F&O (Futures & Options) markets. Your task is to perform a meticulous deep analysis on {symbol} for the session date {sec1["session_date"]}.
+
+Your goal is to evaluate if there is a valid swing setup (2-5 days hold) on this stock matching the Turn 2 preliminary direction ({direction}).
+You must apply the 100-point Conviction Scoring Framework and enforce all operational hard gates to determine the trade readiness of the setup: TRADE_READY, WATCH, ON_RADAR, or REJECT.
+
+[SECTION B: STOCK CONTEXT]
+- Symbol: {symbol}
+- Preliminary Direction: {direction}
+- Preliminary Reason from Pre-Scan: {sec1["preliminary_reason"]}
+- Mandatory Stock: {is_mandatory_str}
+- Previous Setups for Symbol: {previous_setups_compact}
+
+[SECTION C: MARKET CONTEXT]
+- Market Trend: {sec7["market_trend"]}
+- Volatility Stance: {sec7["market_volatility"]}
+- Execution Bias: {sec7["execution_bias"]}
+- Session Risk Level: {sec7["session_risk_level"]}
+- Conviction Multiplier: {sec7["conviction_multiplier"]}
+- Nifty Price Structure: {json.dumps(sec7["nifty_price_structure"], separators=(',', ':'))}
+- VIX Assessment: {json.dumps(sec7["vix_assessment"], separators=(',', ':'))}
+- FII/DII Net Flows: {json.dumps(sec7["fii_dii_assessment"], separators=(',', ':'))}
+- Prescan Guidance: {json.dumps(sec7["prescan_guidance"], separators=(',', ':'))}
+
+- Sector Context:
+  - Sector: {sec6["stock_sector"]}
+  - Stance details: {json.dumps(sec6["sector_picture"], separators=(',', ':')) if sec6["sector_known"] else "UNKNOWN"}
+
+[SECTION D: PRICE DATA]
+- 180 Days OHLCV Time Series:
+{ohlcv_compact}
+- Volume Ratio (20d): {sec2["volume_ratio_20d"]}
+- Pre-Computed Indicators:
+  - EMA20: {sec3["ema20"]} (Price vs EMA20: {sec3["price_vs_ema20"]})
+  - EMA50: {sec3["ema50"]} (Price vs EMA50: {sec3["price_vs_ema50"]})
+  - EMA180: {sec3["ema180"]} (Price vs EMA180: {sec3["price_vs_ema180"]})
+  - EMA Arrangement: {sec3["ema_arrangement"]}
+  - ATR14: {sec3["atr14"]} (ATR% of Price: {sec3["atr_pct"]}%)
+  - RSI14: {sec3["rsi14"]}
+  - MACD Line: {sec3["macd_line"]} | Signal: {sec3["macd_signal"]} | Hist: {sec3["macd_histogram"]}
+  - MACD Histogram Direction: {sec3["macd_histogram_direction"]}
+  - Last 20 RSI Values: {json.dumps(sec3["rsi_last_20"], separators=(',', ':'))}
+  - Last 20 MACD Histogram Values: {json.dumps(sec3["macd_hist_last_20"], separators=(',', ':'))}
+
+[SECTION E: F&O DATA]
+- Futures Available: {sec4["futures_available"]}
+- Futures 30 Days series:
+{futures_compact}
+- Current Futures Basis: {sec4["basis_current"]} (Trend: {sec4["basis_trend"]})
+- Rollover Phase: {sec4["rollover_phase"]}
+- Days to Expiry (DTE): {sec4["days_to_expiry"]}
+- Near Month OI Trend: {sec4["near_month_oi_trend"]}
+
+- Options Data Available: {sec5["options_available"]}
+- Options Snapshot Details:
+{options_compact}
+
+[SECTION F: SCORING INSTRUCTIONS]
+Evaluate the stock setup across 4 dimensions (100 Points Total) using the following rubrics.
+
+1. Dimension 1: Price Structure (55 pts)
+   - S/R Zones (15 pts): EMA dynamic support + horizontal swing levels confluence. 14-15 = major confluence, 10-13 = clear S/R from 2 sources, 6-9 = single level, 2-5 = weak, 0-1 = no basis.
+   - Chart Patterns (13 pts): Completion, textbook shape, mechanical target. 12-13 = complete/clean, 8-11 = clear but imperfect, 4-7 = forming, 1-3 = ambiguous, 0 = none.
+   - Buyer/Seller Analysis (12 pts): Body vs range, close position, last 5 candles control. 11-12 = clear control, 7-10 = biased, 4-6 = contested, 1-3 = opposing building, 0 = absorption.
+   - Candlestick Patterns (8 pts): Named candlestick patterns at key levels. 7-8 = high significance, 5-6 = medium, 3-4 = low, 1-2 = conflicting, 0 = none.
+   - RSI + MACD (4 pts): RSI divergence (only divergence, not overbought/oversold) and MACD momentum direction.
+   - Volume (3 pts): Volume ratio and trend confirming the price movement.
+
+2. Dimension 2: Risk/Reward (25 pts)
+   - Stop Loss Quality (10 pts): Invalidation logic clarity and ATR check (sweet spot 0.75x-1.5x ATR). 0 = no structural SL (triggers REJECT).
+   - Target Logic (8 pts): Targets T1/T2 at structural S/R. T2 must yield >= 1:1.5 R:R. 0 = R:R < 1:1.5 (triggers REJECT).
+   - Entry Zone Quality (5 pts): Zone confluence and tightness (< 1% width).
+   - R:R Ratio Score (2 pts): >= 2.5 R:R = 2 pts, >= 2.0 = 1.5 pts, >= 1.5 = 1 pt, < 1.5 = 0 pts (triggers REJECT).
+
+3. Dimension 3: Market + Sector Context (15 pts)
+   - Index Context (8 pts): Mapped from Nifty bias (Supportive = 7-8 pts, Neutral = 4-5 pts, Resistant = 1-2 pts).
+   - Sector Context (7 pts): Tailwind Strong = 6-7 pts, Tailwind Moderate = 4-5 pts, Neutral = 3 pts, Headwind = 0-2 pts. Adjust for Relative Strength: +1 pt if stock outperforms sector return by 2%+, -1 pt if it underperforms by 2%+.
+
+4. Dimension 4: Stock F&O Context (5 pts)
+   - Futures Basis (2 pts): Positive carry = 2 pts, negative carry = 0-1 pts.
+   - PCR Context (2 pts): Contrarian extreme PCR checks.
+   - Rollover + DTE (1 pt): DTE < 6 trading days triggers options REJECT.
+
+SCORING CALCULATIONS:
+Calculate raw_total_score = Sum of Dimension 1 + 2 + 3 + 4.
+Calculate adjusted_score = raw_total_score * conviction_multiplier (from Turn 1, currently {sec7["conviction_multiplier"]}).
+
+Apply thresholds on adjusted_score to set the initial stage:
+- TRADE_READY : adjusted_score >= 72
+- WATCH       : adjusted_score 52-71
+- ON_RADAR    : adjusted_score 35-51
+- REJECT      : adjusted_score < 35 OR any hard gate triggered
+
+ENFORCE HARD GATES (Force stage=REJECT if triggered):
+- GATE 1: No structural SL identified.
+- GATE 2: R:R < 1:1.5 at Target 2.
+- GATE 3: DTE < 6 trading days (disqualifies OPTIONS instrument only. FUT setup may still be valid).
+- GATE 4: Price chart directly contradicts Turn 2 direction hypothesis and you find no alternative valid direction.
+
+[SECTION G: OUTPUT SPECIFICATION]
+Provide your analysis ONLY as a single valid JSON object. Do not include any markdown styling, conversational text, introduction, or wrap it in anything other than the JSON format.
+
+Your JSON output must match this exact schema:
+{{
+  "symbol": "{symbol}",
+  "direction": "LONG | SHORT",
+  "stage": "TRADE_READY | WATCH | ON_RADAR | REJECT",
+  "conviction_score": <raw_total_score_0_to_100>,
+  "adjusted_score": <adjusted_score_raw_times_multiplier>,
+  "conviction_multiplier_applied": {sec7["conviction_multiplier"]},
+  "setup_summary": {{
+    "pattern_name": "<Pattern name, e.g. Bull Flag or None>",
+    "pattern_status": "COMPLETE | FORMING | NONE",
+    "key_candle": "<Key candle description, e.g. Hammer or Inside Bar>",
+    "key_candle_location": "AT_SUPPORT | AT_RESISTANCE | MID_RANGE | NONE",
+    "key_candle_significance": "HIGH | MEDIUM | LOW | NONE"
+  }},
+  "key_levels": {{
+    "support_zone_low": <number>,
+    "support_zone_high": <number>,
+    "support_basis": "<basis for support, e.g. EMA20 + Swing Low>",
+    "resistance_1": <number>,
+    "resistance_1_basis": "<basis, e.g. prior swing high date>",
+    "resistance_2": <number>,
+    "resistance_2_basis": "<basis>",
+    "stop_loss": <number>,
+    "stop_loss_basis": "<basis>"
+  }},
+  "trade_parameters": {{
+    "entry_low": <number>,
+    "entry_high": <number>,
+    "entry_mid": <number>,
+    "target_1": <number>,
+    "target_2": <number>,
+    "rr_t1": <number_ratio>,
+    "rr_t2": <number_ratio>
+  }},
+  "options_setup": {{
+    "strike": <number_or_null_if_fut_only>,
+    "option_type": "CE | PE | null",
+    "expiry": "<YYYY-MM-DD_or_null>",
+    "days_to_expiry": <number_or_null>,
+    "entry_premium_low": <number_or_null>,
+    "entry_premium_high": <number_or_null>,
+    "sl_pct": <number_or_null>,
+    "sl_premium": <number_or_null>,
+    "target_1_premium": <number_or_null>,
+    "target_2_premium": <number_or_null>,
+    "iv_note": "<note about IV and VIX proxy>"
+  }},
+  "fut_setup": {{
+    "entry_low": <number_or_null>,
+    "entry_high": <number_or_null>,
+    "stop_loss": <number_or_null>,
+    "target_1": <number_or_null>,
+    "target_2": <number_or_null>,
+    "lots": null,
+    "lot_size": null,
+    "risk_inr": null,
+    "risk_pct_capital": null
+  }},
+  "instrument_recommendation": "OPTIONS | FUT | NONE",
+  "instrument_reason": "<reasons for recommending options or futures based on IV and index bias>",
+  "hard_gate_triggered": <true_or_false>,
+  "hard_gate_reason": "<name of hard gate triggered or null>",
+  "scoring_breakdown": {{
+    "dimension_1": {{ "score": <0_to_55>, "max": 55, "pct": <percentage> }},
+    "dimension_2": {{ "score": <0_to_25>, "max": 25, "pct": <percentage> }},
+    "dimension_3": {{ "score": <0_to_15>, "max": 15, "pct": <percentage> }},
+    "dimension_4": {{ "score": <0_to_5>, "max": 5, "pct": <percentage> }},
+    "raw_total": <raw_total_score_0_to_100>,
+    "adjusted_total": <adjusted_score_raw_times_multiplier>
+  }},
+  "dimension_1_narrative": "<Meticulous detail. Assess S/R confluence, completed/forming patterns with dates/prices, candle body/wicks close position, candlestick patterns with location context, RSI divergence check, and volume trend. Every number/date must be chart-verifiable. Do not generalize.>",
+  "dimension_2_narrative": "<Describe SL structural invalidation logic with ATR validation. Detail T1 and T2 levels and R:R parameters. Describe entry zone confluence basis.>",
+  "dimension_3_narrative": "<Connect Nifty regime stance and bias to this trade's execution. Assess sector tailwind/headwind and stock relative strength/performance vs sector.>",
+  "dimension_4_narrative": "<Assess F&O context: basis current/trend, PCR contrarian reading with any thin OI warning, and DTE/rollover phase significance.>",
+  "mentor_notes": "<Educational swing-trading takeaways taught by this specific setup. Why does it work and what visual cues verify it on the chart.>",
+  "why_could_be_wrong": "<Three highly specific bearish scenarios with exact invalidation price levels where the trade goes wrong (e.g. 'If closes below 1828 on high volume'). No generic disclaimers.>",
+  "key_thing_to_watch": "<Single, most critical actionable observation for the morning market open (e.g. entry boundary trigger, gap opens).>",
+  "rejection_reason": "<Detail reasons for REJECT or null>"
+}}
+"""
+    return prompt
+
+
 # ── Turn 3+: Deep Analysis ────────────────────────────────────────────────────
 
 def run_turn_deep_analysis(
