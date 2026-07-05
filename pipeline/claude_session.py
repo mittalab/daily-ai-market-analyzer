@@ -2427,6 +2427,31 @@ def _build_turn3_prompt(data_package: dict) -> str:
     else:
         sector_picture_text = f"- Sector: {sec6['stock_sector']}\n- Sector analysis details: UNKNOWN"
 
+    # Format Section E: F&O Data
+    if sec4["futures_available"]:
+        futures_text = f"""- Futures Available: True
+- Futures 30 Days series:
+{futures_compact}
+- Basis Current: {sec4['basis_current']} ({sec4['basis_trend']} trend)
+- Rollover Phase: {sec4['rollover_phase']}
+- Days to Expiry: {sec4['days_to_expiry']} trading days
+- Near Month OI Trend: {sec4['near_month_oi_trend']}"""
+    else:
+        futures_text = "- Futures: NOT AVAILABLE for this stock"
+
+    if sec5["options_available"]:
+        options_text = f"""- Options Available: True
+- PCR Near Month: {sec5['pcr_near']}
+- Max Pain: {sec5['max_pain']}
+- ATM Strike: {sec5['atm_strike']}
+- IV Available: {sec5['iv_available']}
+- IV ATM: {sec5['iv_atm'] or 'null — use VIX as proxy'}
+- Options Note: {sec5['options_note']}
+- CE Walls (resistance): {json.dumps(sec5['ce_walls'])}
+- PE Walls (support): {json.dumps(sec5['pe_walls'])}"""
+    else:
+        options_text = "- Options: NOT AVAILABLE — use VIX as IV proxy for premium estimation"
+
     prompt = f"""[SECTION A: ROLE AND TASK DEFINITION]
 You are a highly experienced hedge fund manager and swing trading mentor specializing in the Indian F&O (Futures & Options) markets. Your task is to perform a meticulous deep analysis on {symbol} for the session date {sec1["session_date"]}.
 
@@ -2471,17 +2496,9 @@ You must apply the 100-point Conviction Scoring Framework and enforce all operat
   - Last 20 MACD Histogram Values: {json.dumps(sec3["macd_hist_last_20"], separators=(',', ':'))}
 
 [SECTION E: F&O DATA]
-- Futures Available: {sec4["futures_available"]}
-- Futures 30 Days series:
-{futures_compact}
-- Current Futures Basis: {sec4["basis_current"]} (Trend: {sec4["basis_trend"]})
-- Rollover Phase: {sec4["rollover_phase"]}
-- Days to Expiry (DTE): {sec4["days_to_expiry"]}
-- Near Month OI Trend: {sec4["near_month_oi_trend"]}
+{futures_text}
 
-- Options Data Available: {sec5["options_available"]}
-- Options Snapshot Details:
-{options_compact}
+{options_text}
 
 [SECTION F: SCORING INSTRUCTIONS]
 Evaluate the stock setup across 4 dimensions (100 Points Total) using the following rubrics:
@@ -2611,6 +2628,131 @@ Your JSON output must match this exact schema:
 }}
 """
     return prompt
+
+
+def _validate_position_sizing_turn3(analysis: dict, config: dict) -> dict:
+    """
+    Validates position sizing for Turn 3 deep analysis (supporting Options vs Futures recommendation).
+    """
+    capital = float(config.get("claude_capital_inr", 500000.0))
+    max_risk_pct = 0.025
+    max_risk_inr = capital * max_risk_pct
+    
+    symbol = analysis.get("symbol")
+    rec = analysis.get("instrument_recommendation", "NONE")
+    
+    from database.queries import get_all_lot_sizes
+    lot_sizes = get_all_lot_sizes()
+    lot_size = lot_sizes.get(symbol, 1)
+    
+    analysis["lot_size"] = lot_size
+    
+    # Flatten basic setup fields based on recommendation
+    if rec == "OPTIONS":
+        opt = analysis.get("options_setup", {})
+        if not opt:
+            opt = {}
+            analysis["options_setup"] = opt
+            
+        opt["days_to_expiry"] = analysis.get("days_to_expiry") or opt.get("days_to_expiry")
+        
+        entry_low = opt.get("entry_premium_low")
+        entry_high = opt.get("entry_premium_high")
+        stop_loss = opt.get("sl_premium")
+        target_1 = opt.get("target_1_premium")
+        target_2 = opt.get("target_2_premium")
+        
+        # Map to flat keys for DB compatibility
+        analysis["strike"] = opt.get("strike")
+        analysis["option_type"] = opt.get("option_type")
+        analysis["expiry_date"] = opt.get("expiry")
+        analysis["entry_premium_low"] = entry_low
+        analysis["entry_premium_high"] = entry_high
+        analysis["stop_loss_premium"] = stop_loss
+        analysis["target_1_premium"] = target_1
+        analysis["target_2_premium"] = target_2
+        
+        if all(x is not None for x in [entry_low, entry_high, stop_loss, target_2]):
+            entry_mid = (float(entry_low) + float(entry_high)) / 2.0
+            risk_per_lot = (entry_mid - float(stop_loss)) * lot_size
+            
+            if risk_per_lot <= 0 or risk_per_lot > max_risk_inr:
+                lots = 0
+                actual_risk = 0.0
+                actual_rr = 0.0
+            else:
+                lots = max(1, int(max_risk_inr / risk_per_lot))
+                actual_risk = risk_per_lot * lots
+                actual_rr = (float(target_2) - entry_mid) / (entry_mid - float(stop_loss))
+                
+            analysis["lots"] = lots
+            analysis["max_risk_inr"] = round(actual_risk, 0)
+            analysis["risk_pct_capital"] = round((actual_risk / capital) * 100, 2)
+            analysis["risk_reward"] = round(actual_rr, 2)
+            
+            # Write back to options_setup
+            opt["lots"] = lots
+            opt["risk_inr"] = round(actual_risk, 0)
+            opt["risk_pct_capital"] = round((actual_risk / capital) * 100, 2)
+            opt["rr_t1"] = round((float(target_1) - entry_mid) / (entry_mid - float(stop_loss)), 2) if target_1 else 0.0
+            opt["rr_t2"] = round(actual_rr, 2)
+            
+    elif rec == "FUT":
+        fut = analysis.get("fut_setup", {})
+        if not fut:
+            fut = {}
+            analysis["fut_setup"] = fut
+            
+        entry_low = fut.get("entry_low")
+        entry_high = fut.get("entry_high")
+        stop_loss = fut.get("stop_loss")
+        target_1 = fut.get("target_1")
+        target_2 = fut.get("target_2")
+        
+        # Map to flat keys for DB compatibility
+        analysis["strike"] = None
+        analysis["option_type"] = "FUT"
+        analysis["expiry_date"] = None
+        analysis["entry_premium_low"] = entry_low
+        analysis["entry_premium_high"] = entry_high
+        analysis["stop_loss_premium"] = stop_loss
+        analysis["target_1_premium"] = target_1
+        analysis["target_2_premium"] = target_2
+        
+        if all(x is not None for x in [entry_low, entry_high, stop_loss, target_2]):
+            entry_mid = (float(entry_low) + float(entry_high)) / 2.0
+            risk_per_lot = (entry_mid - float(stop_loss)) * lot_size
+            
+            if risk_per_lot <= 0 or risk_per_lot > max_risk_inr:
+                lots = 0
+                actual_risk = 0.0
+                actual_rr = 0.0
+            else:
+                lots = max(1, int(max_risk_inr / risk_per_lot))
+                actual_risk = risk_per_lot * lots
+                actual_rr = (float(target_2) - entry_mid) / (entry_mid - float(stop_loss))
+                
+            analysis["lots"] = lots
+            analysis["max_risk_inr"] = round(actual_risk, 0)
+            analysis["risk_pct_capital"] = round((actual_risk / capital) * 100, 2)
+            analysis["risk_reward"] = round(actual_rr, 2)
+            
+            # Write back to fut_setup
+            fut["lots"] = lots
+            fut["lot_size"] = lot_size
+            fut["risk_inr"] = round(actual_risk, 0)
+            fut["risk_pct_capital"] = round((actual_risk / capital) * 100, 2)
+            fut["rr_t1"] = round((float(target_1) - entry_mid) / (entry_mid - float(stop_loss)), 2) if target_1 else 0.0
+            fut["rr_t2"] = round(actual_rr, 2)
+            
+    else:
+        # None recommended or skip
+        analysis["lots"] = 0
+        analysis["max_risk_inr"] = 0.0
+        analysis["risk_pct_capital"] = 0.0
+        analysis["risk_reward"] = 0.0
+        
+    return analysis
 
 
 # ── Turn 3+: Deep Analysis ────────────────────────────────────────────────────
