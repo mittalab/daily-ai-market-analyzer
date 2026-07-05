@@ -178,6 +178,189 @@ async def get_deep_analysis_turns():
         return {"turns": [], "error": str(exc)}
 
 
+@router.get("/active-trades")
+async def get_active_trades():
+    """
+    Fetches active Zerodha Kite holdings and F&O positions,
+    and returns them merged with their latest deep analysis turn/setup.
+    """
+    # 1. Fetch live holdings and positions from Kite
+    holdings_dict = {}
+    positions_dict = {}
+    
+    try:
+        from new_integration.kite_holdings import fetch_holdings
+        h_data = fetch_holdings()
+        # Merge NSE and BSE holdings
+        for exch in ["NSE", "BSE"]:
+            for sym, items in h_data.get(exch, {}).items():
+                if items:
+                    holdings_dict[sym] = items[0]
+    except Exception as exc:
+        logger.warning("Active Trades: failed to fetch Kite holdings: %s", exc)
+        
+    try:
+        from new_integration.kite_positions import fetch_fo_positions
+        p_data = fetch_fo_positions()
+        for exch in ["NFO", "MCX"]:
+            for sym, items in p_data.get(exch, {}).items():
+                if items:
+                    positions_dict[sym] = items[0]
+    except Exception as exc:
+        logger.warning("Active Trades: failed to fetch Kite positions: %s", exc)
+        
+    # All active symbols
+    active_symbols = set(holdings_dict.keys()) | set(positions_dict.keys())
+    
+    if not active_symbols:
+        return {"turns": [], "holdings": {}, "positions": {}}
+        
+    # 2. Fetch latest Deep Analysis or Trade Setup details for these symbols
+    session = get_latest_session()
+    session_id = session.get("session_id") if session else None
+    
+    today_turns = {}
+    if session_id:
+        try:
+            from database.client import get_client
+            res = (
+                get_client()
+                .table("session_claude_turns")
+                .select("turn_number,turn_type,symbol,output_text,completed_at")
+                .eq("session_id", session_id)
+                .eq("turn_type", "deep_analysis")
+                .in_("symbol", list(active_symbols))
+                .execute()
+            )
+            for row in res.data:
+                today_turns[row["symbol"]] = row
+        except Exception as exc:
+            logger.warning("Active Trades: failed to fetch today's turns: %s", exc)
+            
+    # For symbols not in today's turns, fetch latest trade setup from DB
+    missing_symbols = active_symbols - set(today_turns.keys())
+    setups_dict = {}
+    if missing_symbols:
+        try:
+            from database.client import get_client
+            for sym in missing_symbols:
+                setup_res = (
+                    get_client()
+                    .table("trade_setups")
+                    .select("*")
+                    .eq("symbol", sym)
+                    .order("setup_date", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                if setup_res.data:
+                    setups_dict[sym] = setup_res.data[0]
+        except Exception as exc:
+            logger.warning("Active Trades: failed to fetch setups: %s", exc)
+            
+    # 3. Assemble turns list
+    turns = []
+    import json
+    
+    for sym in active_symbols:
+        turn_row = today_turns.get(sym)
+        setup_row = setups_dict.get(sym)
+        
+        analysis = {}
+        completed_at = None
+        turn_num = 999
+        
+        if turn_row:
+            completed_at = turn_row["completed_at"]
+            turn_num = turn_row["turn_number"]
+            text = turn_row["output_text"].strip()
+            try:
+                clean_text = text
+                if clean_text.startswith("```"):
+                    first_newline = clean_text.find("\n")
+                    clean_text = clean_text[first_newline+1:] if first_newline != -1 else clean_text[3:]
+                if clean_text.endswith("```"):
+                    clean_text = clean_text[:-3]
+                analysis = json.loads(clean_text.strip())
+            except Exception:
+                analysis = {"error": "JSON parse failure", "symbol": sym, "stage": "WATCH"}
+        elif setup_row:
+            completed_at = setup_row.get("created_at")
+            analysis = {
+                "symbol": sym,
+                "direction": setup_row.get("direction"),
+                "stage": setup_row.get("stage") or "WATCH",
+                "conviction_score": setup_row.get("conviction_score"),
+                "adjusted_score": setup_row.get("adjusted_score"),
+                "conviction_multiplier_applied": setup_row.get("conviction_multiplier"),
+                "instrument_recommendation": setup_row.get("instrument") or "OPTIONS",
+                "instrument_reason": setup_row.get("instrument_reason"),
+                "hard_gate_triggered": setup_row.get("hard_gate_triggered"),
+                "hard_gate_reason": setup_row.get("hard_gate_reason"),
+                "setup_summary": {
+                    "pattern_name": setup_row.get("pattern_name"),
+                    "pattern_status": setup_row.get("pattern_status"),
+                    "key_candle": setup_row.get("key_candle")
+                },
+                "key_levels": {
+                    "support_zone_low": setup_row.get("spot_support_low"),
+                    "support_zone_high": setup_row.get("spot_support_high"),
+                    "support_basis": setup_row.get("support_basis"),
+                    "stop_loss": setup_row.get("underlying_stop"),
+                    "stop_loss_basis": setup_row.get("stop_loss_premium")
+                },
+                "trade_parameters": {
+                    "entry_low": setup_row.get("spot_entry_low"),
+                    "entry_high": setup_row.get("spot_entry_high"),
+                    "target_1": setup_row.get("spot_target_1"),
+                    "target_2": setup_row.get("spot_target_2"),
+                    "rr_t2": setup_row.get("risk_reward")
+                },
+                "options_setup": {
+                    "strike": setup_row.get("strike"),
+                    "option_type": setup_row.get("option_type"),
+                    "expiry": setup_row.get("expiry_date"),
+                    "entry_premium_low": setup_row.get("entry_zone_low"),
+                    "entry_premium_high": setup_row.get("entry_zone_high"),
+                    "sl_premium": setup_row.get("stop_loss_premium"),
+                    "target_1_premium": setup_row.get("target_1_premium"),
+                    "target_2_premium": setup_row.get("target_2_premium")
+                },
+                "lots": setup_row.get("lots"),
+                "lot_size": setup_row.get("lot_size"),
+                "max_risk_inr": setup_row.get("max_risk_inr"),
+                "risk_pct_capital": setup_row.get("risk_pct_capital"),
+                "dimension_1_narrative": setup_row.get("claude_full_rationale"),
+                "mentor_explanation": setup_row.get("mentor_explanation"),
+                "why_could_be_wrong": setup_row.get("why_could_be_wrong"),
+                "key_thing_to_watch": setup_row.get("key_learning_today")
+            }
+        else:
+            analysis = {
+                "symbol": sym,
+                "direction": "LONG",
+                "stage": "WATCH",
+                "conviction_score": 50,
+                "instrument_recommendation": "NONE"
+            }
+            
+        turns.append({
+            "turn_number": turn_num,
+            "turn_type": "deep_analysis",
+            "symbol": sym,
+            "completed_at": completed_at,
+            "analysis": analysis
+        })
+        
+    return {
+        "turns": turns,
+        "holdings": holdings_dict,
+        "positions": positions_dict,
+        "session_id": session_id,
+        "session_date": str(session["session_date"]) if session else None
+    }
+
+
 # ── GET /api/setup/{setup_id} ─────────────────────────────────────────────────
 
 @router.get("/setup/{setup_id}")

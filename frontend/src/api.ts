@@ -1,4 +1,4 @@
-import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse, IndicatorValidation } from './types';
+import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse, IndicatorValidation, ActiveTradesResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -112,5 +112,9 @@ export function fetchIndicatorValidation(
 ): Promise<IndicatorValidation> {
   const query = date ? `?symbol=${symbol}&date=${date}` : `?symbol=${symbol}`;
   return apiFetch<IndicatorValidation>(`/api/validate/indicators${query}`);
+}
+
+export function fetchActiveTrades(): Promise<ActiveTradesResponse> {
+  return apiFetch<ActiveTradesResponse>('/api/active-trades');
 }
 

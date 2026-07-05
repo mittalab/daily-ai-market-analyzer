@@ -1,11 +1,11 @@
-export type Screen = 'today' | 'deep' | 'watchlist' | 'analyse' | 'status';
+export type Screen = 'today' | 'deep' | 'active' | 'analyse' | 'status';
 
 interface Tab { id: Screen; label: string; icon: string; }
 
 const TABS: Tab[] = [
   { id: 'today',       label: 'Today',   icon: '🏠' },
   { id: 'deep',        label: 'Deep',    icon: '🧠' },
-  { id: 'watchlist',   label: 'Watch',   icon: '👁' },
+  { id: 'active',      label: 'Active',  icon: '💼' },
   { id: 'analyse',     label: 'Analyse', icon: '🔍' },
   { id: 'status',      label: 'Status',  icon: '⚙️' },
 ];

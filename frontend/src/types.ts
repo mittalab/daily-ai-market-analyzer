@@ -217,3 +217,38 @@ export interface IndicatorValidation {
   note: string;
 }
 
+export interface KitePosition {
+  symbol: string;
+  qty: number;
+  avg: number;
+  ltp: number;
+  pnl: number;
+  unrealised?: number;
+  realised?: number;
+  product?: string;
+  exchange?: string;
+}
+
+export interface KiteHolding {
+  symbol: string;
+  qty: number;
+  free_qty?: number;
+  t1_qty?: number;
+  collateral_qty?: number;
+  collateral_type?: string;
+  avg: number;
+  ltp: number;
+  close?: number;
+  pnl: number;
+  current_value?: number;
+  investment_value?: number;
+}
+
+export interface ActiveTradesResponse {
+  turns: DeepAnalysisTurn[];
+  holdings: Record<string, KiteHolding>;
+  positions: Record<string, KitePosition>;
+  session_id: string | null;
+  session_date: string | null;
+}
+
