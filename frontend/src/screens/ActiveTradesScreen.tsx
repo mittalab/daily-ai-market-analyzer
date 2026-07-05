@@ -139,49 +139,137 @@ function formatRejectionNarrative(text: string | null | undefined): React.ReactN
 
 // ── Zerodha status panel at top of card ────────────────────────────────────────
 
-function KiteTradePanel({ holding, position }: { holding?: KiteHolding; position?: KitePosition }) {
-  if (!holding && !position) return null;
-
-  const isPosition = !!position;
-  const qty = isPosition ? position.qty : holding!.qty;
-  const avgPrice = isPosition ? position.avg : holding!.avg;
-  const ltp = isPosition ? position.ltp : holding!.ltp;
-  const pnl = isPosition ? position.pnl : holding!.pnl;
-  const typeLabel = isPosition ? 'F&O Position' : 'Equity Holding';
-  const typeCls = isPosition ? 'bg-indigo-50 text-indigo-700 border-indigo-150' : 'bg-green-50 text-green-700 border-green-150';
+function KiteRow({
+  type,
+  symbol,
+  qty,
+  avg,
+  ltp,
+  pnl,
+  value,
+}: {
+  type: 'Equity' | 'Future' | 'Option';
+  symbol: string;
+  qty: number;
+  avg: number;
+  ltp: number;
+  pnl: number;
+  value: number;
+}) {
+  const typeCls =
+    type === 'Equity' ? 'bg-green-50 text-green-700 border-green-200' :
+    type === 'Future' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+    'bg-purple-50 text-purple-700 border-purple-200';
 
   const pnlCls = pnl >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold';
   const pnlPrefix = pnl >= 0 ? '+' : '';
 
   return (
-    <div className="bg-gray-50 border border-gray-150/70 rounded-lg p-3 text-xs mb-3 font-sans shadow-xs">
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${typeCls}`}>
-          {typeLabel}
-        </span>
-        <span className={pnlCls}>
-          PNL: {pnlPrefix}₹{INR.format(pnl)}
+    <div className="pt-2.5 first:pt-0">
+      {/* Row header: badge, instrument, PNL */}
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className={`text-[8px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border leading-none ${typeCls}`}>
+            {type}
+          </span>
+          <span className="font-semibold text-gray-800 text-[10px] truncate max-w-[180px] font-mono">
+            {symbol}
+          </span>
+        </div>
+        <span className={`${pnlCls} text-[11px] font-mono`}>
+          {pnlPrefix}₹{INR.format(pnl)}
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-1 text-center font-mono">
+      
+      {/* Row metrics */}
+      <div className="grid grid-cols-4 gap-1 text-center font-mono text-[9px] bg-gray-50/50 py-1 rounded">
         <div>
-          <p className="text-[8px] text-gray-400 uppercase font-sans mb-0.5">Sizing</p>
-          <p className="font-bold text-gray-800">{qty}</p>
+          <p className="text-[7.5px] text-gray-400 uppercase font-sans mb-0.5">Sizing</p>
+          <p className="font-bold text-gray-700">{qty}</p>
         </div>
         <div>
-          <p className="text-[8px] text-gray-400 uppercase font-sans mb-0.5">Avg Entry</p>
-          <p className="font-bold text-gray-800">₹{avgPrice.toFixed(1)}</p>
+          <p className="text-[7.5px] text-gray-400 uppercase font-sans mb-0.5">Avg Price</p>
+          <p className="font-bold text-gray-700">₹{avg.toFixed(1)}</p>
         </div>
         <div>
-          <p className="text-[8px] text-gray-400 uppercase font-sans mb-0.5">LTP</p>
-          <p className="font-bold text-gray-800">₹{ltp.toFixed(1)}</p>
+          <p className="text-[7.5px] text-gray-400 uppercase font-sans mb-0.5">LTP</p>
+          <p className="font-bold text-gray-700">₹{ltp.toFixed(1)}</p>
         </div>
         <div>
-          <p className="text-[8px] text-gray-400 uppercase font-sans mb-0.5">Value</p>
-          <p className="font-bold text-gray-800">
-            ₹{INR.format(Math.abs(qty) * ltp)}
-          </p>
+          <p className="text-[7.5px] text-gray-400 uppercase font-sans mb-0.5">Value</p>
+          <p className="font-bold text-gray-700">₹{INR.format(value)}</p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function KiteTradePanel({ holding, positions }: { holding?: KiteHolding; positions?: KitePosition | KitePosition[] }) {
+  const hasHolding = !!holding;
+  const pListArray = Array.isArray(positions) ? positions : positions ? [positions] : [];
+  const futPositions = pListArray.filter(p => p.symbol.endsWith('FUT') || p.symbol.includes('FUT'));
+  const optPositions = pListArray.filter(p => !p.symbol.endsWith('FUT') && !p.symbol.includes('FUT'));
+
+  const rows: React.ReactNode[] = [];
+
+  // 1. Equity Holding Row
+  if (hasHolding && holding) {
+    rows.push(
+      <KiteRow
+        key="equity"
+        type="Equity"
+        symbol={holding.symbol}
+        qty={holding.qty}
+        avg={holding.avg}
+        ltp={holding.ltp}
+        pnl={holding.pnl}
+        value={holding.qty * holding.ltp}
+      />
+    );
+  }
+
+  // 2. Futures Row(s)
+  futPositions.forEach((p, idx) => {
+    rows.push(
+      <KiteRow
+        key={`fut-${idx}`}
+        type="Future"
+        symbol={p.symbol}
+        qty={p.qty}
+        avg={p.avg}
+        ltp={p.ltp}
+        pnl={p.pnl}
+        value={Math.abs(p.qty) * p.ltp}
+      />
+    );
+  });
+
+  // 3. Options Row(s)
+  optPositions.forEach((p, idx) => {
+    rows.push(
+      <KiteRow
+        key={`opt-${idx}`}
+        type="Option"
+        symbol={p.symbol}
+        qty={p.qty}
+        avg={p.avg}
+        ltp={p.ltp}
+        pnl={p.pnl}
+        value={Math.abs(p.qty) * p.ltp}
+      />
+    );
+  });
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="bg-white border border-gray-150 rounded-xl p-3 text-xs mb-1 font-sans shadow-xs space-y-2">
+      <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-150 pb-1.5 flex justify-between items-center">
+        <span>Portfolio Positions</span>
+        <span className="text-[8px] font-semibold lowercase opacity-75">({rows.length} active)</span>
+      </div>
+      <div className="divide-y divide-gray-150 space-y-2.5">
+        {rows}
       </div>
     </div>
   );
@@ -189,7 +277,7 @@ function KiteTradePanel({ holding, position }: { holding?: KiteHolding; position
 
 // ── Individual stock card ─────────────────────────────────────────────────────
 
-function StockCard({ turn, holding, position }: { turn: DeepAnalysisTurn; holding?: KiteHolding; position?: KitePosition }) {
+function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holding?: KiteHolding; positions?: KitePosition | KitePosition[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { symbol } = turn;
   const s = turn.analysis;
@@ -246,9 +334,9 @@ function StockCard({ turn, holding, position }: { turn: DeepAnalysisTurn; holdin
         <div className="px-4 py-3 divide-y divide-gray-100">
           
           {/* Zerodha Holdings / Positions status panel inside card */}
-          {(holding || position) && (
+          {(holding || (positions && (Array.isArray(positions) ? positions.length > 0 : true))) && (
             <div className="py-3">
-              <KiteTradePanel holding={holding} position={position} />
+              <KiteTradePanel holding={holding} positions={positions} />
             </div>
           )}
 
@@ -533,7 +621,7 @@ function StageGroup({
   stage: string;
   turns: DeepAnalysisTurn[];
   holdings: Record<string, KiteHolding>;
-  positions: Record<string, KitePosition>;
+  positions: Record<string, KitePosition | KitePosition[]>;
 }) {
   const cfg = STAGE_CFG[stage] ?? {
     icon: '•', label: stage, defaultOpen: false,
@@ -571,7 +659,7 @@ function StageGroup({
                 key={turn.turn_number}
                 turn={turn}
                 holding={holdings[sym]}
-                position={positions[sym]}
+                positions={positions[sym]}
               />
             );
           })}
@@ -646,9 +734,12 @@ export default function ActiveTradesScreen() {
     totalHoldingValue += Math.abs(h.qty) * h.ltp;
   });
 
-  Object.values(positions).forEach(p => {
-    totalPNL += p.pnl;
-    totalPositionValue += Math.abs(p.qty) * p.ltp;
+  Object.values(positions).forEach(pList => {
+    const pListArray = Array.isArray(pList) ? pList : [pList];
+    pListArray.forEach(p => {
+      totalPNL += p.pnl;
+      totalPositionValue += Math.abs(p.qty) * p.ltp;
+    });
   });
 
   const portfolioValue = totalHoldingValue + totalPositionValue;
@@ -704,7 +795,7 @@ export default function ActiveTradesScreen() {
                       key={turn.turn_number}
                       turn={turn}
                       holding={holdings[sym]}
-                      position={positions[sym]}
+                      positions={positions[sym]}
                     />
                   );
                 })}

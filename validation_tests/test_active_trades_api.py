@@ -15,6 +15,8 @@ async def run_test():
     print("Turns count:", len(res.get("turns", [])))
     print("Holdings count:", len(res.get("holdings", {})))
     print("Positions count:", len(res.get("positions", {})))
+    import json
+    print("Positions JSON:", json.dumps(res.get("positions", {}), indent=2))
     print("\nTurns details:")
     for turn in res.get("turns", []):
         print(f"- Symbol: {turn['symbol']} | Turn number: {turn['turn_number']} | Stage: {turn['analysis'].get('stage')}")
