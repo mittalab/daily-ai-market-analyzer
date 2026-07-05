@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { fetchDeepAnalysis } from '../api';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
@@ -19,6 +19,146 @@ function extractDateFromSessionId(sessionId: string | null | undefined): string 
   return null;
 }
 
+// ── Mobile-Friendly Text Highlighters ────────────────────────────────────────
+
+function highlightKeyTerms(text: string): React.ReactNode[] {
+  // Matches key levels (like 793.5, 24000), strikes, indicators, and directions
+  const regex = /(\b(?:EMA20|EMA50|EMA180|RSI14|MACD|ATR|CE|PE|Nifty|Banknifty|LONG|SHORT|SL)\b|\b\d{3,5}(?:\.\d{1,2})?\b)/gi;
+  const tokens = text.split(regex);
+  return tokens.map((token, i) => {
+    if (token.match(regex)) {
+      return (
+        <span key={i} className="font-mono bg-gray-100 border border-gray-200 px-1 py-0.5 rounded text-[10px] font-semibold text-gray-900 mx-0.5">
+          {token}
+        </span>
+      );
+    }
+    return <span key={i}>{token}</span>;
+  });
+}
+
+function formatNarrative(text: string | null | undefined): React.ReactNode {
+  if (!text) return null;
+
+  let parts: string[] = [];
+
+  // Check for (1), (2), (a), (b) type points
+  if (text.includes('(') && (text.includes('(1)') || text.includes('(a)'))) {
+    parts = text.split(/\((\d+|[a-zA-Z])\)/).filter(Boolean);
+    const assembled: React.ReactNode[] = [];
+    let numberIndex = 1;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      if (!part || part.match(/^\d+$/) || part.length === 1) continue;
+      assembled.push(
+        <div key={i} className="flex gap-2 mb-2 items-start text-xs leading-relaxed text-gray-700">
+          <span className="flex-shrink-0 bg-blue-50 text-blue-600 font-bold px-1.5 py-0.5 rounded text-[10px] mt-0.5">
+            {numberIndex++}
+          </span>
+          <span className="flex-1">{highlightKeyTerms(part)}</span>
+        </div>
+      );
+    }
+    return <div className="space-y-1">{assembled}</div>;
+  }
+
+  // Check for bullets • or -
+  if (text.includes('•') || text.includes('\n-')) {
+    parts = text.split(/[\n\r]+[•-]\s*/).filter(Boolean);
+    return (
+      <ul className="space-y-2 list-none pl-0 my-1">
+        {parts.map((part, i) => (
+          <li key={i} className="flex gap-2 items-start text-xs leading-relaxed text-gray-700">
+            <span className="text-blue-500 font-bold mt-0.5">•</span>
+            <span className="flex-1">{highlightKeyTerms(part.trim())}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  // Check for numbered items 1. 2. 3.
+  if (text.match(/\b\d+\.\s/)) {
+    parts = text.split(/\b\d+\.\s+/).filter(Boolean);
+    return (
+      <div className="space-y-2 my-1">
+        {parts.map((part, i) => (
+          <div key={i} className="flex gap-2 items-start text-xs leading-relaxed text-gray-700">
+            <span className="flex-shrink-0 bg-blue-50 text-blue-600 font-bold px-1.5 py-0.5 rounded text-[10px] mt-0.5">
+              {i + 1}
+            </span>
+            <span className="flex-1">{highlightKeyTerms(part.trim())}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Fallback: split long paragraphs by sentences
+  parts = text.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(Boolean);
+  return (
+    <div className="space-y-2 my-1">
+      {parts.map((part, i) => (
+        <p key={i} className="text-xs leading-relaxed text-gray-700 pl-2 border-l-2 border-blue-200">
+          {highlightKeyTerms(part.trim())}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function formatRejectionNarrative(text: string | null | undefined): React.ReactNode {
+  if (!text) return null;
+
+  let parts: string[] = [];
+
+  if (text.includes('(') && (text.includes('(1)') || text.includes('(a)'))) {
+    parts = text.split(/\((\d+|[a-zA-Z])\)/).filter(Boolean);
+    const assembled: React.ReactNode[] = [];
+    let numberIndex = 1;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      if (!part || part.match(/^\d+$/) || part.length === 1) continue;
+      assembled.push(
+        <div key={i} className="flex gap-2 mb-2 items-start text-xs leading-relaxed text-red-950 bg-red-50/20 border border-red-100/30 rounded-lg p-2">
+          <span className="flex-shrink-0 bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded text-[10px] mt-0.5">
+            {numberIndex++}
+          </span>
+          <span className="flex-1">{highlightKeyTerms(part)}</span>
+        </div>
+      );
+    }
+    return <div className="space-y-1">{assembled}</div>;
+  }
+
+  if (text.match(/\b\d+\.\s/)) {
+    parts = text.split(/\b\d+\.\s+/).filter(Boolean);
+    return (
+      <div className="space-y-2 my-1">
+        {parts.map((part, i) => (
+          <div key={i} className="flex gap-2 items-start text-xs leading-relaxed text-red-950 bg-red-50/20 border border-red-100/30 rounded-lg p-2">
+            <span className="flex-shrink-0 bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded text-[10px] mt-0.5">
+              {i + 1}
+            </span>
+            <span className="flex-1">{highlightKeyTerms(part.trim())}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  parts = text.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(Boolean);
+  return (
+    <div className="space-y-2 my-1">
+      {parts.map((part, i) => (
+        <p key={i} className="text-xs leading-relaxed text-red-900 pl-2 border-l-2 border-red-200 bg-red-50/10 py-1 px-2 rounded">
+          {highlightKeyTerms(part.trim())}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 // ── Individual stock card (collapsed by default) ───────────────────────────────
 
 function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
@@ -33,8 +173,13 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
   const dirLabel =
     s.direction === 'LONG' ? '↑ LONG' : s.direction === 'SHORT' ? '↓ SHORT' : s.direction || 'AUTO';
 
+  const recInstrument = s.instrument_recommendation || 'NONE';
+  const recColor = 
+    recInstrument === 'OPTIONS' ? 'bg-purple-100 text-purple-800' :
+    recInstrument === 'FUT' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800';
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-2">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-2 shadow-sm">
       {/* Header — always visible */}
       <div
         className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${isExpanded ? 'border-b border-gray-100' : ''}`}
@@ -45,9 +190,12 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${dirClass}`}>
               {dirLabel}
             </span>
-            {s.setup_type && (
-              <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                {s.setup_type}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${recColor}`}>
+              {recInstrument}
+            </span>
+            {s.setup_summary?.pattern_name && (
+              <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-semibold">
+                {s.setup_summary.pattern_name}
               </span>
             )}
           </div>
@@ -57,84 +205,249 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
           </div>
         </div>
         <ConvictionBar score={s.conviction_score} />
+        {s.adjusted_score && (
+          <div className="flex items-center justify-between text-[10px] text-gray-400 mt-1">
+            <span>Score: {s.conviction_score} / 100</span>
+            <span>Adjusted: <b>{s.adjusted_score}</b> ({s.conviction_multiplier_applied}x)</span>
+          </div>
+        )}
       </div>
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-4 py-3">
-
-          {/* Trade params — TRADE_READY only */}
-          {s.stage === 'TRADE_READY' && (s.entry_premium_low != null || s.strike) && (
-            <div className="mb-3">
-              <p className="text-xs text-gray-500 mb-1.5">
-                {s.option_type} {s.strike ? Math.round(s.strike) : '—'}
-                {s.expiry_date
-                  ? ` · ${new Date(s.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
-                  : ''}
-                {s.lot_size ? ` · LOT: ${s.lot_size}` : ''}
-                {s.lots     ? ` · ${s.lots} lot${s.lots > 1 ? 's' : ''}` : ''}
+        <div className="px-4 py-3 divide-y divide-gray-100">
+          
+          {/* Section 1: Overview Grid */}
+          <div className="pb-3 grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <p className="text-gray-400 mb-0.5 font-medium">Pattern Summary</p>
+              <p className="font-semibold text-gray-800">
+                {s.setup_summary?.pattern_name || 'None'} ({s.setup_summary?.pattern_status || 'N/A'})
               </p>
-              <div className="grid grid-cols-4 gap-1.5 mb-2">
-                {([
-                  ['Entry', s.entry_premium_low != null && s.entry_premium_high != null
-                    ? `${Math.round(s.entry_premium_low)}–${Math.round(s.entry_premium_high)}` : '—'],
-                  ['SL',    s.stop_loss_premium  != null ? String(Math.round(s.stop_loss_premium))  : '—'],
-                  ['T1',    s.target_1_premium   != null ? String(Math.round(s.target_1_premium))   : '—'],
-                  ['T2',    s.target_2_premium   != null ? String(Math.round(s.target_2_premium))   : '—'],
-                ] as [string, string][]).map(([label, value]) => (
-                  <div key={label} className="bg-gray-50 rounded-lg py-2 text-center">
-                    <p className="text-[9px] text-gray-400 uppercase mb-0.5">{label}</p>
-                    <p className="text-xs font-bold text-gray-900">{value}</p>
-                  </div>
-                ))}
+            </div>
+            <div>
+              <p className="text-gray-400 mb-0.5 font-medium">Key Candle Signal</p>
+              <p className="font-semibold text-gray-800">
+                {s.setup_summary?.key_candle || 'None'} ({s.setup_summary?.key_candle_location || 'N/A'})
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-400 mb-0.5 font-medium">Recomm. Instrument</p>
+              <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_reason || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 mb-0.5 font-medium">Hard Gate Status</p>
+              <p className={`font-semibold ${s.hard_gate_triggered ? 'text-red-600' : 'text-green-600'}`}>
+                {s.hard_gate_triggered ? `TRIGGERED (${s.hard_gate_reason})` : 'PASSED'}
+              </p>
+            </div>
+          </div>
+
+          {/* Section 2: Spot Levels & Trade Parameters */}
+          <div className="py-3">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Spot (Underlying) Levels</p>
+            
+            {/* Spot Pricing Grid */}
+            <div className="grid grid-cols-4 gap-1.5 text-center mb-2.5">
+              {[
+                ['Entry Zone', s.trade_parameters?.entry_low != null && s.trade_parameters?.entry_high != null
+                  ? `${s.trade_parameters.entry_low}–${s.trade_parameters.entry_high}` : '—'],
+                ['Stop Loss', s.key_levels?.stop_loss != null ? String(s.key_levels.stop_loss) : '—'],
+                ['Target 1', s.trade_parameters?.target_1 != null ? String(s.trade_parameters.target_1) : '—'],
+                ['Target 2', s.trade_parameters?.target_2 != null ? String(s.trade_parameters.target_2) : '—'],
+              ].map(([lbl, val]) => (
+                <div key={lbl} className="bg-gray-50 rounded-lg py-2">
+                  <p className="text-[9px] text-gray-400 uppercase mb-0.5">{lbl}</p>
+                  <p className="text-xs font-mono font-bold text-gray-800">{val}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Support and Stop Loss Basis Explanations (Full-Width Rows for High Mobile Readability) */}
+            <div className="text-xs space-y-1.5 bg-gray-50 rounded-lg p-2.5">
+              <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center">
+                <span className="text-gray-400 font-medium">Support Basis:</span>
+                <span className="font-semibold text-gray-800 mt-0.5 sm:mt-0 text-left sm:text-right">{s.key_levels?.support_basis || '—'}</span>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {([
-                  ['Risk',  s.max_risk_inr != null ? `₹${INR.format(s.max_risk_inr)}` : '—'],
-                  ['R:R',   s.risk_reward  != null ? `1:${s.risk_reward.toFixed(1)}`  : '—'],
-                  ['IV',    s.iv_assessment || '—'],
-                ] as [string, string][]).map(([label, value]) => (
-                  <div key={label} className="bg-gray-50 rounded-lg py-2 text-center">
-                    <p className="text-[9px] text-gray-400 uppercase mb-0.5">{label}</p>
-                    <p className={`text-xs font-bold ${
-                      label === 'IV' && value === 'LOW'  ? 'text-green-600' :
-                      label === 'IV' && value === 'HIGH' ? 'text-red-600'   : 'text-gray-900'
-                    }`}>{value}</p>
+              <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center border-t border-gray-200/50 pt-1.5">
+                <span className="text-gray-400 font-medium">SL Invalidation Basis:</span>
+                <span className="font-semibold text-gray-800 mt-0.5 sm:mt-0 text-left sm:text-right">{s.key_levels?.stop_loss_basis || '—'}</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
+                <span className="text-gray-400 font-medium">Target 1 R:R Ratio:</span>
+                <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
+                  {s.trade_parameters?.rr_t1 != null ? `1:${s.trade_parameters.rr_t1.toFixed(2)}` : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
+                <span className="text-gray-400 font-medium">Target 2 R:R Ratio:</span>
+                <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
+                  {s.trade_parameters?.rr_t2 != null ? `1:${s.trade_parameters.rr_t2.toFixed(2)}` : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Recommended Setup Details */}
+          {recInstrument === 'OPTIONS' && s.options_setup && (
+            <div className="py-3">
+              <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2">Options Contract Setup</p>
+              <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 text-xs mb-2.5">
+                <div className="flex justify-between mb-1.5">
+                  <span>Contract: <strong>{s.options_setup.strike} {s.options_setup.option_type}</strong></span>
+                  <span>Expiry: <strong>{s.options_setup.expiry}</strong> ({s.options_setup.days_to_expiry} DTE)</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-purple-100/50">
+                  <span>IV Status: <strong>{s.options_setup.iv_note || 'N/A'}</strong></span>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5 text-center">
+                {[
+                  ['Premium Entry', s.options_setup.entry_premium_low != null && s.options_setup.entry_premium_high != null
+                    ? `${s.options_setup.entry_premium_low}–${s.options_setup.entry_premium_high}` : '—'],
+                  ['Premium SL', s.options_setup.sl_premium != null ? String(s.options_setup.sl_premium) : '—'],
+                  ['Premium T1', s.options_setup.target_1_premium != null ? String(s.options_setup.target_1_premium) : '—'],
+                  ['Premium T2', s.options_setup.target_2_premium != null ? String(s.options_setup.target_2_premium) : '—'],
+                ].map(([lbl, val]) => (
+                  <div key={lbl} className="bg-purple-50/30 border border-purple-100/50 rounded-lg py-1.5">
+                    <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
+                    <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Rationale expanders */}
-          {s.claude_full_rationale && (
-            <Expander title="Deep Rationale" defaultOpen={s.stage !== 'SKIP'}>
-              <p className="text-gray-700">{s.claude_full_rationale}</p>
-            </Expander>
-          )}
-          {s.rr_reasoning && (
-            <Expander title="R:R & Target Reasoning">
-              <p className="text-blue-700 italic">{s.rr_reasoning}</p>
-            </Expander>
-          )}
-          {s.mentor_explanation && (
-            <Expander title="Mentor Explanation">
-              <p className="text-gray-700 italic">"{s.mentor_explanation}"</p>
-            </Expander>
-          )}
-          {s.why_could_be_wrong && (
-            <Expander title="What Could Go Wrong?">
-              <p className="text-red-700">{s.why_could_be_wrong}</p>
-            </Expander>
-          )}
-
-          {/* Skip reason */}
-          {s.skip_reason && (
-            <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-1">Skip Reason</p>
-              <p className="text-xs text-red-700">{s.skip_reason}</p>
+          {recInstrument === 'FUT' && s.fut_setup && (
+            <div className="py-3">
+              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Futures Trade Setup</p>
+              <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs mb-2.5">
+                <div className="flex justify-between mb-1.5">
+                  <span>Contract Lot Size: <strong>{s.fut_setup.lot_size || s.lot_size || '—'}</strong></span>
+                  <span>Sized Lots: <strong>{s.fut_setup.lots || s.lots || '—'} lot(s)</strong></span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-indigo-100/50">
+                  <span>Margin Risk Allocation: <strong className="text-indigo-700">₹{INR.format(s.fut_setup.risk_inr || s.max_risk_inr || 0)}</strong></span>
+                  <span>Capital Risk %: <strong>{s.fut_setup.risk_pct_capital || s.risk_pct_capital || '—'}%</strong></span>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5 text-center">
+                {[
+                  ['Futures Entry', s.fut_setup.entry_low != null && s.fut_setup.entry_high != null
+                    ? `${s.fut_setup.entry_low}–${s.fut_setup.entry_high}` : '—'],
+                  ['Futures SL', s.fut_setup.stop_loss != null ? String(s.fut_setup.stop_loss) : '—'],
+                  ['Futures T1', s.fut_setup.target_1 != null ? String(s.fut_setup.target_1) : '—'],
+                  ['Futures T2', s.fut_setup.target_2 != null ? String(s.fut_setup.target_2) : '—'],
+                ].map(([lbl, val]) => (
+                  <div key={lbl} className="bg-indigo-50/30 border border-indigo-100/50 rounded-lg py-1.5">
+                    <p className="text-[8px] text-indigo-400 uppercase mb-0.5">{lbl}</p>
+                    <p className="text-xs font-mono font-bold text-indigo-900">{val}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Section 4: Position Sizing & Capital Allocation */}
+          {s.lots != null && s.lots > 0 && recInstrument !== 'FUT' && (
+            <div className="py-3 text-xs">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Position Sizing & Risk Allocation</p>
+              <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-2.5">
+                <div>
+                  <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Sized Lots</p>
+                  <p className="font-bold text-gray-800">{s.lots} lot{s.lots > 1 ? 's' : ''} (Size: {s.lot_size})</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Capital Risk</p>
+                  <p className="font-bold text-red-600">₹{INR.format(s.max_risk_inr)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Risk % Capital</p>
+                  <p className="font-bold text-gray-800">{s.risk_pct_capital}%</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 5: Scoring Breakdown Visuals */}
+          {s.scoring_breakdown && (
+            <div className="py-3">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Scoring Breakdown</p>
+              <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
+                {[
+                  ['D1: Technicals', s.scoring_breakdown.dimension_1, 'text-blue-700 bg-blue-50 border-blue-100'],
+                  ['D2: Trade parameters', s.scoring_breakdown.dimension_2, 'text-green-700 bg-green-50 border-green-100'],
+                  ['D3: Market & Sector', s.scoring_breakdown.dimension_3, 'text-amber-700 bg-amber-50 border-amber-100'],
+                  ['D4: Stock F&O', s.scoring_breakdown.dimension_4, 'text-purple-700 bg-purple-50 border-purple-100'],
+                ].map(([label, dim, cls]) => (
+                  <div key={label} className={`border rounded p-1.5 ${cls}`}>
+                    <p className="text-[8px] font-normal uppercase opacity-75 leading-tight truncate">{label}</p>
+                    <p className="font-bold font-mono mt-0.5">
+                      {dim ? `${dim.score}/${dim.max}` : '—'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 6: Meticulous Narratives (Collapsible Expanders) */}
+          <div className="py-3">
+            {s.dimension_1_narrative && (
+              <Expander title="Dimension 1: Chart & Indicators Analysis" defaultOpen={s.stage !== 'SKIP' && s.stage !== 'REJECT'}>
+                {formatNarrative(s.dimension_1_narrative)}
+              </Expander>
+            )}
+            {s.dimension_2_narrative && (
+              <Expander title="Dimension 2: Levels, Targets & Stop Loss Logic">
+                {formatNarrative(s.dimension_2_narrative)}
+              </Expander>
+            )}
+            {s.dimension_3_narrative && (
+              <Expander title="Dimension 3: Nifty & Sector Outperformance">
+                {formatNarrative(s.dimension_3_narrative)}
+              </Expander>
+            )}
+            {s.dimension_4_narrative && (
+              <Expander title="Dimension 4: Derivatives (Basis & PCR) Data">
+                {formatNarrative(s.dimension_4_narrative)}
+              </Expander>
+            )}
+            {s.mentor_notes && (
+              <Expander title="Swing Trading Mentorship Lessons">
+                <div className="bg-amber-50/50 border-l-4 border-amber-400 p-3.5 rounded-r-lg text-xs leading-relaxed text-amber-950 shadow-xs">
+                  <span className="text-lg font-serif text-amber-400 font-bold block leading-none mb-1">“</span>
+                  <p className="italic">{highlightKeyTerms(s.mentor_notes)}</p>
+                </div>
+              </Expander>
+            )}
+            {s.why_could_be_wrong && (
+              <Expander title="Three Specific Invalidation Scenarios">
+                {formatRejectionNarrative(s.why_could_be_wrong)}
+              </Expander>
+            )}
+            {s.key_thing_to_watch && (
+              <Expander title="Key Trigger for Morning Market Open">
+                <div className="text-blue-950 font-semibold text-xs leading-relaxed bg-blue-50/50 border border-blue-200 rounded-lg p-3.5 shadow-xs">
+                  <div className="flex gap-2.5 items-start">
+                    <span className="text-sm">🔔</span>
+                    <span className="flex-1">{highlightKeyTerms(s.key_thing_to_watch)}</span>
+                  </div>
+                </div>
+              </Expander>
+            )}
+          </div>
+
+          {/* Skip / Rejection Reason */}
+          {(s.skip_reason || s.rejection_reason) && (
+            <div className="pt-3">
+              <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
+                <p className="text-[9px] font-bold text-red-700 uppercase tracking-wide mb-1 font-semibold">Rejection/Skip Reason</p>
+                <p className="text-xs text-red-700 font-semibold">{s.rejection_reason || s.skip_reason}</p>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>
@@ -156,6 +469,11 @@ const STAGE_CFG: Record<string, StageConfig> = {
     icon: '🟢', label: 'Trade Ready', defaultOpen: true,
     headerCls: 'bg-green-50 border-green-200 text-green-900',
     chevronCls: 'text-green-400',
+  },
+  REJECT: {
+    icon: '🔴', label: 'Reject', defaultOpen: false,
+    headerCls: 'bg-red-50 border-red-200 text-red-950',
+    chevronCls: 'text-red-400',
   },
   WATCH: {
     icon: '🟡', label: 'Watch', defaultOpen: true,
@@ -215,19 +533,24 @@ function StageGroup({ stage, turns }: { stage: string; turns: DeepAnalysisTurn[]
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-const STAGE_ORDER = ['TRADE_READY', 'WATCH', 'ON_RADAR', 'SKIP'] as const;
+const STAGE_ORDER = ['TRADE_READY', 'REJECT', 'WATCH', 'ON_RADAR', 'SKIP'] as const;
 
 export default function DeepAnalysisScreen() {
   const [data, setData]       = useState<DeepAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadDeepAnalysis = useCallback(() => {
+    setLoading(true);
     fetchDeepAnalysis()
       .then(setData)
       .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadDeepAnalysis();
+  }, [loadDeepAnalysis]);
 
   if (loading) {
     return (
@@ -267,7 +590,7 @@ export default function DeepAnalysisScreen() {
   const extractedDate = extractDateFromSessionId(data?.session_id) || data?.session_date;
 
   return (
-    <div className="pb-20">
+    <div className="pb-20 bg-gray-50/50 min-h-screen">
       <div className="px-4 pt-5 pb-3">
         <h1 className="text-xl font-semibold text-gray-900">Deep Analysis</h1>
         <p className="text-xs text-gray-500 mt-1">
