@@ -247,7 +247,7 @@ export interface KiteHolding {
 export interface ActiveTradesResponse {
   turns: DeepAnalysisTurn[];
   holdings: Record<string, KiteHolding>;
-  positions: Record<string, KitePosition>;
+  positions: Record<string, KitePosition[]>;
   session_id: string | null;
   session_date: string | null;
 }

@@ -205,7 +205,7 @@ async def get_active_trades():
         for exch in ["NFO", "MCX"]:
             for sym, items in p_data.get(exch, {}).items():
                 if items:
-                    positions_dict[sym] = items[0]
+                    positions_dict[sym] = items
     except Exception as exc:
         logger.warning("Active Trades: failed to fetch Kite positions: %s", exc)
         
@@ -238,25 +238,25 @@ async def get_active_trades():
             logger.warning("Active Trades: failed to fetch today's turns: %s", exc)
             
     # For symbols not in today's turns, fetch latest trade setup from DB
-    missing_symbols = active_symbols - set(today_turns.keys())
+    # missing_symbols = active_symbols - set(today_turns.keys())
     setups_dict = {}
-    if missing_symbols:
-        try:
-            from database.client import get_client
-            for sym in missing_symbols:
-                setup_res = (
-                    get_client()
-                    .table("trade_setups")
-                    .select("*")
-                    .eq("symbol", sym)
-                    .order("setup_date", desc=True)
-                    .limit(1)
-                    .execute()
-                )
-                if setup_res.data:
-                    setups_dict[sym] = setup_res.data[0]
-        except Exception as exc:
-            logger.warning("Active Trades: failed to fetch setups: %s", exc)
+    # if missing_symbols:
+    #     try:
+    #         from database.client import get_client
+    #         for sym in missing_symbols:
+    #             setup_res = (
+    #                 get_client()
+    #                 .table("trade_setups")
+    #                 .select("*")
+    #                 .eq("symbol", sym)
+    #                 .order("setup_date", desc=True)
+    #                 .limit(1)
+    #                 .execute()
+    #             )
+    #             if setup_res.data:
+    #                 setups_dict[sym] = setup_res.data[0]
+    #     except Exception as exc:
+    #         logger.warning("Active Trades: failed to fetch setups: %s", exc)
             
     # 3. Assemble turns list
     turns = []
@@ -267,8 +267,8 @@ async def get_active_trades():
         setup_row = setups_dict.get(sym)
         
         # Only include if we have a real deep analysis turn (today_turns) or a database setup (setups_dict)
-        if not turn_row and not setup_row:
-            continue
+        # if not turn_row and not setup_row:
+        #     continue
             
         analysis = {}
         completed_at = None
