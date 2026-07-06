@@ -289,7 +289,7 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
           </div>
 
           {/* Section 3: Recommended Setup Details */}
-          {recInstrument === 'OPTIONS' && s.options_setup && (
+          {s.options_setup && (
             <div className="py-3">
               <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2">Options Contract Setup</p>
               <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 text-xs mb-2.5">
@@ -318,7 +318,7 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
             </div>
           )}
 
-          {recInstrument === 'FUT' && s.fut_setup && (
+          {s.fut_setup && (
             <div className="py-3">
               <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Futures Trade Setup</p>
               <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs mb-2.5">
