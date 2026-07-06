@@ -1018,7 +1018,7 @@ async def system_status():
     session = get_latest_session()
 
     # Kite token status
-    kite_info: dict = {"valid": False, "expires_at": None, "hours_remaining": None}
+    kite_info: dict = {"valid": False, "expires_at": None, "hours_remaining": None, "error_message": None}
     try:
         from database.queries import get_kite_token
         row = get_kite_token()
@@ -1032,10 +1032,25 @@ async def system_status():
                 if exp.tzinfo is None:
                     exp = exp.replace(tzinfo=timezone.utc)
                 hours_left = round((exp - now).total_seconds() / 3600, 1)
-            kite_info["valid"]           = (hours_left or 0) > 0
             kite_info["hours_remaining"] = hours_left
+            
+            time_valid = (hours_left or 0) > 0
+            if time_valid:
+                from new_validation.data_validator import validate_kite_token
+                ok, msg = validate_kite_token()
+                kite_info["valid"] = ok
+                if not ok:
+                    kite_info["error_message"] = msg
+            else:
+                kite_info["valid"] = False
+                kite_info["error_message"] = "Expired (time limit reached)"
+        else:
+            kite_info["valid"] = False
+            kite_info["error_message"] = "Missing in database"
     except Exception as exc:
         logger.warning("Kite token check failed: %s", exc)
+        kite_info["valid"] = False
+        kite_info["error_message"] = str(exc)
 
     # Scheduler jobs
     jobs = []
