@@ -102,6 +102,25 @@ export async function fetchChatContextText(): Promise<string> {
   return res.text();
 }
 
+export interface SessionTurnMeta {
+  turn_number: number;
+  turn_type: 'market_context' | 'prescan' | 'deep_analysis';
+  symbol: string | null;
+}
+
+export function fetchSessionTurns(): Promise<{ turns: SessionTurnMeta[] }> {
+  return apiFetch<{ turns: SessionTurnMeta[] }>('/api/session/today/turns');
+}
+
+export async function fetchTurnInput(turnType: string, symbol?: string): Promise<string> {
+  const query = symbol ? `?turn_type=${turnType}&symbol=${symbol}` : `?turn_type=${turnType}`;
+  const res = await fetch(`${API_URL}/api/session/today/turn-input${query}`);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.text();
+}
+
 export function fetchFoStocks(): Promise<string[]> {
   return apiFetch<string[]>('/api/fo-stocks');
 }

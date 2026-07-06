@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { checkChatContext, fetchChatContextText, sendChatMessage } from '../api';
-import type { ChatMessage } from '../api';
+import { checkChatContext, fetchChatContextText, sendChatMessage, fetchSessionTurns, fetchTurnInput } from '../api';
+import type { ChatMessage, SessionTurnMeta } from '../api';
 
 type LoadState  = 'idle' | 'loading' | 'success' | 'error' | 'no_session';
 type WidgetMode = 'intro' | 'chat';
@@ -74,6 +74,11 @@ export default function ChatWidget() {
   const [timeLeft,       setTimeLeft]       = useState('');
   const [isMobile,       setIsMobile]       = useState(window.innerWidth < 640);
 
+  // turn context selection state
+  const [sessionTurns,     setSessionTurns]     = useState<SessionTurnMeta[]>([]);
+  const [selectedTurnType, setSelectedTurnType] = useState<string>('full_context');
+  const [selectedSymbol,   setSelectedSymbol]   = useState<string>('');
+
   // chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([GREETING]);
   const [chatInput,    setChatInput]    = useState('');
@@ -103,6 +108,24 @@ export default function ChatWidget() {
     window.addEventListener('resize', onResize);
     return () => { clearInterval(pollId); window.removeEventListener('resize', onResize); };
   }, [isExpanded]);
+
+  // Load session turns metadata when expanded
+  useEffect(() => {
+    if (isExpanded) {
+      fetchSessionTurns()
+        .then(res => {
+          setSessionTurns(res.turns || []);
+          // Pre-select first deep_analysis symbol if available
+          const firstDeep = res.turns?.find(t => t.turn_type === 'deep_analysis');
+          if (firstDeep && firstDeep.symbol) {
+            setSelectedSymbol(firstDeep.symbol);
+          }
+        })
+        .catch(err => {
+          console.error("Failed to load session turns:", err);
+        });
+    }
+  }, [isExpanded, sessionId]);
 
   // Countdown timer
   useEffect(() => {
@@ -139,7 +162,12 @@ export default function ChatWidget() {
     cancelRef.current = false;
     setLoadState('loading');
     try {
-      const text = await fetchChatContextText();
+      let text = '';
+      if (selectedTurnType === 'full_context') {
+        text = await fetchChatContextText();
+      } else {
+        text = await fetchTurnInput(selectedTurnType, selectedTurnType === 'deep_analysis' ? selectedSymbol : undefined);
+      }
       if (cancelRef.current) return;
       await copyToClipboard(text);
       setLastLoadedDate(sessionDate);
@@ -287,18 +315,64 @@ export default function ChatWidget() {
               {sessionDate && <div className="text-sm text-gray-500 mt-1">{formatBadgeDate(sessionDate)}</div>}
             </div>
 
+            {/* Context selection dropdowns */}
+            <div className="bg-gray-50 border border-gray-150 rounded-xl p-3.5 space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Select Context to Copy
+                </label>
+                <select
+                  value={selectedTurnType}
+                  onChange={e => setSelectedTurnType(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-sans"
+                >
+                  <option value="full_context">All-in-one Full Context</option>
+                  <option value="market_context">Market Context (Turn 1)</option>
+                  <option value="prescan">Prescan (Turn 2)</option>
+                  <option value="deep_analysis">Deep Analysis Stock (Turn 3)</option>
+                </select>
+              </div>
+
+              {selectedTurnType === 'deep_analysis' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                    Select Stock Symbol
+                  </label>
+                  <select
+                    value={selectedSymbol}
+                    onChange={e => setSelectedSymbol(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-sans"
+                  >
+                    {sessionTurns
+                      .filter(t => t.turn_type === 'deep_analysis' && t.symbol)
+                      .map(t => (
+                        <option key={t.symbol} value={t.symbol!}>
+                          {t.symbol} (Turn {t.turn_number})
+                        </option>
+                      ))}
+                    {sessionTurns.filter(t => t.turn_type === 'deep_analysis').length === 0 && (
+                      <option value="">No stock analysis found</option>
+                    )}
+                  </select>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleLoad}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 px-4 text-sm transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 px-4 text-xs transition-colors"
             >
-              Load Context &amp; Open Claude.ai
+              {selectedTurnType === 'full_context' && 'Load Full Context & Open Claude.ai'}
+              {selectedTurnType === 'market_context' && 'Load Market Context & Open Claude.ai'}
+              {selectedTurnType === 'prescan' && 'Load Prescan Context & Open Claude.ai'}
+              {selectedTurnType === 'deep_analysis' && `Load ${selectedSymbol || 'Stock'} Context & Open Claude.ai`}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </button>
-            <p className="text-xs text-gray-500 text-center leading-relaxed">
-              Copies full context to clipboard and opens a fresh Claude.ai tab.
+            <p className="text-[10px] text-gray-400 text-center leading-relaxed">
+              Copies selection prompt to clipboard and opens a fresh Claude.ai tab.
             </p>
 
             <div className="relative flex items-center gap-2">

@@ -796,6 +796,57 @@ async def get_chat_context(response: Response):
     return PlainTextResponse(content=text, headers=dict(response.headers))
 
 
+@router.get("/session/today/turns")
+async def get_session_turns():
+    """Returns lightweight list of turns (turn_number, turn_type, symbol) from today's session."""
+    session = get_latest_session()
+    if not session:
+        return {"turns": []}
+    session_id = session.get("session_id")
+    try:
+        from database.client import get_client
+        res = (
+            get_client()
+            .table("session_claude_turns")
+            .select("turn_number,turn_type,symbol")
+            .eq("session_id", session_id)
+            .order("turn_number")
+            .execute()
+        )
+        return {"turns": res.data or []}
+    except Exception as exc:
+        logger.error("Failed to fetch session turns: %s", exc)
+        return {"turns": [], "error": str(exc)}
+
+
+@router.get("/session/today/turn-input", response_class=PlainTextResponse)
+async def get_turn_input(turn_type: str, symbol: str | None = None):
+    """Returns the input_text (Claude prompt) of a specific turn from today's session."""
+    session = get_latest_session()
+    if not session:
+        raise HTTPException(status_code=404, detail="No session found")
+    session_id = session.get("session_id")
+    try:
+        from database.client import get_client
+        query = get_client().table("session_claude_turns").select("input_text").eq("session_id", session_id)
+        if turn_type == "deep_analysis":
+            if not symbol:
+                raise HTTPException(status_code=400, detail="Symbol required for deep_analysis")
+            query = query.eq("turn_type", "deep_analysis").eq("symbol", symbol)
+        else:
+            query = query.eq("turn_type", turn_type)
+            
+        res = query.execute()
+        if not res.data or not res.data[0].get("input_text"):
+            raise HTTPException(status_code=404, detail="Turn input text not found")
+        return PlainTextResponse(content=res.data[0]["input_text"])
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to fetch turn input: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 # ── POST /api/chat ────────────────────────────────────────────────────────────
 
 @router.post("/chat")
