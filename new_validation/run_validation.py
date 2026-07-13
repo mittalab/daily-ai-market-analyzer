@@ -695,11 +695,15 @@ def run_validation_now_for_symbol(symbol: str, include_indexes: bool = True,) ->
 
 # ── Morning bhavcopy validation ───────────────────────────────────────────────
 
+_FO_VALIDATION_MAX_RETRIES = 3
+_FO_VALIDATION_RETRY_DELAY = 10  # seconds between retries
+
+
 def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
     """
     Validate all Kite F&O stocks for target_date (OHLCV + futures + options).
-    Called from job_morning_bhavcopy after bhavcopy ingestion to confirm the
-    downloaded data landed correctly in the database.
+    Each stock is retried up to _FO_VALIDATION_MAX_RETRIES times on failure.
+    Called from job_morning_bhavcopy after bhavcopy ingestion.
 
     Returns (passed_count, total_count, failed_symbols).
     """
@@ -727,14 +731,38 @@ def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
 
     for idx, sym in enumerate(symbols, 1):
         logger.info("[%d/%d] Morning FO validation: %s", idx, len(symbols), sym)
-        try:
-            ok = validate_and_heal(sym, target_date, holidays, other_indices)
-            if ok:
-                passed_count += 1
-            else:
-                failed_symbols.append(sym)
-        except Exception as exc:
-            logger.error("Morning FO validation error for %s: %s", sym, exc)
+        passed = False
+
+        for attempt in range(1, _FO_VALIDATION_MAX_RETRIES + 1):
+            try:
+                ok = validate_and_heal(sym, target_date, holidays, other_indices)
+                if ok:
+                    if attempt > 1:
+                        logger.info("%s: passed on retry %d/%d", sym, attempt, _FO_VALIDATION_MAX_RETRIES)
+                    passed = True
+                    break
+                else:
+                    logger.warning(
+                        "%s: attempt %d/%d failed (validate_and_heal returned False)",
+                        sym, attempt, _FO_VALIDATION_MAX_RETRIES,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "%s: attempt %d/%d raised exception: %s",
+                    sym, attempt, _FO_VALIDATION_MAX_RETRIES, exc,
+                )
+
+            if attempt < _FO_VALIDATION_MAX_RETRIES:
+                logger.info("%s: retrying in %ds…", sym, _FO_VALIDATION_RETRY_DELAY)
+                time.sleep(_FO_VALIDATION_RETRY_DELAY)
+
+        if passed:
+            passed_count += 1
+        else:
+            logger.error(
+                "%s: FAILED after %d attempt(s) — adding to failed list",
+                sym, _FO_VALIDATION_MAX_RETRIES,
+            )
             failed_symbols.append(sym)
 
     logger.info(
