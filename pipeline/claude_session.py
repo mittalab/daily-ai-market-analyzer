@@ -2308,7 +2308,13 @@ def _build_turn3_data(
         "iv_atm": iv_atm,
         "options_note": options_note,
         "ce_walls": ce_walls,
-        "pe_walls": pe_walls
+        "pe_walls": pe_walls,
+        "options_chain_last_day": [
+            {"date": r.get("snapshot_date"), "strike": r["strike"], "type": r["option_type"],
+             "oi": r.get("oi"), "iv": r.get("iv"),
+             "premium": r.get("premium_close")}
+            for r in options
+        ]
     }
     
     # ── Section 6: Sector Context ─────────────────────────────────────────────
@@ -2440,6 +2446,7 @@ def _build_turn3_prompt(data_package: dict) -> str:
         futures_text = "- Futures: NOT AVAILABLE for this stock"
 
     if sec5["options_available"]:
+        chain_compact = json.dumps(sec5['options_chain_last_day'], separators=(',', ':'))
         options_text = f"""- Options Available: True
 - PCR Near Month: {sec5['pcr_near']}
 - Max Pain: {sec5['max_pain']}
@@ -2448,7 +2455,8 @@ def _build_turn3_prompt(data_package: dict) -> str:
 - IV ATM: {sec5['iv_atm'] or 'null — use VIX as proxy'}
 - Options Note: {sec5['options_note']}
 - CE Walls (resistance): {json.dumps(sec5['ce_walls'])}
-- PE Walls (support): {json.dumps(sec5['pe_walls'])}"""
+- PE Walls (support): {json.dumps(sec5['pe_walls'])}
+- Option Chain Last Day: {chain_compact}"""
     else:
         options_text = "- Options: NOT AVAILABLE — use VIX as IV proxy for premium estimation"
 
@@ -2462,7 +2470,6 @@ You must apply the 100-point Conviction Scoring Framework and enforce all operat
 - Symbol: {symbol}
 - Preliminary Direction: {direction}
 - Preliminary Reason from Pre-Scan: {sec1["preliminary_reason"]}
-- Mandatory Stock: {is_mandatory_str}
 - Previous Setups for Symbol: {previous_setups_compact}
 
 [SECTION C: MARKET CONTEXT]

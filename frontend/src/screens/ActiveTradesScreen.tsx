@@ -651,7 +651,7 @@ function StageGroup({
 
       {/* Stock cards */}
       {open && (
-        <div className="mt-2">
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
           {turns.map(turn => {
             const sym = turn.symbol || '';
             return (
@@ -787,7 +787,7 @@ export default function ActiveTradesScreen() {
               ) : null
             )}
             {others.length > 0 && (
-              <div className="mt-2">
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
                 {others.map(turn => {
                   const sym = turn.symbol || '';
                   return (

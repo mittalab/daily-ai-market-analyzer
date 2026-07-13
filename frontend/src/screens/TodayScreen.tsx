@@ -146,7 +146,7 @@ function MarketAnalysisPanel({ turn, sessionDate }: { turn: DeepAnalysisTurn; se
   ].filter(([, v]) => v) as [string, string][];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 mb-4">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 md:mx-0 mb-4">
       {/* Always-visible summary chips */}
       <div className="px-4 py-3 border-b border-gray-100">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -385,7 +385,7 @@ function MarketAnalysisPanel({ turn, sessionDate }: { turn: DeepAnalysisTurn; se
 
 function SimpleMarketContext({ ctx, sessionDate }: { ctx: NonNullable<TodayResponse['market_context']>, sessionDate?: string }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-4">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 md:mx-0 p-4 mb-4">
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
         Market Context · {sessionDate || ctx.session_date}
       </p>
@@ -492,69 +492,73 @@ export default function TodayScreen() {
         </div>
       )}
 
-      {/* Market analysis — rich panel if deep analysis available, else simple fallback */}
-      {marketTurn ? (
-        <MarketAnalysisPanel turn={marketTurn} sessionDate={displayDate} />
-      ) : ctx ? (
-        <SimpleMarketContext ctx={ctx} sessionDate={displayDate} />
-      ) : null}
-
-      {/* Divider */}
-      <div className="mx-4 my-4 border-t-2 border-dashed border-gray-200" />
-
-      {/* Setup summary */}
-      <div className="px-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-          Tonight's Setups
-        </p>
-
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl border bg-green-50 border-green-100">
-            <span className="text-sm font-semibold text-green-900">🟢 Trade Ready</span>
-            <span className="text-xl font-bold text-green-700">{trCount}</span>
-          </div>
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl border bg-red-50 border-red-150">
-            <span className="text-sm font-semibold text-red-955">🔴 Reject</span>
-            <span className="text-xl font-bold text-red-800">{rejectCount}</span>
-          </div>
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl border bg-amber-50 border-amber-150 col-span-2">
-            <span className="text-sm font-semibold text-amber-900">🟡 Watch</span>
-            <span className="text-xl font-bold text-amber-700">{wtCount}</span>
-          </div>
+      {/* Main Grid: Responsive 2-column layout on md+ */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 px-4">
+        {/* Left column: Market Analysis (Span 7 on md) */}
+        <div className="md:col-span-7">
+          {marketTurn ? (
+            <MarketAnalysisPanel turn={marketTurn} sessionDate={displayDate} />
+          ) : ctx ? (
+            <SimpleMarketContext ctx={ctx} sessionDate={displayDate} />
+          ) : null}
         </div>
 
-        {deepTurns.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 mt-2.5">
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg border bg-blue-50/50 border-blue-100 text-xs">
-              <span className="text-blue-900 font-medium">On Radar</span>
-              <span className="font-bold text-blue-700">{radarCount}</span>
+        {/* Right column: Setup summary (Span 5 on md) */}
+        <div className="md:col-span-5">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Tonight's Setups
+            </p>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl border bg-green-50 border-green-100">
+                <span className="text-sm font-semibold text-green-900">🟢 Trade Ready</span>
+                <span className="text-xl font-bold text-green-700">{trCount}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl border bg-red-50 border-red-150">
+                <span className="text-sm font-semibold text-red-955">🔴 Reject</span>
+                <span className="text-xl font-bold text-red-800">{rejectCount}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl border bg-amber-50 border-amber-150 col-span-2">
+                <span className="text-sm font-semibold text-amber-900">🟡 Watch</span>
+                <span className="text-xl font-bold text-amber-700">{wtCount}</span>
+              </div>
             </div>
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg border bg-gray-50 border-gray-150 text-xs">
-              <span className="text-gray-600 font-medium">Skip</span>
-              <span className="font-bold text-gray-700">{skipCount}</span>
-            </div>
+
+            {deepTurns.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mt-2.5">
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-lg border bg-blue-50/50 border-blue-100 text-xs">
+                  <span className="text-blue-900 font-medium">On Radar</span>
+                  <span className="font-bold text-blue-700">{radarCount}</span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-lg border bg-gray-50 border-gray-150 text-xs">
+                  <span className="text-gray-600 font-medium">Skip</span>
+                  <span className="font-bold text-gray-700">{skipCount}</span>
+                </div>
+              </div>
+            )}
+
+            {deepTurns.length === 0 && (
+              <p className="text-xs text-gray-400 text-center mt-3">
+                {ctx?.regime ? `Regime: ${ctx.regime}` : 'Run the pipeline tonight for new setups'}
+              </p>
+            )}
+
+            <p className="text-xs text-gray-400 text-center mt-4">
+              Open the Deep tab for full stock detail
+            </p>
+
+            {/* Session footer */}
+            {todayData?.session_info?.completed_at && (
+              <p className="text-xs text-gray-400 text-center mt-3 pt-3 border-t border-gray-100">
+                Pipeline ran {todayData.session_info.hours_since_run}h ago
+                {todayData.session_info.cost_usd != null
+                  ? ` · $${todayData.session_info.cost_usd.toFixed(2)}`
+                  : ''}
+              </p>
+            )}
           </div>
-        )}
-
-        {deepTurns.length === 0 && (
-          <p className="text-xs text-gray-400 text-center mt-3">
-            {ctx?.regime ? `Regime: ${ctx.regime}` : 'Run the pipeline tonight for new setups'}
-          </p>
-        )}
-
-        <p className="text-xs text-gray-400 text-center mt-4">
-          Open the Deep tab for full stock detail
-        </p>
-
-        {/* Session footer */}
-        {todayData?.session_info?.completed_at && (
-          <p className="text-xs text-gray-400 text-center mt-2">
-            Pipeline ran {todayData.session_info.hours_since_run}h ago
-            {todayData.session_info.cost_usd != null
-              ? ` · $${todayData.session_info.cost_usd.toFixed(2)}`
-              : ''}
-          </p>
-        )}
+        </div>
       </div>
     </div>
   );

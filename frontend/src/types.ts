@@ -160,7 +160,7 @@ export interface CostInfo {
 
 export interface SystemStatus {
   database: { connected: boolean };
-  kite_token: { valid: boolean; expires_at: string | null; hours_remaining: number | null };
+  kite_token: { valid: boolean; expires_at: string | null; hours_remaining: number | null; error_message?: string | null };
   last_pipeline: {
     session_id: string | null;
     session_date: string | null;

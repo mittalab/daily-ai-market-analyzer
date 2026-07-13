@@ -12,7 +12,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-lg mx-auto flex flex-col relative">
+      <div className="w-full max-w-lg md:max-w-4xl lg:max-w-6xl mx-auto flex flex-col relative">
         <main className="flex-1 overflow-y-auto pb-20">
           {/* All screens stay mounted — CSS hidden preserves state across tab switches */}
           <div className={screen !== 'today'   ? 'hidden' : ''}><TodayScreen /></div>

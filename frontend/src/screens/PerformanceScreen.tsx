@@ -205,7 +205,7 @@ function IndicatorValidationSection() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 md:mx-0 p-4 mb-3">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
         🔍 Indicator Validation
       </p>
@@ -354,152 +354,168 @@ export default function PerformanceScreen() {
     <div className="pb-20">
       <h1 className="text-xl font-semibold text-gray-900 px-4 pt-5 pb-3">System Status</h1>
 
-      {/* Health */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Health</p>
-        <Row label="Database" value={
-          <span className="flex items-center gap-2">
-            <StatusDot ok={status?.database.connected ?? false} />
-            {status?.database.connected ? 'Connected' : 'Unreachable'}
-          </span>
-        } />
-        <Row label="Kite Token" value={
-          <span className="flex items-center gap-2">
-            <StatusDot ok={status?.kite_token.valid ?? false} />
-            {status?.kite_token.valid
-              ? `Valid · ${status.kite_token.hours_remaining?.toFixed(1)}h left`
-              : 'Expired / missing'}
-          </span>
-        } />
-      </div>
-
-      {/* Kite refresh */}
-      <div className="mx-4 mb-3">
-        <a
-          href="https://api.abhishekmittal.in/kite/refresh"
-          target="_blank"
-          rel="noreferrer"
-          className="block w-full text-center bg-white border border-gray-300 text-gray-700 rounded-xl py-3 text-sm font-medium hover:bg-gray-50 transition-colors duration-150"
-        >
-          🔑 Refresh Kite Token
-        </a>
-      </div>
-
-      {/* Indicator Validation Section */}
-      <IndicatorValidationSection />
-
-      {/* Last pipeline */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Last Pipeline</p>
-        <Row label="Date"       value={lp?.session_date ?? '—'} />
-        <Row label="Status"     value={lp?.status ?? '—'} />
-        <Row label="Completed"  value={fmtTime(lp?.completed_at)} />
-        <Row label="Age"        value={lp?.hours_since_run != null ? `${lp.hours_since_run}h ago` : '—'} />
-        <Row label="Cost"       value={lp?.cost_usd != null ? `$${lp.cost_usd.toFixed(4)}` : '—'} />
-      </div>
-
-      {/* ── API Cost Tracker ── */}
-      {cost && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            💰 API Cost Tracker
-          </p>
-
-          {/* Today's session summary */}
-          {tot && (
-            <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-gray-100">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  ${tot.total_cost_usd.toFixed(2)}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  ₹{tot.total_cost_inr.toFixed(0)} · today's session
-                  {cost.regime && (
-                    <span className="ml-2 bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs">
-                      {cost.regime}
-                    </span>
-                  )}
-                </p>
+      {/* Main Grid: Responsive 2-column layout on md+ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4">
+        {/* Left Column: Health, Token Refresh, Indicator Validation */}
+        <div className="space-y-4">
+          {/* Health */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Health</p>
+            <Row label="Database" value={
+              <span className="flex items-center gap-2">
+                <StatusDot ok={status?.database.connected ?? false} />
+                {status?.database.connected ? 'Connected' : 'Unreachable'}
+              </span>
+            } />
+            <Row label="Kite Token" value={
+              <div className="flex flex-col items-end">
+                <span className="flex items-center gap-2">
+                  <StatusDot ok={status?.kite_token.valid ?? false} />
+                  {status?.kite_token.valid
+                    ? `Valid · ${status.kite_token.hours_remaining?.toFixed(1)}h left`
+                    : 'Invalid'}
+                </span>
+                {status?.kite_token.error_message && !status.kite_token.valid && (
+                  <span className="text-[10px] text-red-500 font-normal mt-0.5 max-w-[200px] truncate" title={status.kite_token.error_message}>
+                    {status.kite_token.error_message}
+                  </span>
+                )}
               </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-gray-700">
-                  ~{tot.sessions_remaining_estimate} sessions left
-                </p>
-                <p className="text-xs text-gray-400">this month</p>
-              </div>
-            </div>
-          )}
+            } />
+          </div>
 
-          {/* Monthly budget bar */}
-          {cost.monthly_spent_usd != null && cost.budget_usd != null && (
-            <div className="mb-4 pb-3 border-b border-gray-100">
-              <p className="text-xs font-medium text-gray-600 mb-2">Monthly Budget</p>
-              <BudgetBar spent={cost.monthly_spent_usd} budget={cost.budget_usd} />
+          {/* Kite refresh */}
+          <div>
+            <a
+              href="https://api.abhishekmittal.in/kite/refresh"
+              target="_blank"
+              rel="noreferrer"
+              className="block w-full text-center bg-white border border-gray-300 text-gray-700 rounded-xl py-3 text-sm font-medium hover:bg-gray-50 transition-colors duration-150"
+            >
+              🔑 Refresh Kite Token
+            </a>
+          </div>
+
+          {/* Indicator Validation Section */}
+          <IndicatorValidationSection />
+        </div>
+
+        {/* Right Column: Last Pipeline, API Cost Tracker, Scheduler Jobs */}
+        <div className="space-y-4">
+          {/* Last pipeline */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Last Pipeline</p>
+            <Row label="Date"       value={lp?.session_date ?? '—'} />
+            <Row label="Status"     value={lp?.status ?? '—'} />
+            <Row label="Completed"  value={fmtTime(lp?.completed_at)} />
+            <Row label="Age"        value={lp?.hours_since_run != null ? `${lp.hours_since_run}h ago` : '—'} />
+            <Row label="Cost"       value={lp?.cost_usd != null ? `$${lp.cost_usd.toFixed(4)}` : '—'} />
+          </div>
+
+          {/* ── API Cost Tracker ── */}
+          {cost && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                💰 API Cost Tracker
+              </p>
+
+              {/* Today's session summary */}
               {tot && (
-                <p className="text-xs text-gray-400 mt-1.5">
-                  ${tot.monthly_remaining_usd.toFixed(2)} remaining
+                <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-gray-100">
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${tot.total_cost_usd.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      ₹{tot.total_cost_inr.toFixed(0)} · today's session
+                      {cost.regime && (
+                        <span className="ml-2 bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs">
+                          {cost.regime}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-700">
+                      ~{tot.sessions_remaining_estimate} sessions left
+                    </p>
+                    <p className="text-xs text-gray-400">this month</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Monthly budget bar */}
+              {cost.monthly_spent_usd != null && cost.budget_usd != null && (
+                <div className="mb-4 pb-3 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Monthly Budget</p>
+                  <BudgetBar spent={cost.monthly_spent_usd} budget={cost.budget_usd} />
+                  {tot && (
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      ${tot.monthly_remaining_usd.toFixed(2)} remaining
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Turn breakdown */}
+              {cost.session_turns && cost.session_turns.length > 0 && (
+                <div className="mb-4 pb-3 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Breakdown today</p>
+                  <TurnBreakdown turns={cost.session_turns} />
+                </div>
+              )}
+
+              {/* Token counts */}
+              {tot && (
+                <div className="grid grid-cols-2 gap-2 mb-4 pb-3 border-b border-gray-100">
+                  <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                    <p className="text-xs text-gray-500 mb-0.5">Input tokens</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {(tot.total_input_tokens / 1000).toFixed(1)}K
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                    <p className="text-xs text-gray-500 mb-0.5">Output tokens</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {(tot.total_output_tokens / 1000).toFixed(1)}K
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Context quality */}
+              {cost.context_quality && (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-2">Context Quality</p>
+                  <ContextQualitySection cq={cost.context_quality} />
+                </div>
+              )}
+
+              {!tot && !cost.session_turns && (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  Run the pipeline to see cost breakdown
                 </p>
               )}
             </div>
           )}
 
-          {/* Turn breakdown */}
-          {cost.session_turns && cost.session_turns.length > 0 && (
-            <div className="mb-4 pb-3 border-b border-gray-100">
-              <p className="text-xs font-medium text-gray-600 mb-2">Breakdown today</p>
-              <TurnBreakdown turns={cost.session_turns} />
+          {/* Scheduler jobs */}
+          {(status?.scheduler_jobs?.length ?? 0) > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Scheduled Jobs</p>
+              {status!.scheduler_jobs.map(job => (
+                <Row
+                  key={job.id}
+                  label={job.name}
+                  value={job.next_run ? fmtTime(job.next_run) : 'Unscheduled'}
+                />
+              ))}
             </div>
-          )}
-
-          {/* Token counts */}
-          {tot && (
-            <div className="grid grid-cols-2 gap-2 mb-4 pb-3 border-b border-gray-100">
-              <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                <p className="text-xs text-gray-500 mb-0.5">Input tokens</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {(tot.total_input_tokens / 1000).toFixed(1)}K
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                <p className="text-xs text-gray-500 mb-0.5">Output tokens</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {(tot.total_output_tokens / 1000).toFixed(1)}K
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Context quality */}
-          {cost.context_quality && (
-            <div>
-              <p className="text-xs font-medium text-gray-600 mb-2">Context Quality</p>
-              <ContextQualitySection cq={cost.context_quality} />
-            </div>
-          )}
-
-          {!tot && !cost.session_turns && (
-            <p className="text-sm text-gray-400 text-center py-2">
-              Run the pipeline to see cost breakdown
-            </p>
           )}
         </div>
-      )}
+      </div>
 
-      {/* Scheduler jobs */}
-      {(status?.scheduler_jobs?.length ?? 0) > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 p-4 mb-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Scheduled Jobs</p>
-          {status!.scheduler_jobs.map(job => (
-            <Row
-              key={job.id}
-              label={job.name}
-              value={job.next_run ? fmtTime(job.next_run) : 'Unscheduled'}
-            />
-          ))}
-        </div>
-      )}
-
-      <p className="text-xs text-gray-400 text-center mt-2 mb-4">
+      <p className="text-xs text-gray-400 text-center mt-4 mb-4">
         Server time: {fmtTime(status?.server_time_ist)}
       </p>
     </div>
