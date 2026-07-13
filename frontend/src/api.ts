@@ -1,4 +1,5 @@
 import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse, IndicatorValidation, ActiveTradesResponse } from './types';
+import { getCached, setCached } from './cache';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -135,5 +136,31 @@ export function fetchIndicatorValidation(
 
 export function fetchActiveTrades(): Promise<ActiveTradesResponse> {
   return apiFetch<ActiveTradesResponse>('/api/active-trades');
+}
+
+// ── Cache-aware variants ───────────────────────────────────────────────────────
+
+export async function fetchTodayCached(): Promise<TodayResponse> {
+  const cached = getCached<TodayResponse>('today');
+  if (cached) return cached;
+  const data = await fetchToday();
+  setCached('today', data);
+  return data;
+}
+
+export async function fetchDeepAnalysisCached(): Promise<DeepAnalysisResponse> {
+  const cached = getCached<DeepAnalysisResponse>('deep-analysis');
+  if (cached) return cached;
+  const data = await fetchDeepAnalysis();
+  setCached('deep-analysis', data);
+  return data;
+}
+
+export async function fetchActiveTradesCached(): Promise<ActiveTradesResponse> {
+  const cached = getCached<ActiveTradesResponse>('active-trades');
+  if (cached) return cached;
+  const data = await fetchActiveTrades();
+  setCached('active-trades', data);
+  return data;
 }
 

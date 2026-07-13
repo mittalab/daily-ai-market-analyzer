@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchToday, fetchDeepAnalysis } from '../api';
+import { fetchTodayCached, fetchDeepAnalysisCached } from '../api';
 import Expander from '../components/Expander';
 import type { TodayResponse, DeepAnalysisTurn, DeepAnalysisResponse } from '../types';
 
@@ -415,7 +415,7 @@ function SimpleMarketContext({ ctx, sessionDate }: { ctx: NonNullable<TodayRespo
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-export default function TodayScreen() {
+export default function TodayScreen({ refreshKey = 0 }: { refreshKey?: number }) {
   const [todayData, setTodayData]   = useState<TodayResponse | null>(null);
   const [deepData, setDeepData]     = useState<DeepAnalysisResponse | null>(null);
   const [marketTurn, setMarketTurn] = useState<DeepAnalysisTurn | null>(null);
@@ -423,7 +423,9 @@ export default function TodayScreen() {
   const [error, setError]           = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.allSettled([fetchToday(), fetchDeepAnalysis()])
+    setLoading(true);
+    setError(null);
+    Promise.allSettled([fetchTodayCached(), fetchDeepAnalysisCached()])
       .then(([todayRes, deepRes]) => {
         if (todayRes.status === 'fulfilled') {
           setTodayData(todayRes.value);
@@ -437,7 +439,7 @@ export default function TodayScreen() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   if (loading) {
     return (

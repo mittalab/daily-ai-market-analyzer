@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchActiveTrades } from '../api';
+import { fetchActiveTradesCached } from '../api';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
 import type { ActiveTradesResponse, DeepAnalysisTurn, KiteHolding, KitePosition } from '../types';
@@ -673,18 +673,18 @@ function StageGroup({
 
 const STAGE_ORDER = ['TRADE_READY', 'REJECT', 'WATCH', 'ON_RADAR', 'SKIP'] as const;
 
-export default function ActiveTradesScreen() {
+export default function ActiveTradesScreen({ refreshKey = 0 }: { refreshKey?: number }) {
   const [data, setData]       = useState<ActiveTradesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
   const loadActiveTrades = useCallback(() => {
     setLoading(true);
-    fetchActiveTrades()
+    fetchActiveTradesCached()
       .then(setData)
       .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     loadActiveTrades();
