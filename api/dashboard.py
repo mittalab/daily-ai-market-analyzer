@@ -171,7 +171,31 @@ async def get_deep_analysis_turns():
                 "completed_at": row["completed_at"],
                 "analysis":     analysis
             })
-            
+
+        # Backfill spot_price for turns where Claude didn't include it in output.
+        # One batch query keyed by session_date avoids N+1 lookups.
+        symbols = [t["symbol"] for t in turns if t.get("symbol")]
+        if symbols:
+            try:
+                price_res = (
+                    get_client()
+                    .table("price_history")
+                    .select("symbol,close")
+                    .in_("symbol", symbols)
+                    .eq("date", str(session["session_date"]))
+                    .execute()
+                )
+                price_map = {
+                    row["symbol"]: float(row["close"])
+                    for row in price_res.data
+                    if row.get("close") is not None
+                }
+                for turn in turns:
+                    if turn["symbol"] in price_map and not turn["analysis"].get("spot_price"):
+                        turn["analysis"]["spot_price"] = price_map[turn["symbol"]]
+            except Exception as price_exc:
+                logger.warning("spot_price backfill failed: %s", price_exc)
+
         return {"turns": turns, "session_id": session_id, "session_date": str(session["session_date"])}
     except Exception as exc:
         logger.error("Failed to fetch deep analysis turns: %s", exc)

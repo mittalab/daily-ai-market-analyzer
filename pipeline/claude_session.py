@@ -2495,6 +2495,7 @@ You must apply the 100-point Conviction Scoring Framework and enforce all operat
   - EMA50: {sec3["ema50"]} (Price vs EMA50: {sec3["price_vs_ema50"]})
   - EMA180: {sec3["ema180"]} (Price vs EMA180: {sec3["price_vs_ema180"]})
   - EMA Arrangement: {sec3["ema_arrangement"]}
+  - Current Close Price (Spot): {sec2["ohlcv_180d"][-1]["close"] if sec2.get("ohlcv_180d") else "N/A"}
   - ATR14: {sec3["atr14"]} (ATR% of Price: {sec3["atr_pct"]}%)
   - RSI14: {sec3["rsi14"]}
   - MACD Line: {sec3["macd_line"]} | Signal: {sec3["macd_signal"]} | Hist: {sec3["macd_histogram"]}
@@ -2631,6 +2632,7 @@ Your JSON output must match this exact schema:
   "mentor_notes": "<Educational swing-trading takeaways taught by this specific setup. Why does it work and what visual cues verify it on the chart.>",
   "why_could_be_wrong": "<Three highly specific bearish scenarios with exact invalidation price levels where the trade goes wrong (e.g. 'If closes below 1828 on high volume'). No generic disclaimers.>",
   "key_thing_to_watch": "<Single, most critical actionable observation for the morning market open (e.g. entry boundary trigger, gap opens).>",
+  "spot_price": <underlying_close_price_for_session_date_as_number>,
   "rejection_reason": "<Detail reasons for REJECT or null>"
 }}
 """

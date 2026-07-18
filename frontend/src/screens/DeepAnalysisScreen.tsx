@@ -755,6 +755,12 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
             <span className="text-gray-300 text-sm w-3 text-center">{isExpanded ? '−' : '+'}</span>
           </div>
         </div>
+        {s.spot_price != null && (
+          <div className="flex items-center justify-between text-[10px] mb-1 mt-0.5">
+            <span className="text-gray-400">Spot Close</span>
+            <span className="font-mono font-bold text-gray-700">₹{INR.format(s.spot_price)}</span>
+          </div>
+        )}
         <ConvictionBar score={s.conviction_score} />
         {s.adjusted_score && (
           <div className="flex items-center justify-between text-[10px] text-gray-400 mt-1">
