@@ -12,23 +12,32 @@ function extractDateFromSessionId(sessionId: string | null | undefined): string 
   if (match && match[1]) {
     const yyyymmdd = match[1];
     const yyyy = yyyymmdd.substring(0, 4);
-    const mm = yyyymmdd.substring(4, 6);
-    const dd = yyyymmdd.substring(6, 8);
+    const mm   = yyyymmdd.substring(4, 6);
+    const dd   = yyyymmdd.substring(6, 8);
     return `${yyyy}-${mm}-${dd}`;
   }
   return null;
 }
 
-// ── Mobile-Friendly Text Highlighters ────────────────────────────────────────
+// ── Text Highlighters ─────────────────────────────────────────────────────────
 
-function highlightKeyTerms(text: string): React.ReactNode[] {
-  // Matches key levels (like 793.5, 24000), strikes, indicators, and directions
-  const regex = /(\b(?:EMA20|EMA50|EMA180|RSI14|MACD|ATR|CE|PE|Nifty|Banknifty|LONG|SHORT|SL)\b|\b\d{3,5}(?:\.\d{1,2})?\b)/gi;
+// Fix 3: boldChips param for Key Trigger; comma-adjacent numbers skipped to
+// prevent large formatted numbers (e.g. 1,008,244) from being split into chips.
+function highlightKeyTerms(text: string, boldChips = false): React.ReactNode[] {
+  const regex = /(\b(?:EMA20|EMA50|EMA180|RSI14|MACD|ATR|CE|PE|Nifty|Banknifty|LONG|SHORT|SL)\b|\b\d{3,6}(?:\.\d{1,2})?\b)/gi;
   const tokens = text.split(regex);
   return tokens.map((token, i) => {
     if (token.match(regex)) {
+      const prev = i > 0 ? tokens[i - 1] : '';
+      const next = i < tokens.length - 1 ? tokens[i + 1] : '';
+      if (prev.endsWith(',') || next.startsWith(',')) {
+        return <span key={i}>{token}</span>;
+      }
       return (
-        <span key={i} className="font-mono bg-gray-100 border border-gray-200 px-1 py-0.5 rounded text-[10px] font-semibold text-gray-900 mx-0.5">
+        <span
+          key={i}
+          className={`font-mono bg-gray-100 border border-gray-200 px-1 py-0.5 rounded text-[10px] ${boldChips ? 'font-bold' : 'font-semibold'} text-gray-900 mx-0.5`}
+        >
           {token}
         </span>
       );
@@ -42,7 +51,6 @@ function formatNarrative(text: string | null | undefined): React.ReactNode {
 
   let parts: string[] = [];
 
-  // Check for (1), (2), (a), (b) type points
   if (text.includes('(') && (text.includes('(1)') || text.includes('(a)'))) {
     parts = text.split(/\((\d+|[a-zA-Z])\)/).filter(Boolean);
     const assembled: React.ReactNode[] = [];
@@ -62,7 +70,6 @@ function formatNarrative(text: string | null | undefined): React.ReactNode {
     return <div className="space-y-1">{assembled}</div>;
   }
 
-  // Check for bullets • or -
   if (text.includes('•') || text.includes('\n-')) {
     parts = text.split(/[\n\r]+[•-]\s*/).filter(Boolean);
     return (
@@ -77,7 +84,6 @@ function formatNarrative(text: string | null | undefined): React.ReactNode {
     );
   }
 
-  // Check for numbered items 1. 2. 3.
   if (text.match(/\b\d+\.\s/)) {
     parts = text.split(/\b\d+\.\s+/).filter(Boolean);
     return (
@@ -94,7 +100,6 @@ function formatNarrative(text: string | null | undefined): React.ReactNode {
     );
   }
 
-  // Fallback: split long paragraphs by sentences
   parts = text.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(Boolean);
   return (
     <div className="space-y-2 my-1">
@@ -159,24 +164,570 @@ function formatRejectionNarrative(text: string | null | undefined): React.ReactN
   );
 }
 
-// ── Individual stock card (collapsed by default) ───────────────────────────────
+// ── Invalidation helpers ───────────────────────────────────────────────────────
+
+function extractInvalidationSignal(text: string): string {
+  const sigMatch = text.match(/invalidation signal:?\s*([^.]+\.?)/i);
+  if (sigMatch) return sigMatch[1].trim();
+  const exitMatch = text.match(/exit if\s+([^.]+\.?)/i);
+  if (exitMatch) return exitMatch[1].trim();
+  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+  return sentences[sentences.length - 1] ?? text.slice(0, 120);
+}
+
+function splitScenarios(text: string): string[] {
+  if (text.includes('(1)')) return text.split(/\(\d+\)/).map(s => s.trim()).filter(Boolean);
+  if (text.match(/\b1\.\s/)) return text.split(/\b\d+\.\s+/).map(s => s.trim()).filter(Boolean);
+  return [text];
+}
+
+// ── Fix 6: Mentor lesson blocks ───────────────────────────────────────────────
+
+function formatMentorLessons(text: string | null | undefined): React.ReactNode {
+  if (!text) return null;
+  let items: string[] = [];
+  if (text.includes('(1)')) {
+    items = text.split(/\(\d+\)/).map(s => s.trim()).filter(Boolean);
+  } else if (text.match(/\b1\.\s/)) {
+    items = text.split(/\b\d+\.\s+/).map(s => s.trim()).filter(Boolean);
+  }
+  const blocks = items.length > 1 ? items : [text];
+  return (
+    <div className="space-y-3">
+      {blocks.map((item, i) => (
+        <div key={i} className="bg-amber-50/60 border-l-4 border-amber-400 pl-3 pr-3 py-2.5 rounded-r-lg flex gap-2 items-start">
+          {blocks.length > 1 && (
+            <span className="flex-shrink-0 bg-amber-200 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5">
+              {i + 1}
+            </span>
+          )}
+          <span className="text-xs leading-relaxed text-amber-950">{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Fix 4: Dimension narrative with label/score/read-more ────────────────────
+
+function DimensionPoint({ content, isFirst }: { content: string; isFirst: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const labelMatch = content.match(/^([A-Z][A-Z0-9\s/&-]+?)\s*\((\d+)\/(\d+)\)\s*:\s*/);
+  let label = '', score = 0, max = 0, body = content;
+  if (labelMatch) {
+    label = labelMatch[1].trim();
+    score = parseInt(labelMatch[2]);
+    max   = parseInt(labelMatch[3]);
+    body  = content.slice(labelMatch[0].length).trim();
+  }
+  const pct      = max > 0 ? score / max : 0;
+  const badgeCls = pct >= 0.8 ? 'bg-green-100 text-green-800'
+                 : pct >= 0.6 ? 'bg-amber-100 text-amber-800'
+                 : 'bg-red-100 text-red-800';
+  const LIMIT  = 500;
+  const isLong = body.length > LIMIT;
+  return (
+    <div>
+      {!isFirst && <div className="border-t border-gray-100 mt-4 mb-4" />}
+      {label && (
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-xs font-bold text-gray-800">{label}</span>
+          {max > 0 && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeCls}`}>
+              {score}/{max}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="text-xs leading-relaxed text-gray-700">
+        {highlightKeyTerms((isLong && !expanded) ? body.slice(0, LIMIT) + '…' : body)}
+      </div>
+      {isLong && (
+        <button onClick={() => setExpanded(v => !v)} className="text-[10px] text-gray-400 mt-1 block">
+          {expanded ? 'Show less ↑' : 'Read more ↓'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function formatDimensionNarrative(text: string | null | undefined): React.ReactNode {
+  if (!text) return null;
+  const rawParts = text.split(/\b(\d+)\.\s+/);
+  // After split with capturing group: [pre, '1', content1, '2', content2, ...]
+  // Content items are at even indices >= 2
+  const items: string[] = [];
+  for (let i = 2; i < rawParts.length; i += 2) {
+    const piece = rawParts[i]?.trim();
+    if (piece) items.push(piece);
+  }
+  if (items.length < 2) return formatNarrative(text);
+  return (
+    <div>
+      {items.map((item, idx) => (
+        <DimensionPoint key={idx} content={item} isFirst={idx === 0} />
+      ))}
+    </div>
+  );
+}
+
+// ── Fix 1: Action View components ─────────────────────────────────────────────
+
+function CompactScenarioItem({ text, index }: { text: string; index: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const signal = extractInvalidationSignal(text);
+  return (
+    <div
+      className="bg-red-50 border border-red-100 rounded-lg p-2.5 cursor-pointer"
+      onClick={() => setExpanded(v => !v)}
+    >
+      <div className="flex items-start gap-2">
+        <span className="text-[10px] mt-0.5">⚠️</span>
+        <div className="flex-1">
+          <p className="text-[10px] font-bold text-red-700 uppercase mb-0.5">Scenario {index}</p>
+          <p className="text-xs text-red-800">{expanded ? text : signal}</p>
+          <p className="text-[10px] text-gray-400 mt-1">{expanded ? '↑ tap to collapse' : '↓ tap to expand'}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () => void }) {
+  const [reasonExpanded, setReasonExpanded] = useState(false);
+  const recInstrument = s.instrument_recommendation || 'NONE';
+  const scenarios     = s.why_could_be_wrong ? splitScenarios(s.why_could_be_wrong) : [];
+
+  return (
+    <div className="px-4 py-3 space-y-4">
+
+      {/* 1 — Key Trigger (most prominent element) */}
+      {s.key_thing_to_watch && (
+        <div>
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">⚡ KEY TRIGGER</p>
+          <div className="border-l-4 border-amber-400 bg-amber-50 rounded-r-lg p-4">
+            <p className="text-[15px] leading-relaxed font-semibold text-amber-950">
+              {highlightKeyTerms(s.key_thing_to_watch, true)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 2 — Trade Levels */}
+      <div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+          Trade Levels (Spot/Underlying)
+        </p>
+        <div className="grid grid-cols-4 gap-1.5 text-center">
+          {([
+            ['ENTRY ZONE', s.trade_parameters?.entry_low != null && s.trade_parameters?.entry_high != null
+              ? `${s.trade_parameters.entry_low}–${s.trade_parameters.entry_high}` : '—'],
+            ['STOP LOSS', s.key_levels?.stop_loss != null ? String(s.key_levels.stop_loss) : '—'],
+            ['TARGET 1',  s.trade_parameters?.target_1 != null ? String(s.trade_parameters.target_1) : '—'],
+            ['TARGET 2',  s.trade_parameters?.target_2 != null ? String(s.trade_parameters.target_2) : '—'],
+          ] as [string, string][]).map(([lbl, val]) => (
+            <div key={lbl} className="bg-gray-50 rounded-lg py-2">
+              <p className="text-[9px] text-gray-400 uppercase mb-0.5">{lbl}</p>
+              <p className="text-xs font-mono font-bold text-gray-800">{val}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3 — Instrument Recommendation (compact + expand) */}
+      <div>
+        <p className="text-xs font-semibold text-gray-800">
+          {recInstrument} recommended
+          {s.instrument_reason ? (
+            <>
+              {' — '}
+              {reasonExpanded
+                ? s.instrument_reason
+                : s.instrument_reason.slice(0, 80) + (s.instrument_reason.length > 80 ? '…' : '')}
+            </>
+          ) : ''}
+        </p>
+        {s.instrument_reason && s.instrument_reason.length > 80 && (
+          <button
+            onClick={() => setReasonExpanded(v => !v)}
+            className="text-[10px] text-gray-400 mt-0.5"
+          >
+            {reasonExpanded ? 'Show less ↑' : 'See reasoning ↓'}
+          </button>
+        )}
+        {s.options_setup && (
+          <p className="text-[10px] text-gray-500 mt-1">
+            {s.options_setup.strike} {s.options_setup.option_type} · {s.options_setup.expiry} · {s.options_setup.days_to_expiry} DTE
+          </p>
+        )}
+        {!s.options_setup && s.fut_setup && (
+          <p className="text-[10px] text-gray-500 mt-1">
+            Futures · Lot: {s.fut_setup.lot_size ?? s.lot_size ?? '—'} · {s.fut_setup.lots ?? s.lots ?? '—'} lot(s)
+          </p>
+        )}
+      </div>
+
+      {/* 4 — Options levels */}
+      {s.options_setup && (
+        <div>
+          <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2">Options Levels</p>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            {([
+              ['PREMIUM ENTRY', s.options_setup.entry_premium_low != null && s.options_setup.entry_premium_high != null
+                ? `${s.options_setup.entry_premium_low}–${s.options_setup.entry_premium_high}` : '—'],
+              ['PREMIUM SL', s.options_setup.sl_premium != null ? String(s.options_setup.sl_premium) : '—'],
+              ['PREMIUM T1', s.options_setup.target_1_premium != null ? String(s.options_setup.target_1_premium) : '—'],
+              ['PREMIUM T2', s.options_setup.target_2_premium != null ? String(s.options_setup.target_2_premium) : '—'],
+            ] as [string, string][]).map(([lbl, val]) => (
+              <div key={lbl} className="bg-purple-50/30 border border-purple-100/50 rounded-lg py-1.5">
+                <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
+                <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 4 — Futures levels (when no options) */}
+      {!s.options_setup && s.fut_setup && (
+        <div>
+          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Futures Levels</p>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            {([
+              ['FUT ENTRY', s.fut_setup.entry_low != null && s.fut_setup.entry_high != null
+                ? `${s.fut_setup.entry_low}–${s.fut_setup.entry_high}` : '—'],
+              ['FUT SL',   s.fut_setup.stop_loss != null ? String(s.fut_setup.stop_loss) : '—'],
+              ['FUT T1',   s.fut_setup.target_1 != null ? String(s.fut_setup.target_1) : '—'],
+              ['FUT T2',   s.fut_setup.target_2 != null ? String(s.fut_setup.target_2) : '—'],
+            ] as [string, string][]).map(([lbl, val]) => (
+              <div key={lbl} className="bg-indigo-50/30 border border-indigo-100/50 rounded-lg py-1.5">
+                <p className="text-[8px] text-indigo-400 uppercase mb-0.5">{lbl}</p>
+                <p className="text-xs font-mono font-bold text-indigo-900">{val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5 — Compact invalidation scenarios */}
+      {scenarios.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            ⚠️ Invalidation Scenarios
+          </p>
+          <div className="space-y-2">
+            {scenarios.map((sc, i) => (
+              <CompactScenarioItem key={i} text={sc} index={i + 1} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6 — Switch to Analysis View */}
+      <button
+        onClick={onSwitchToAnalysis}
+        className="w-full py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm font-semibold text-amber-900"
+      >
+        📖 Read Full Analysis
+      </button>
+    </div>
+  );
+}
+
+function AnalysisView({ s }: { s: any }) {
+  const recInstrument = s.instrument_recommendation || 'NONE';
+
+  return (
+    <div className="px-4 py-3 divide-y divide-gray-100">
+
+      {/* 1 — Overview Grid (Fix 2: single col on mobile) */}
+      <div className="pb-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+        <div>
+          <p className="text-gray-400 mb-0.5 font-medium">Pattern Summary</p>
+          <p className="font-semibold text-gray-800">
+            {s.setup_summary?.pattern_name || 'None'} ({s.setup_summary?.pattern_status || 'N/A'})
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-400 mb-0.5 font-medium">Key Candle Signal</p>
+          <p className="font-semibold text-gray-800">
+            {s.setup_summary?.key_candle || 'None'} ({s.setup_summary?.key_candle_location || 'N/A'})
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-400 mb-0.5 font-medium">Recomm. Instrument</p>
+          {/* Fix 8: full instrument_reason in Analysis View */}
+          <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_reason || 'N/A'}</p>
+        </div>
+        <div>
+          <p className="text-gray-400 mb-0.5 font-medium">Hard Gate Status</p>
+          <p className={`font-semibold ${s.hard_gate_triggered ? 'text-red-600' : 'text-green-600'}`}>
+            {s.hard_gate_triggered ? `TRIGGERED (${s.hard_gate_reason})` : 'PASSED'}
+          </p>
+        </div>
+      </div>
+
+      {/* 2 — Spot Levels & Trade Parameters */}
+      <div className="py-3">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+          Spot (Underlying) Levels
+        </p>
+        <div className="grid grid-cols-4 gap-1.5 text-center mb-2.5">
+          {([
+            ['Entry Zone', s.trade_parameters?.entry_low != null && s.trade_parameters?.entry_high != null
+              ? `${s.trade_parameters.entry_low}–${s.trade_parameters.entry_high}` : '—'],
+            ['Stop Loss', s.key_levels?.stop_loss != null ? String(s.key_levels.stop_loss) : '—'],
+            ['Target 1',  s.trade_parameters?.target_1 != null ? String(s.trade_parameters.target_1) : '—'],
+            ['Target 2',  s.trade_parameters?.target_2 != null ? String(s.trade_parameters.target_2) : '—'],
+          ] as [string, string][]).map(([lbl, val]) => (
+            <div key={lbl} className="bg-gray-50 rounded-lg py-2">
+              <p className="text-[9px] text-gray-400 uppercase mb-0.5">{lbl}</p>
+              <p className="text-xs font-mono font-bold text-gray-800">{val}</p>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs space-y-1.5 bg-gray-50 rounded-lg p-2.5">
+          <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center">
+            <span className="text-gray-400 font-medium">Support Basis:</span>
+            <span className="font-semibold text-gray-800 mt-0.5 sm:mt-0 text-left sm:text-right">
+              {s.key_levels?.support_basis || '—'}
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center border-t border-gray-200/50 pt-1.5">
+            <span className="text-gray-400 font-medium">SL Invalidation Basis:</span>
+            <span className="font-semibold text-gray-800 mt-0.5 sm:mt-0 text-left sm:text-right">
+              {s.key_levels?.stop_loss_basis || '—'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
+            <span className="text-gray-400 font-medium">Target 1 R:R Ratio:</span>
+            <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
+              {s.trade_parameters?.rr_t1 != null ? `1:${s.trade_parameters.rr_t1.toFixed(2)}` : '—'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
+            <span className="text-gray-400 font-medium">Target 2 R:R Ratio:</span>
+            <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
+              {s.trade_parameters?.rr_t2 != null ? `1:${s.trade_parameters.rr_t2.toFixed(2)}` : '—'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3 — Options Contract Setup */}
+      {s.options_setup && (
+        <div className="py-3">
+          <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2">
+            Options Contract Setup
+          </p>
+          <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 text-xs mb-2.5">
+            <div className="flex justify-between mb-1.5">
+              <span>Contract: <strong>{s.options_setup.strike} {s.options_setup.option_type}</strong></span>
+              <span>Expiry: <strong>{s.options_setup.expiry}</strong> ({s.options_setup.days_to_expiry} DTE)</span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-purple-100/50">
+              <span>IV Status: <strong>{s.options_setup.iv_note || 'N/A'}</strong></span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            {([
+              ['Premium Entry', s.options_setup.entry_premium_low != null && s.options_setup.entry_premium_high != null
+                ? `${s.options_setup.entry_premium_low}–${s.options_setup.entry_premium_high}` : '—'],
+              ['Premium SL', s.options_setup.sl_premium != null ? String(s.options_setup.sl_premium) : '—'],
+              ['Premium T1', s.options_setup.target_1_premium != null ? String(s.options_setup.target_1_premium) : '—'],
+              ['Premium T2', s.options_setup.target_2_premium != null ? String(s.options_setup.target_2_premium) : '—'],
+            ] as [string, string][]).map(([lbl, val]) => (
+              <div key={lbl} className="bg-purple-50/30 border border-purple-100/50 rounded-lg py-1.5">
+                <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
+                <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 4 — Futures Trade Setup */}
+      {s.fut_setup && (
+        <div className="py-3">
+          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">
+            Futures Trade Setup
+          </p>
+          <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs mb-2.5">
+            <div className="flex justify-between mb-1.5">
+              <span>Contract Lot Size: <strong>{s.fut_setup.lot_size || s.lot_size || '—'}</strong></span>
+              <span>Sized Lots: <strong>{s.fut_setup.lots || s.lots || '—'} lot(s)</strong></span>
+            </div>
+            <div className="flex justify-between pt-1 border-t border-indigo-100/50">
+              <span>
+                Margin Risk:{' '}
+                <strong className="text-indigo-700">
+                  ₹{INR.format(s.fut_setup.risk_inr || s.max_risk_inr || 0)}
+                </strong>
+              </span>
+              <span>Capital Risk %: <strong>{s.fut_setup.risk_pct_capital || s.risk_pct_capital || '—'}%</strong></span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            {([
+              ['Futures Entry', s.fut_setup.entry_low != null && s.fut_setup.entry_high != null
+                ? `${s.fut_setup.entry_low}–${s.fut_setup.entry_high}` : '—'],
+              ['Futures SL', s.fut_setup.stop_loss != null ? String(s.fut_setup.stop_loss) : '—'],
+              ['Futures T1', s.fut_setup.target_1 != null ? String(s.fut_setup.target_1) : '—'],
+              ['Futures T2', s.fut_setup.target_2 != null ? String(s.fut_setup.target_2) : '—'],
+            ] as [string, string][]).map(([lbl, val]) => (
+              <div key={lbl} className="bg-indigo-50/30 border border-indigo-100/50 rounded-lg py-1.5">
+                <p className="text-[8px] text-indigo-400 uppercase mb-0.5">{lbl}</p>
+                <p className="text-xs font-mono font-bold text-indigo-900">{val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5 — Position Sizing & Capital Allocation */}
+      {s.lots != null && s.lots > 0 && recInstrument !== 'FUT' && (
+        <div className="py-3 text-xs">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Position Sizing & Risk Allocation
+          </p>
+          <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-2.5">
+            <div>
+              <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Sized Lots</p>
+              <p className="font-bold text-gray-800">{s.lots} lot{s.lots > 1 ? 's' : ''} (Size: {s.lot_size})</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Capital Risk</p>
+              <p className="font-bold text-red-600">₹{INR.format(s.max_risk_inr)}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Risk % Capital</p>
+              <p className="font-bold text-gray-800">{s.risk_pct_capital}%</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6 — Scoring Breakdown */}
+      {s.scoring_breakdown && (
+        <div className="py-3">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Scoring Breakdown
+          </p>
+          <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
+            {([
+              ['D1: Technicals',       s.scoring_breakdown.dimension_1, 'text-blue-700 bg-blue-50 border-blue-100'],
+              ['D2: Trade parameters', s.scoring_breakdown.dimension_2, 'text-green-700 bg-green-50 border-green-100'],
+              ['D3: Market & Sector',  s.scoring_breakdown.dimension_3, 'text-amber-700 bg-amber-50 border-amber-100'],
+              ['D4: Stock F&O',        s.scoring_breakdown.dimension_4, 'text-purple-700 bg-purple-50 border-purple-100'],
+            ] as [string, any, string][]).map(([label, dim, cls]) => (
+              <div key={label} className={`border rounded p-1.5 ${cls}`}>
+                <p className="text-[8px] font-normal uppercase opacity-75 leading-tight truncate">{label}</p>
+                <p className="font-bold font-mono mt-0.5">
+                  {dim ? `${dim.score}/${dim.max}` : '—'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 7–12 — Dimension narratives, mentor, invalidation scenarios */}
+      <div className="py-3">
+        {s.dimension_1_narrative && (
+          <Expander
+            title="Dimension 1: Chart & Indicators Analysis"
+            defaultOpen={s.stage !== 'SKIP' && s.stage !== 'REJECT'}
+          >
+            {formatDimensionNarrative(s.dimension_1_narrative)}
+          </Expander>
+        )}
+        {s.dimension_2_narrative && (
+          <Expander title="Dimension 2: Levels, Targets & Stop Loss Logic">
+            {formatDimensionNarrative(s.dimension_2_narrative)}
+          </Expander>
+        )}
+        {s.dimension_3_narrative && (
+          <Expander title="Dimension 3: Nifty & Sector Outperformance">
+            {formatDimensionNarrative(s.dimension_3_narrative)}
+          </Expander>
+        )}
+        {s.dimension_4_narrative && (
+          <Expander title="Dimension 4: Derivatives (Basis & PCR) Data">
+            {formatDimensionNarrative(s.dimension_4_narrative)}
+          </Expander>
+        )}
+        {s.mentor_notes && (
+          <Expander title="Swing Trading Mentorship Lessons">
+            {formatMentorLessons(s.mentor_notes)}
+          </Expander>
+        )}
+        {/* Fix 5: full text, no truncation */}
+        {s.why_could_be_wrong && (
+          <Expander title="Three Specific Invalidation Scenarios">
+            {formatRejectionNarrative(s.why_could_be_wrong)}
+          </Expander>
+        )}
+      </div>
+
+      {/* 13 — Key Trigger: most prominent section (Fix 7) */}
+      {s.key_thing_to_watch && (
+        <div className="pt-3">
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">
+            ⚡ KEY TRIGGER
+          </p>
+          <div className="border-l-4 border-amber-400 bg-amber-50 rounded-r-lg p-4">
+            <p className="text-[15px] leading-relaxed font-semibold text-amber-950">
+              {highlightKeyTerms(s.key_thing_to_watch, true)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection / Skip Reason */}
+      {(s.skip_reason || s.rejection_reason) && (
+        <div className="pt-3">
+          <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
+            <p className="text-[9px] font-bold text-red-700 uppercase tracking-wide mb-1">
+              Rejection/Skip Reason
+            </p>
+            <p className="text-xs text-red-700 font-semibold">{s.rejection_reason || s.skip_reason}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Individual stock card ──────────────────────────────────────────────────────
 
 function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { symbol } = turn;
   const s = turn.analysis;
 
+  // Fix 1: per-symbol view mode persisted in sessionStorage for the session
+  const storageKey = `deep_view_${symbol}`;
+  const [viewMode, setViewMode] = useState<'action' | 'analysis'>(() => {
+    try { return (sessionStorage.getItem(storageKey) as 'action' | 'analysis') ?? 'action'; }
+    catch { return 'action'; }
+  });
+  const switchView = (mode: 'action' | 'analysis') => {
+    setViewMode(mode);
+    try { sessionStorage.setItem(storageKey, mode); } catch {}
+  };
+
   const dirClass =
     s.direction === 'LONG'  ? 'bg-green-100 text-green-800' :
     s.direction === 'SHORT' ? 'bg-red-100 text-red-800'     : 'bg-gray-100 text-gray-700';
 
   const dirLabel =
-    s.direction === 'LONG' ? '↑ LONG' : s.direction === 'SHORT' ? '↓ SHORT' : s.direction || 'AUTO';
+    s.direction === 'LONG'  ? '↑ LONG'  :
+    s.direction === 'SHORT' ? '↓ SHORT' : s.direction || 'AUTO';
 
   const recInstrument = s.instrument_recommendation || 'NONE';
-  const recColor = 
+  const recColor =
     recInstrument === 'OPTIONS' ? 'bg-purple-100 text-purple-800' :
-    recInstrument === 'FUT' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800';
+    recInstrument === 'FUT'     ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800';
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-2 shadow-sm">
@@ -213,242 +764,30 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
         )}
       </div>
 
-      {/* Expanded content */}
+      {/* Toggle + Content */}
       {isExpanded && (
-        <div className="px-4 py-3 divide-y divide-gray-100">
-          
-          {/* Section 1: Overview Grid */}
-          <div className="pb-3 grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <p className="text-gray-400 mb-0.5 font-medium">Pattern Summary</p>
-              <p className="font-semibold text-gray-800">
-                {s.setup_summary?.pattern_name || 'None'} ({s.setup_summary?.pattern_status || 'N/A'})
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-400 mb-0.5 font-medium">Key Candle Signal</p>
-              <p className="font-semibold text-gray-800">
-                {s.setup_summary?.key_candle || 'None'} ({s.setup_summary?.key_candle_location || 'N/A'})
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-400 mb-0.5 font-medium">Recomm. Instrument</p>
-              <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_reason || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 mb-0.5 font-medium">Hard Gate Status</p>
-              <p className={`font-semibold ${s.hard_gate_triggered ? 'text-red-600' : 'text-green-600'}`}>
-                {s.hard_gate_triggered ? `TRIGGERED (${s.hard_gate_reason})` : 'PASSED'}
-              </p>
-            </div>
+        <>
+          {/* View mode toggle */}
+          <div className="px-4 py-2 border-b border-gray-100 flex gap-2">
+            {(['action', 'analysis'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => switchView(mode)}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  viewMode === mode
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-500 border border-gray-200'
+                }`}
+              >
+                {mode === 'action' ? '⚡ Action View' : '📖 Full Analysis'}
+              </button>
+            ))}
           </div>
 
-          {/* Section 2: Spot Levels & Trade Parameters */}
-          <div className="py-3">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Spot (Underlying) Levels</p>
-            
-            {/* Spot Pricing Grid */}
-            <div className="grid grid-cols-4 gap-1.5 text-center mb-2.5">
-              {[
-                ['Entry Zone', s.trade_parameters?.entry_low != null && s.trade_parameters?.entry_high != null
-                  ? `${s.trade_parameters.entry_low}–${s.trade_parameters.entry_high}` : '—'],
-                ['Stop Loss', s.key_levels?.stop_loss != null ? String(s.key_levels.stop_loss) : '—'],
-                ['Target 1', s.trade_parameters?.target_1 != null ? String(s.trade_parameters.target_1) : '—'],
-                ['Target 2', s.trade_parameters?.target_2 != null ? String(s.trade_parameters.target_2) : '—'],
-              ].map(([lbl, val]) => (
-                <div key={lbl} className="bg-gray-50 rounded-lg py-2">
-                  <p className="text-[9px] text-gray-400 uppercase mb-0.5">{lbl}</p>
-                  <p className="text-xs font-mono font-bold text-gray-800">{val}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Support and Stop Loss Basis Explanations (Full-Width Rows for High Mobile Readability) */}
-            <div className="text-xs space-y-1.5 bg-gray-50 rounded-lg p-2.5">
-              <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center">
-                <span className="text-gray-400 font-medium">Support Basis:</span>
-                <span className="font-semibold text-gray-800 mt-0.5 sm:mt-0 text-left sm:text-right">{s.key_levels?.support_basis || '—'}</span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center border-t border-gray-200/50 pt-1.5">
-                <span className="text-gray-400 font-medium">SL Invalidation Basis:</span>
-                <span className="font-semibold text-gray-800 mt-0.5 sm:mt-0 text-left sm:text-right">{s.key_levels?.stop_loss_basis || '—'}</span>
-              </div>
-              <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
-                <span className="text-gray-400 font-medium">Target 1 R:R Ratio:</span>
-                <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
-                  {s.trade_parameters?.rr_t1 != null ? `1:${s.trade_parameters.rr_t1.toFixed(2)}` : '—'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
-                <span className="text-gray-400 font-medium">Target 2 R:R Ratio:</span>
-                <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
-                  {s.trade_parameters?.rr_t2 != null ? `1:${s.trade_parameters.rr_t2.toFixed(2)}` : '—'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Recommended Setup Details */}
-          {s.options_setup && (
-            <div className="py-3">
-              <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2">Options Contract Setup</p>
-              <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 text-xs mb-2.5">
-                <div className="flex justify-between mb-1.5">
-                  <span>Contract: <strong>{s.options_setup.strike} {s.options_setup.option_type}</strong></span>
-                  <span>Expiry: <strong>{s.options_setup.expiry}</strong> ({s.options_setup.days_to_expiry} DTE)</span>
-                </div>
-                <div className="flex justify-between pt-1 border-t border-purple-100/50">
-                  <span>IV Status: <strong>{s.options_setup.iv_note || 'N/A'}</strong></span>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-1.5 text-center">
-                {[
-                  ['Premium Entry', s.options_setup.entry_premium_low != null && s.options_setup.entry_premium_high != null
-                    ? `${s.options_setup.entry_premium_low}–${s.options_setup.entry_premium_high}` : '—'],
-                  ['Premium SL', s.options_setup.sl_premium != null ? String(s.options_setup.sl_premium) : '—'],
-                  ['Premium T1', s.options_setup.target_1_premium != null ? String(s.options_setup.target_1_premium) : '—'],
-                  ['Premium T2', s.options_setup.target_2_premium != null ? String(s.options_setup.target_2_premium) : '—'],
-                ].map(([lbl, val]) => (
-                  <div key={lbl} className="bg-purple-50/30 border border-purple-100/50 rounded-lg py-1.5">
-                    <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
-                    <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {s.fut_setup && (
-            <div className="py-3">
-              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Futures Trade Setup</p>
-              <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs mb-2.5">
-                <div className="flex justify-between mb-1.5">
-                  <span>Contract Lot Size: <strong>{s.fut_setup.lot_size || s.lot_size || '—'}</strong></span>
-                  <span>Sized Lots: <strong>{s.fut_setup.lots || s.lots || '—'} lot(s)</strong></span>
-                </div>
-                <div className="flex justify-between pt-1 border-t border-indigo-100/50">
-                  <span>Margin Risk Allocation: <strong className="text-indigo-700">₹{INR.format(s.fut_setup.risk_inr || s.max_risk_inr || 0)}</strong></span>
-                  <span>Capital Risk %: <strong>{s.fut_setup.risk_pct_capital || s.risk_pct_capital || '—'}%</strong></span>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-1.5 text-center">
-                {[
-                  ['Futures Entry', s.fut_setup.entry_low != null && s.fut_setup.entry_high != null
-                    ? `${s.fut_setup.entry_low}–${s.fut_setup.entry_high}` : '—'],
-                  ['Futures SL', s.fut_setup.stop_loss != null ? String(s.fut_setup.stop_loss) : '—'],
-                  ['Futures T1', s.fut_setup.target_1 != null ? String(s.fut_setup.target_1) : '—'],
-                  ['Futures T2', s.fut_setup.target_2 != null ? String(s.fut_setup.target_2) : '—'],
-                ].map(([lbl, val]) => (
-                  <div key={lbl} className="bg-indigo-50/30 border border-indigo-100/50 rounded-lg py-1.5">
-                    <p className="text-[8px] text-indigo-400 uppercase mb-0.5">{lbl}</p>
-                    <p className="text-xs font-mono font-bold text-indigo-900">{val}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Section 4: Position Sizing & Capital Allocation */}
-          {s.lots != null && s.lots > 0 && recInstrument !== 'FUT' && (
-            <div className="py-3 text-xs">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Position Sizing & Risk Allocation</p>
-              <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-2.5">
-                <div>
-                  <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Sized Lots</p>
-                  <p className="font-bold text-gray-800">{s.lots} lot{s.lots > 1 ? 's' : ''} (Size: {s.lot_size})</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Capital Risk</p>
-                  <p className="font-bold text-red-600">₹{INR.format(s.max_risk_inr)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-[10px] mb-0.5 font-medium">Risk % Capital</p>
-                  <p className="font-bold text-gray-800">{s.risk_pct_capital}%</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Section 5: Scoring Breakdown Visuals */}
-          {s.scoring_breakdown && (
-            <div className="py-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Scoring Breakdown</p>
-              <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
-                {[
-                  ['D1: Technicals', s.scoring_breakdown.dimension_1, 'text-blue-700 bg-blue-50 border-blue-100'],
-                  ['D2: Trade parameters', s.scoring_breakdown.dimension_2, 'text-green-700 bg-green-50 border-green-100'],
-                  ['D3: Market & Sector', s.scoring_breakdown.dimension_3, 'text-amber-700 bg-amber-50 border-amber-100'],
-                  ['D4: Stock F&O', s.scoring_breakdown.dimension_4, 'text-purple-700 bg-purple-50 border-purple-100'],
-                ].map(([label, dim, cls]) => (
-                  <div key={label} className={`border rounded p-1.5 ${cls}`}>
-                    <p className="text-[8px] font-normal uppercase opacity-75 leading-tight truncate">{label}</p>
-                    <p className="font-bold font-mono mt-0.5">
-                      {dim ? `${dim.score}/${dim.max}` : '—'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Section 6: Meticulous Narratives (Collapsible Expanders) */}
-          <div className="py-3">
-            {s.dimension_1_narrative && (
-              <Expander title="Dimension 1: Chart & Indicators Analysis" defaultOpen={s.stage !== 'SKIP' && s.stage !== 'REJECT'}>
-                {formatNarrative(s.dimension_1_narrative)}
-              </Expander>
-            )}
-            {s.dimension_2_narrative && (
-              <Expander title="Dimension 2: Levels, Targets & Stop Loss Logic">
-                {formatNarrative(s.dimension_2_narrative)}
-              </Expander>
-            )}
-            {s.dimension_3_narrative && (
-              <Expander title="Dimension 3: Nifty & Sector Outperformance">
-                {formatNarrative(s.dimension_3_narrative)}
-              </Expander>
-            )}
-            {s.dimension_4_narrative && (
-              <Expander title="Dimension 4: Derivatives (Basis & PCR) Data">
-                {formatNarrative(s.dimension_4_narrative)}
-              </Expander>
-            )}
-            {s.mentor_notes && (
-              <Expander title="Swing Trading Mentorship Lessons">
-                <div className="bg-amber-50/50 border-l-4 border-amber-400 p-3.5 rounded-r-lg text-xs leading-relaxed text-amber-950 shadow-xs">
-                  <span className="text-lg font-serif text-amber-400 font-bold block leading-none mb-1">“</span>
-                  <p className="italic">{highlightKeyTerms(s.mentor_notes)}</p>
-                </div>
-              </Expander>
-            )}
-            {s.why_could_be_wrong && (
-              <Expander title="Three Specific Invalidation Scenarios">
-                {formatRejectionNarrative(s.why_could_be_wrong)}
-              </Expander>
-            )}
-            {s.key_thing_to_watch && (
-              <Expander title="Key Trigger for Morning Market Open">
-                <div className="text-blue-950 font-semibold text-xs leading-relaxed bg-blue-50/50 border border-blue-200 rounded-lg p-3.5 shadow-xs">
-                  <div className="flex gap-2.5 items-start">
-                    <span className="text-sm">🔔</span>
-                    <span className="flex-1">{highlightKeyTerms(s.key_thing_to_watch)}</span>
-                  </div>
-                </div>
-              </Expander>
-            )}
-          </div>
-
-          {/* Skip / Rejection Reason */}
-          {(s.skip_reason || s.rejection_reason) && (
-            <div className="pt-3">
-              <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
-                <p className="text-[9px] font-bold text-red-700 uppercase tracking-wide mb-1 font-semibold">Rejection/Skip Reason</p>
-                <p className="text-xs text-red-700 font-semibold">{s.rejection_reason || s.skip_reason}</p>
-              </div>
-            </div>
-          )}
-
-        </div>
+          {viewMode === 'action'
+            ? <ActionView s={s} onSwitchToAnalysis={() => switchView('analysis')} />
+            : <AnalysisView s={s} />}
+        </>
       )}
     </div>
   );
@@ -502,7 +841,6 @@ function StageGroup({ stage, turns }: { stage: string; turns: DeepAnalysisTurn[]
 
   return (
     <div className="mb-3">
-      {/* Group header */}
       <button
         onClick={() => setOpen(o => !o)}
         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border font-semibold transition-colors ${cfg.headerCls}`}
@@ -519,7 +857,6 @@ function StageGroup({ stage, turns }: { stage: string; turns: DeepAnalysisTurn[]
         </svg>
       </button>
 
-      {/* Stock cards */}
       {open && (
         <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
           {turns.map(turn => (
@@ -571,10 +908,8 @@ export default function DeepAnalysisScreen({ refreshKey = 0 }: { refreshKey?: nu
     );
   }
 
-  // Strip market_context turns — those live in the Today tab
   const deepTurns = (data?.turns ?? []).filter(t => t.turn_type === 'deep_analysis');
 
-  // Group and sort each group by conviction score DESC
   const grouped = STAGE_ORDER.reduce<Record<string, DeepAnalysisTurn[]>>((acc, stage) => {
     acc[stage] = deepTurns
       .filter(t => t.analysis?.stage === stage)
@@ -582,11 +917,9 @@ export default function DeepAnalysisScreen({ refreshKey = 0 }: { refreshKey?: nu
     return acc;
   }, {} as Record<string, DeepAnalysisTurn[]>);
 
-  // Any turns with an unrecognised stage
   const others = deepTurns.filter(t => !(STAGE_ORDER as readonly string[]).includes(t.analysis?.stage));
 
-  const totalStocks = deepTurns.length;
-
+  const totalStocks   = deepTurns.length;
   const extractedDate = extractDateFromSessionId(data?.session_id) || data?.session_date;
 
   return (
