@@ -83,7 +83,7 @@ export default function StockChartPanel({
   // ── Minimised slim bar ──────────────────────────────────────────────────────
   if (minimised) {
     return (
-      <div className="flex items-center justify-between px-4 h-11 bg-gray-50 border-b border-gray-100 text-xs">
+      <div className="sticky top-0 z-[35] flex items-center justify-between px-4 h-11 bg-gray-50 border-b border-gray-100 text-xs">
         <div className="flex items-center gap-2 font-mono text-gray-600">
           <span className="font-semibold text-gray-800">{tvSymbol}</span>
           {spotPrice != null && (
@@ -102,7 +102,7 @@ export default function StockChartPanel({
 
   // ── Expanded panel ──────────────────────────────────────────────────────────
   return (
-    <div className="border-b border-gray-100">
+    <div className="sticky top-0 z-[35] bg-white border-b border-gray-100">
       {/* Mode toggle row */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
         <div className="flex gap-1">

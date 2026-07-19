@@ -731,7 +731,7 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
     recInstrument === 'FUT'     ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800';
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-2 shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-clip mb-2 shadow-sm">
       {/* Header — always visible */}
       <div
         className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${isExpanded ? 'border-b border-gray-100' : ''}`}
