@@ -664,7 +664,7 @@ def get_latest_session() -> dict | None:
         get_client()
         .table("analysis_sessions")
         .select("*")
-        .order("created_at", desc=True)
+        .order("session_date", desc=True)
         .limit(1)
         .execute()
     )
