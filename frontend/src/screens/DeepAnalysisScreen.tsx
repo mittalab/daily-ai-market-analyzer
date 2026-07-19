@@ -731,7 +731,7 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
     recInstrument === 'FUT'     ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800';
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-clip mb-2 shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-2 shadow-sm">
       {/* Header — always visible */}
       <div
         className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${isExpanded ? 'border-b border-gray-100' : ''}`}
@@ -784,26 +784,28 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
             />
           )}
 
-          {/* View mode toggle */}
-          <div className="px-4 py-2 border-b border-gray-100 flex gap-2">
-            {(['action', 'analysis'] as const).map(mode => (
-              <button
-                key={mode}
-                onClick={() => switchView(mode)}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  viewMode === mode
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-500 border border-gray-200'
-                }`}
-              >
-                {mode === 'action' ? '⚡ Action View' : '📖 Full Analysis'}
-              </button>
-            ))}
-          </div>
+          <div className="overflow-y-auto max-h-[60vh]">
+            {/* View mode toggle — sticky within the scroll container */}
+            <div className="sticky top-0 z-10 bg-white px-4 py-2 border-b border-gray-100 flex gap-2">
+              {(['action', 'analysis'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => switchView(mode)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    viewMode === mode
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-500 border border-gray-200'
+                  }`}
+                >
+                  {mode === 'action' ? '⚡ Action View' : '📖 Full Analysis'}
+                </button>
+              ))}
+            </div>
 
-          {viewMode === 'action'
-            ? <ActionView s={s} onSwitchToAnalysis={() => switchView('analysis')} />
-            : <AnalysisView s={s} />}
+            {viewMode === 'action'
+              ? <ActionView s={s} onSwitchToAnalysis={() => switchView('analysis')} />
+              : <AnalysisView s={s} />}
+          </div>
         </>
       )}
     </div>
