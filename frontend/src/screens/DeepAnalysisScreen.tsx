@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { fetchDeepAnalysisCached } from '../api';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
+import StockChartPanel from '../components/chart/StockChartPanel';
 import type { DeepAnalysisResponse, DeepAnalysisTurn } from '../types';
 
 const INR = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -773,6 +774,16 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
       {/* Toggle + Content */}
       {isExpanded && (
         <>
+          {/* Chart panel — TRADE_READY expanded, WATCH minimised, others hidden */}
+          {(s.stage === 'TRADE_READY' || s.stage === 'WATCH') && (
+            <StockChartPanel
+              symbol={symbol ?? ''}
+              analysisData={s}
+              ohlcvData={s.ohlcv_data ?? []}
+              defaultMinimised={s.stage === 'WATCH'}
+            />
+          )}
+
           {/* View mode toggle */}
           <div className="px-4 py-2 border-b border-gray-100 flex gap-2">
             {(['action', 'analysis'] as const).map(mode => (

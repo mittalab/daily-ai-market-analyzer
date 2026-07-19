@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { fetchActiveTradesCached } from '../api';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
+import StockChartPanel from '../components/chart/StockChartPanel';
 import type { ActiveTradesResponse, DeepAnalysisTurn, KiteHolding, KitePosition } from '../types';
 
 const INR = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -331,8 +332,20 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
 
       {/* Expanded content */}
       {isExpanded && (
+        <>
+          {/* Chart panel — all active positions expanded by default */}
+          <StockChartPanel
+            symbol={symbol ?? ''}
+            analysisData={s}
+            ohlcvData={s.ohlcv_data ?? []}
+            defaultMinimised={false}
+            entryPrice={holding?.avg}
+            currentPnl={holding?.pnl}
+            currentPnlPct={holding != null ? (holding.ltp - holding.avg) / holding.avg * 100 : undefined}
+          />
+
         <div className="px-4 py-3 divide-y divide-gray-100">
-          
+
           {/* Zerodha Holdings / Positions status panel inside card */}
           {(holding || (positions && (Array.isArray(positions) ? positions.length > 0 : true))) && (
             <div className="py-3">
@@ -569,6 +582,7 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
           )}
 
         </div>
+        </>
       )}
     </div>
   );

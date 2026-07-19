@@ -65,6 +65,50 @@ def _is_stale(session: dict | None) -> bool:
     return hours is None or hours > 24
 
 
+def _backfill_ohlcv(turns: list[dict], session_date_str: str) -> None:
+    """
+    Batch-fetch up to 120 days of OHLCV from price_history for all turn symbols
+    and attach as analysis['ohlcv_data']. Mirrors the spot_price backfill pattern.
+    """
+    from collections import defaultdict
+    from datetime import timedelta
+
+    symbols = [t["symbol"] for t in turns if t.get("symbol")]
+    if not symbols:
+        return
+    try:
+        from database.client import get_client
+        session_date = date.fromisoformat(session_date_str)
+        cutoff = str(session_date - timedelta(days=180))
+        logger.info("start-date: %s, end-date: %s", cutoff, session_date_str)
+        res = (
+            get_client()
+            .table("price_history")
+            .select("symbol,date,open,high,low,close,volume")
+            .in_("symbol", symbols)
+            .gte("date", cutoff)
+            .lte("date", session_date_str)
+            .order("date")
+            .execute()
+        )
+        ohlcv_map: dict[str, list] = defaultdict(list)
+        for row in res.data:
+            ohlcv_map[row["symbol"]].append({
+                "date":   row["date"],
+                "open":   float(row["open"]),
+                "high":   float(row["high"]),
+                "low":    float(row["low"]),
+                "close":  float(row["close"]),
+                "volume": int(row["volume"] or 0),
+            })
+        for turn in turns:
+            sym = turn["symbol"]
+            if sym and sym in ohlcv_map:
+                turn["analysis"]["ohlcv_data"] = ohlcv_map[sym]
+    except Exception as exc:
+        logger.warning("ohlcv_data backfill failed: %s", exc)
+
+
 # ── GET /api/today ────────────────────────────────────────────────────────────
 
 @router.get("/today")
@@ -195,6 +239,8 @@ async def get_deep_analysis_turns():
                         turn["analysis"]["spot_price"] = price_map[turn["symbol"]]
             except Exception as price_exc:
                 logger.warning("spot_price backfill failed: %s", price_exc)
+
+        _backfill_ohlcv(turns, str(session["session_date"]))
 
         return {"turns": turns, "session_id": session_id, "session_date": str(session["session_date"])}
     except Exception as exc:
@@ -379,7 +425,10 @@ async def get_active_trades():
             "completed_at": completed_at,
             "analysis": analysis
         })
-        
+
+    if session and turns:
+        _backfill_ohlcv(turns, str(session["session_date"]))
+
     return {
         "turns": turns,
         "holdings": holdings_dict,
