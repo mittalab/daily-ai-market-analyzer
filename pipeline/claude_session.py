@@ -67,7 +67,7 @@ _BACKOFF         = [5, 10, 20]
 _PROMPT_VERSIONS = {
     "system_prompt":  "v1.0",
     "market_context": "v1.0",
-    "prescan":        "v1.0",
+    "pre_scan":        "v1.0",
     "deep_analysis":  "v1.0",
 }
 
@@ -1238,7 +1238,7 @@ def _build_turn2_message(level1_passed: list[str], session_date: date) -> str:
         logger.warning("Pre-scan: %d skipped: %s", len(skipped), skipped)
 
     payload = {
-        "turn":         "prescan",
+        "turn":         "pre_scan",
         "session_date": str(session_date),
         "stock_count":  len(stocks),
         "stocks":       stocks,

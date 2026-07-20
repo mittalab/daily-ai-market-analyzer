@@ -105,7 +105,7 @@ export async function fetchChatContextText(): Promise<string> {
 
 export interface SessionTurnMeta {
   turn_number: number;
-  turn_type: 'market_context' | 'prescan' | 'deep_analysis';
+  turn_type: 'market_context' | 'pre_scan' | 'deep_analysis';
   symbol: string | null;
 }
 
