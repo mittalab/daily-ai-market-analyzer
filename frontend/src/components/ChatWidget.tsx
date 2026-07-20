@@ -328,7 +328,7 @@ export default function ChatWidget() {
                 >
                   <option value="full_context">All-in-one Full Context</option>
                   <option value="market_context">Market Context (Turn 1)</option>
-                  <option value="prescan">Prescan (Turn 2)</option>
+                  <option value="pre_ scan">Prescan (Turn 2)</option>
                   <option value="deep_analysis">Deep Analysis Stock (Turn 3)</option>
                 </select>
               </div>
