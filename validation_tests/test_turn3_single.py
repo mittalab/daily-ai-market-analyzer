@@ -98,11 +98,12 @@ def _call_claude(client: anthropic.Anthropic, prompt: str, max_tokens: int = 800
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
+    # if len(sys.argv) < 2:
+    #     print(__doc__)
+    #     sys.exit(1)
 
-    symbol = sys.argv[1].upper()
+    #symbol = sys.argv[1].upper()
+    symbol = "INFY"
     forced_direction: str | None = sys.argv[2].upper() if len(sys.argv) >= 3 else None
     if forced_direction and forced_direction not in ("LONG", "SHORT"):
         print(f"Error: direction must be LONG or SHORT, got '{forced_direction}'")
