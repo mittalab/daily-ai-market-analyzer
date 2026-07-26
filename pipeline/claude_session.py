@@ -2226,13 +2226,43 @@ def _build_turn3_data(
                 elif pct_change < -5.0:
                     near_month_oi_trend = "DECREASING"
                     
+    # Next-month futures series (same rows, next contract fields)
+    futures_30d_next = []
+    next_month_expiry = None
+    next_month_dte = None
+    next_month_latest_basis = None
+    near_month_expiry = None
+    if fut_rows:
+        near_month_expiry = fut_rows[-1].get("near_expiry")
+        next_month_expiry = fut_rows[-1].get("next_expiry")
+        for row in fut_rows:
+            if row.get("next_futures_price") is not None:
+                futures_30d_next.append({
+                    "date": row["date"],
+                    "futures_price": row["next_futures_price"],
+                    "basis": row["next_basis"],
+                    "oi": int(row.get("next_month_oi") or 0),
+                })
+        if next_month_expiry:
+            try:
+                next_month_dte = (date.fromisoformat(next_month_expiry) - session_date).days
+            except Exception:
+                pass
+        if futures_30d_next:
+            next_month_latest_basis = futures_30d_next[-1]["basis"]
+
     futures_data = {
         "futures_available": futures_available,
         "futures_30d": futures_30d,
+        "futures_30d_next": futures_30d_next,
         "basis_current": basis_current,
         "basis_trend": basis_trend,
         "rollover_phase": rollover_phase,
         "days_to_expiry": None,
+        "near_month_expiry": near_month_expiry,
+        "next_month_expiry": next_month_expiry,
+        "next_month_dte": next_month_dte,
+        "next_month_latest_basis": next_month_latest_basis,
         "near_month_oi_trend": near_month_oi_trend
     }
     
@@ -2242,6 +2272,8 @@ def _build_turn3_data(
     max_pain = None
     atm_strike = None
     summary_atm_iv = None
+    atm_ce_iv = None
+    atm_pe_iv = None
     options_note = ""
     ce_walls = []
     pe_walls = []
@@ -2260,6 +2292,8 @@ def _build_turn3_data(
             near_expiry_date = date.fromisoformat(near_expiry_str)
             days_to_expiry = (near_expiry_date - session_date).days
             futures_data["days_to_expiry"] = days_to_expiry
+            if not futures_data.get("near_month_expiry"):
+                futures_data["near_month_expiry"] = near_expiry_str
         except Exception as exc:
             logger.warning("Failed to compute DTE for %s: %s", symbol, exc)
             
@@ -2281,8 +2315,12 @@ def _build_turn3_data(
                 atm_strike = min(strikes, key=lambda s: abs(s - spot_price))
                 
             ce_atm = [r for r in options if r.get("option_type") == "CE" and float(r["strike"]) == atm_strike]
-            if ce_atm and ce_atm[0].get("implied_volatility") is not None:
-                summary_atm_iv = float(ce_atm[0]["implied_volatility"])
+            pe_atm = [r for r in options if r.get("option_type") == "PE" and float(r["strike"]) == atm_strike]
+            if ce_atm and ce_atm[0].get("iv") is not None:
+                atm_ce_iv = round(float(ce_atm[0]["iv"]), 2)
+                summary_atm_iv = atm_ce_iv  # backward-compat alias
+            if pe_atm and pe_atm[0].get("iv") is not None:
+                atm_pe_iv = round(float(pe_atm[0]["iv"]), 2)
                 
             try:
                 from pipeline.deep_analysis import oi_walls
@@ -2298,6 +2336,8 @@ def _build_turn3_data(
         "max_pain": max_pain,
         "atm_strike": atm_strike,
         "summary_atm_iv": summary_atm_iv,
+        "atm_ce_iv": atm_ce_iv,
+        "atm_pe_iv": atm_pe_iv,
         "options_note": options_note,
         "ce_walls": ce_walls,
         "pe_walls": pe_walls,
@@ -2404,8 +2444,20 @@ def _build_turn3_prompt(data_package: dict) -> str:
     
     # Format lists/dicts compactly to stay well under token limits
     ohlcv_compact = json.dumps(sec2["ohlcv_180d"], separators=(',', ':'))
-    futures_compact = json.dumps(sec4["futures_30d"], separators=(',', ':')) if sec4["futures_available"] else "[]"
     options_compact = json.dumps(sec5, separators=(',', ':')) if sec5["options_available"] else "{}"
+
+    if sec4["futures_available"]:
+        # Rename near_month_oi → oi in prompt JSON so both series use the same generic field name.
+        # Internal Python dicts retain near_month_oi for OI-trend calculations.
+        near_rows_renamed = [
+            {k: v for k, v in r.items() if k != "near_month_oi"} | {"oi": r["near_month_oi"]}
+            for r in sec4["futures_30d"]
+        ]
+        near_compact = json.dumps(near_rows_renamed, separators=(',', ':'))
+        next_compact = json.dumps(sec4.get("futures_30d_next", []), separators=(',', ':'))
+    else:
+        near_compact = "[]"
+        next_compact = "[]"
     previous_setups_compact = json.dumps(sec1["previous_setups"], separators=(',', ':'))
     
     # Format Sector Context
@@ -2427,35 +2479,66 @@ def _build_turn3_prompt(data_package: dict) -> str:
 
     # Format Section E: F&O Data
     if sec4["futures_available"]:
+        _next_meta = ""
+        if sec4.get("next_month_expiry"):
+            _next_meta = f"""
+- Next-Month Contract (Expiry: {sec4['next_month_expiry']}, DTE: {sec4['next_month_dte']} trading days, Latest Basis: {sec4['next_month_latest_basis']}):
+  futures_30d_next_month (fields: date, futures_price, basis, oi):
+{next_compact}"""
+        else:
+            _next_meta = "\n- Next-Month Contract: NOT AVAILABLE"
         futures_text = f"""- Futures Available: True
-- Futures 30 Days series:
-{futures_compact}
+- Near-Month Contract (Expiry: {sec4.get('near_month_expiry') or 'N/A'}, DTE: {sec4['days_to_expiry']} trading days):
+  futures_30d_near_month (fields: date, futures_price, futures_open, futures_high, futures_low, futures_volume, basis, oi):
+{near_compact}
 - Basis Current: {sec4['basis_current']} ({sec4['basis_trend']} trend)
 - Rollover Phase: {sec4['rollover_phase']}
-- Days to Expiry: {sec4['days_to_expiry']} trading days
-- Near Month OI Trend: {sec4['near_month_oi_trend']}"""
+- Near Month OI Trend: {sec4['near_month_oi_trend']}{_next_meta}"""
     else:
         futures_text = "- Futures: NOT AVAILABLE for this stock"
 
     if sec5["options_available"]:
         chain_compact = json.dumps(sec5['options_chain_last_day'], separators=(',', ':'))
+        _ce_iv_str = str(sec5['atm_ce_iv']) if sec5['atm_ce_iv'] is not None else 'null'
+        _pe_iv_str = str(sec5['atm_pe_iv']) if sec5['atm_pe_iv'] is not None else 'null'
         options_text = f"""- Options Available: True
 - PCR Near Month: {sec5['pcr_near']}
 - Max Pain: {sec5['max_pain']}
 - ATM Strike: {sec5['atm_strike']}
-- Summary ATM IV: {sec5['summary_atm_iv'] if sec5['summary_atm_iv'] is not None else 'null'}
+- ATM CE IV (from chain, at strike {sec5['atm_strike']}): {_ce_iv_str}
+- ATM PE IV (from chain, at strike {sec5['atm_strike']}): {_pe_iv_str}
 - Options Note: {sec5['options_note'] if sec5['options_note'] else 'None'}
 - CE Walls (resistance): {json.dumps(sec5['ce_walls'])}
 - PE Walls (support): {json.dumps(sec5['pe_walls'])}
 - Option Chain Last Day: {chain_compact}
 
-[IV SOURCE RULE] Summary ATM IV above is the Kite-summary ATM value (null when Kite did not return it).
-Before concluding IV is unavailable: inspect Option Chain Last Day — if any row has a non-null implied_volatility,
-treat the chain as the authoritative IV source; set options_setup.iv_source_used = "chain_iv" and state in
-iv_note which strikes were used to estimate IV level. Only fall back to VIX proxy when BOTH summary_atm_iv
-is null AND all per-strike implied_volatility values in the chain are null — set iv_source_used = "vix_proxy".
-If summary_atm_iv is populated, set iv_source_used = "summary_atm_iv". Never write "IV unavailable" when
-chain-level IV exists."""
+[IV SOURCE RULE]
+iv_source_used = "chain_iv" if ANY row in Option Chain Last Day has a non-null iv value (even off-ATM).
+iv_source_used = "vix_proxy" ONLY when every row in the chain has null iv.
+A null ATM CE IV or ATM PE IV in the pre-computed values above does NOT mean the chain is empty —
+it only means that specific side was missing/null at the exact ATM strike. Apply the nearby-strike
+fallback in [ATM_IV_COMPUTATION] before concluding a side is unavailable.
+Never write "IV unavailable" when the chain contains any non-null IV values.
+
+[ATM_IV_COMPUTATION — populate options_setup IV fields]
+For each side (CE and PE) independently, apply this priority order:
+1. Use the pre-computed value shown above if non-null — use as-is.
+2. If null: check the nearest available strike within 1 step in Option Chain Last Day for that side
+   (one strike immediately above or below ATM, whichever has data). If found with non-null iv, use it
+   and note the substitution in iv_note (e.g. "atm_pe_iv sourced from 1045 PE — exact ATM 1040 PE row missing").
+3. If step 2 also yields null: set that side's IV field to null and state in iv_note that IV could not
+   be determined for the traded side. Do not substitute VIX for an individual side's IV field.
+
+Set iv_source_used = "vix_proxy" only after confirming every chain row has null iv.
+
+Do NOT average atm_ce_iv and atm_pe_iv — a trade uses only one side; averaging dilutes with the unused
+instrument and hides real skew/liquidity signals.
+- atm_iv_skew = atm_ce_iv − atm_pe_iv, rounded to 2 dp; null if either is null.
+- iv_used_for_trade = atm_ce_iv if direction == "LONG" (trade uses CE); atm_pe_iv if direction == "SHORT"
+  (trade uses PE). Derived deterministically from direction — same pattern as walls_checked_side.
+- If abs(atm_iv_skew) > 5 points, flag in iv_note as a possible liquidity/staleness signal on the thinner
+  side — state BOTH possibilities (genuine market skew vs. stale/thin quote), not just one.
+- When iv_source_used = "vix_proxy", set atm_ce_iv, atm_pe_iv, atm_iv_skew, and iv_used_for_trade all to null."""
     else:
         options_text = "- Options: NOT AVAILABLE — use VIX as IV proxy for premium estimation"
 
@@ -2544,16 +2627,20 @@ Apply thresholds on adjusted_score to set the initial stage:
 - REJECT      : adjusted_score < 35 OR any hard gate triggered
 
 [HARD GATES]
-Enforce operational hard gates. Any trigger of these gates forces the stage to REJECT immediately, bypassing the score:
-- GATE 1: No structural SL identified -> REJECT
-- GATE 2: R:R < 1:1.5 at Target 2 -> REJECT
-- GATE 3: DTE < 6 trading days -> Options instruments REJECT (Futures instrument is still allowed)
-- GATE 4: Price chart directly contradicts Turn 2 direction hypothesis and no alternative valid direction is found -> REJECT
+Enforce operational hard gates. GATES 1, 2, and 4 force stage to REJECT immediately (bypassing the score) and set hard_gate_triggered = true. GATE 3 is instrument-scoped only and NEVER sets hard_gate_triggered or changes stage:
+- GATE 1: No structural SL identified → stage = REJECT, hard_gate_triggered = true
+- GATE 2: R:R < 1:1.5 at Target 2 → stage = REJECT, hard_gate_triggered = true
+- GATE 3: DTE < 6 trading days → OPTIONS instrument path REJECTED; null out options_setup fields; set theta_cost_check and liquidity_check to null with note "N/A — Gate 3 (DTE < 6)". GATE 3 does NOT set hard_gate_triggered = true and does NOT force stage = REJECT. GATE 3 firing is fully compatible with any stage (TRADE_READY / WATCH / ON_RADAR) as long as GATES 1, 2, 4 and the adjusted_score threshold are clear. Futures instrument path is still evaluated normally.
+- GATE 4: Price chart directly contradicts Turn 2 direction hypothesis and no alternative valid direction is found → stage = REJECT, hard_gate_triggered = true
 
 [SECTION G: OUTPUT SPECIFICATION]
 Provide your analysis ONLY as a single valid JSON object. Do not include any markdown styling, conversational text, introduction, or wrap it in anything other than the JSON format.
 
 [INSTRUMENT_DECISION COMPUTATION — evaluate ONLY when hard_gate_triggered == false]
+
+ORDERING CONSTRAINT: hard_gate_triggered is determined SOLELY by GATES 1, 2, and 4, and by adjusted_score < 35.
+It must be finalized BEFORE this block runs. The outcome of this block — including OI wall failures, GATE 3 firing,
+or contract selection — must NEVER feed back into hard_gate_triggered or stage. Those fields are frozen at this point.
 
 HARD GATE SHORT-CIRCUIT: If hard_gate_triggered == true (stage == REJECT), skip all checks below.
 Set instrument_decision to: {{ "oi_wall_proximity_check": null, "theta_cost_check": null,
@@ -2562,6 +2649,11 @@ Set instrument_decision to: {{ "oi_wall_proximity_check": null, "theta_cost_chec
 Set all numeric and string fields inside options_setup and fut_setup to null (keep the object structures, null the values).
 Set actionable_now = false, actionable_note = "Rejected — <hard_gate_reason value>".
 Then skip directly to writing the output schema.
+
+SELF-CHECK (run before finalizing output): Verify hard_gate_reason cites only GATE 1, GATE 2, GATE 4, or the
+adjusted_score threshold (< 35). If you find hard_gate_reason referencing GATE 3 or an OI wall failure,
+correct it: set hard_gate_triggered = false, restore the appropriate stage from the adjusted_score thresholds,
+and move the GATE 3 / wall information to instrument_decision.none_reason and actionable_now / actionable_note only.
 
 1. OI_WALL_PROXIMITY_CHECK — always runs first; its result gates ALL instrument paths:
    - walls_checked_side is derived deterministically: direction=LONG → "CE", direction=SHORT → "PE". Not a free choice.
@@ -2595,11 +2687,11 @@ Otherwise:
 - direction_changed = true if current direction != previous_direction; false otherwise
 - justification: Required only when direction_changed == true. Cite the specific new data visible in this session's inputs that was absent or contradicted the prior direction (e.g., "PCR contracted from 1.8 to 0.5; CE wall at 24500 present in prior chain is now absent from today's chain"). If you cannot identify specific new evidence from the data, write exactly: "NONE — treat with caution". Write null when direction_changed == false.
 
-[PRICE_OI_REGIME COMPUTATION — uses futures_30d from Section E: F&O DATA]
-Requires at least 4 rows in futures_30d to produce 3 day-over-day comparisons. If futures_30d has fewer than 4 rows or futures data is unavailable, set price_oi_regime_last_3 = [].
-Otherwise, take the last 4 rows (rows[-4:], ascending by date) and classify the last 3:
+[PRICE_OI_REGIME COMPUTATION — uses futures_30d_near_month from Section E: F&O DATA]
+Requires at least 4 rows in futures_30d_near_month to produce 3 day-over-day comparisons. If futures_30d_near_month has fewer than 4 rows or futures data is unavailable, set price_oi_regime_last_3 = [].
+Otherwise, take the last 4 rows (rows[-4:], ascending by date) and classify the last 3 using the `oi` field (near-month OI):
   price_change_pct = (futures_price[i] − futures_price[i−1]) / futures_price[i−1] × 100  (round to 2 dp)
-  oi_change_pct:   if near_month_oi[i−1] is zero or null, set oi_change_pct = null and regime = "UNAVAILABLE" for that day and skip classification below; otherwise = (near_month_oi[i] − near_month_oi[i−1]) / near_month_oi[i−1] × 100  (round to 2 dp)
+  oi_change_pct:   if oi[i−1] is zero or null, set oi_change_pct = null and regime = "UNAVAILABLE" for that day and skip classification below; otherwise = (oi[i] − oi[i−1]) / oi[i−1] × 100  (round to 2 dp)
 
 Classification rule:
   price >= prev AND oi >  prev  →  LONG_BUILDUP    (fresh longs added, bullish)
@@ -2609,6 +2701,25 @@ Classification rule:
   NOTE: zero price change is treated as non-negative (groups with LONG_BUILDUP or SHORT_COVERING); zero OI change is treated as non-positive (groups with SHORT_COVERING or LONG_UNWINDING). Deliberate tie-break, not an oversight.
 
 Output the 3 classified sessions most-recent-first in price_oi_regime_last_3.
+
+[FUT_SETUP CONTRACT_SELECTION — determine which futures contract to use before populating fut_setup]
+
+Compare near_month_dte against the expected hold period upper bound plus a 2-day buffer (hold = 2–5 days → threshold = 7).
+
+Selection rule (apply before filling fut_setup fields):
+- near_month_dte >= 7: use NEAR-MONTH contract. Set contract_selected = "near_month", contract_selection_note = null.
+- near_month_dte < 7: evaluate NEXT-MONTH as an alternative.
+  - If futures_30d_next_month is non-empty: use next-month contract. Populate fut_setup.expiry, days_to_expiry,
+    and basis_note from the NEXT-MONTH contract's expiry date, DTE, and basis values. Set contract_selected = "next_month"
+    and contract_selection_note = a one-line explanation (e.g. "Using Aug-28 next-month contract instead of Jul-31
+    near-month due to 4 DTE remaining vs 2–5 day hold requirement").
+  - If futures_30d_next_month is empty or unavailable: fall back to near-month. Set contract_selected = "near_month",
+    contract_selection_note = "Near-month used by default — next-month data not available".
+
+SCOPE LIMIT: This selection only affects fut_setup fields (expiry, days_to_expiry, basis_note, contract_selected,
+contract_selection_note). It does NOT affect hard_gate_triggered, stage, or any score. GATE 3 concerns the OPTIONS
+path only — options remain unavailable when near_month_dte < 6 regardless of which futures contract is chosen,
+since no next-month options data is supplied.
 
 Your JSON output must match this exact schema:
 {{
@@ -2628,7 +2739,7 @@ Your JSON output must match this exact schema:
   "setup_delta_vs_previous": {{
     "previous_direction": "LONG | SHORT | null",
     "previous_score": <number_or_null>,
-    "score_delta": <number_or_null — positive means score improved vs previous>,
+    "score_delta": <number_or_null — current conviction_score minus previous; magnitude only when direction_changed == true>,
     "direction_changed": <true_or_false>,
     "justification": "<specific new evidence justifying direction flip; 'NONE — treat with caution' if none; null if direction_changed == false>"
   }},
@@ -2663,19 +2774,25 @@ Your JSON output must match this exact schema:
     "sl_premium": <number_or_null>,
     "target_1_premium": <number_or_null>,
     "target_2_premium": <number_or_null>,
-    "iv_note": "<IV level assessment (LOW/MEDIUM/HIGH) and which source was used>",
+    "atm_ce_iv": <number_or_null — CE IV at ATM strike; null unless iv_source_used = "chain_iv">,
+    "atm_pe_iv": <number_or_null — PE IV at ATM strike; null unless iv_source_used = "chain_iv">,
+    "atm_iv_skew": <number_or_null — atm_ce_iv minus atm_pe_iv; null if either is null>,
+    "iv_used_for_trade": <number_or_null — atm_ce_iv when LONG, atm_pe_iv when SHORT; null when chain_iv unavailable>,
+    "iv_note": "<State atm_ce_iv and atm_pe_iv, which was used for this trade (iv_used_for_trade) and why, IV level assessment (LOW/MEDIUM/HIGH), source used, and flag the skew if unusually wide (>5 pts) with both possible explanations (market skew vs. stale quote)>",
     "iv_source_used": "chain_iv | summary_atm_iv | vix_proxy"
   }},
   "fut_setup": {{
-    "expiry": "<YYYY-MM-DD_or_null — near-month contract expiry>",
-    "days_to_expiry": <number_or_null>,
+    "expiry": "<YYYY-MM-DD_or_null — expiry of the selected contract (near or next month per contract_selected)>",
+    "days_to_expiry": <number_or_null — DTE of the selected contract>,
     "entry_low": <number_or_null>,
     "entry_high": <number_or_null>,
     "sl_pct": <number_or_null — percentage distance from entry_mid to stop_loss>,
     "stop_loss": <number_or_null>,
     "target_1": <number_or_null>,
     "target_2": <number_or_null>,
-    "basis_note": "<futures basis value and implication: positive = contango/bullish carry, negative = backwardation>"
+    "basis_note": "<basis value and trend for the selected contract; positive = contango/bullish carry, negative = backwardation>",
+    "contract_selected": "near_month | next_month",
+    "contract_selection_note": "<one-line reason for choosing next-month; null when near_month is used by default>"
   }},
   "price_oi_regime_last_3": [
     {{
@@ -2697,7 +2814,7 @@ Your JSON output must match this exact schema:
     }},
     "theta_cost_check": {{
       "pass": <true_or_false_or_null>,
-      "note": "<theta decay assessment vs premium paid over holding period; or 'N/A — FUT path' if Gate 3 triggered>"
+      "note": "<theta decay assessment using iv_used_for_trade (the IV of the side actually being traded — CE for LONG, PE for SHORT) vs premium paid over the 2–5 day holding period; or 'N/A — Gate 3 (DTE < 6)' if Gate 3 triggered>"
     }},
     "liquidity_check": {{
       "pass": <true_or_false_or_null>,
@@ -2721,7 +2838,7 @@ Your JSON output must match this exact schema:
   "dimension_1_narrative": "<Meticulous detail. Assess S/R confluence, completed/forming patterns with dates/prices, candle body/wicks close position, candlestick patterns with location context, RSI divergence check, and volume trend. Every number/date must be chart-verifiable. Do not generalize.>",
   "dimension_2_narrative": "<Describe SL structural invalidation logic with ATR validation. Detail T1 and T2 levels and R:R parameters. Describe entry zone confluence basis.>",
   "dimension_3_narrative": "<Connect Nifty regime stance and bias to this trade's execution. Assess sector tailwind/headwind and stock relative strength/performance vs sector.>",
-  "dimension_4_narrative": "<REQUIRED OPENING: name each of the last 3 sessions' Price-OI regimes by label with supporting numbers, e.g. 'Jul-16→17: LONG_BUILDUP (price +0.7%, OI +0.9%); Jul-15→16: SHORT_COVERING (price +0.3%, OI −1.2%); Jul-14→15: SHORT_BUILDUP (price −0.5%, OI +2.1%)'. Then assess basis current/trend, PCR contrarian reading with any thin OI warning, and DTE/rollover phase significance. If instrument_decision.oi_wall_proximity_check.pass = false, explicitly name the obstructing wall strike, its OI vs neighbors ratio, and explain the impact on target_2 achievability (premium compression for options; gamma-pinning resistance for futures/spot) — state this even when instrument_recommendation = FUT.>",
+  "dimension_4_narrative": "<REQUIRED OPENING: name each of the last 3 sessions' Price-OI regimes by label with supporting numbers, e.g. 'Jul-16→17: LONG_BUILDUP (price +0.7%, OI +0.9%); Jul-15→16: SHORT_COVERING (price +0.3%, OI −1.2%); Jul-14→15: SHORT_BUILDUP (price −0.5%, OI +2.1%)'. Then assess basis current/trend, PCR contrarian reading with any thin OI warning, and DTE/rollover phase significance. When fut_setup.contract_selected = 'next_month', state the contract switch explicitly before the basis discussion (e.g. 'Using next-month Aug-28 futures contract — near-month Jul-31 has only 4 DTE vs 2–5 day hold requirement') and base the basis/DTE commentary on the next-month contract's values. If instrument_decision.oi_wall_proximity_check.pass = false, explicitly name the obstructing wall strike, its OI vs neighbors ratio, and explain the impact on target_2 achievability (premium compression for options; gamma-pinning resistance for futures/spot) — state this even when instrument_recommendation = FUT.>",
   "mentor_notes": "<Educational swing-trading takeaways taught by this specific setup. Why does it work and what visual cues verify it on the chart.>",
   "why_could_be_wrong": "<Three highly specific bearish scenarios with exact invalidation price levels where the trade goes wrong (e.g. 'If closes below 1828 on high volume'). No generic disclaimers.>",
   "key_thing_to_watch": "<Single, most critical actionable observation for the morning market open (e.g. entry boundary trigger, gap opens).>",
@@ -3354,7 +3471,7 @@ def run_claude_session(
             trade_ready_list=trade_ready_list,
             turn1_result=turn1_result,
             turn2_result=turn2_results,
-            max_tokens=10000,
+            max_tokens=16000,
         )
         deep_results.append(deep_res)
         turn_costs.append(deep_cost)

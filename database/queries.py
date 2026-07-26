@@ -498,6 +498,10 @@ def get_futures_series(symbol: str, days: int = 30) -> list[dict]:
         else:
             rollover_phase = "NORMAL"
 
+        _next_price_raw = (next_contract.get("settle_price") or next_contract.get("close_price")) if next_contract else None
+        next_futures_price = float(_next_price_raw) if _next_price_raw is not None else None
+        next_basis = round(next_futures_price - spot_price, 2) if (next_futures_price is not None and spot_price is not None) else None
+
         compiled_rows.append({
             "symbol": symbol,
             "date": snap_date,
@@ -516,6 +520,10 @@ def get_futures_series(symbol: str, days: int = 30) -> list[dict]:
             "futures_high": float(near_contract["high_price"]) if near_contract.get("high_price") is not None else None,
             "futures_low": float(near_contract["low_price"]) if near_contract.get("low_price") is not None else None,
             "futures_volume": int(near_contract["volume"]) if near_contract.get("volume") is not None else None,
+            "near_expiry": near_expiry,
+            "next_expiry": next_expiry,
+            "next_futures_price": next_futures_price,
+            "next_basis": next_basis,
         })
         
     return compiled_rows

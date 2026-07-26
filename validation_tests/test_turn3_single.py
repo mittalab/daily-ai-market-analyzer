@@ -55,7 +55,7 @@ def _parse_json(raw: str) -> dict:
     return json.loads(t.strip())
 
 
-def _call_claude(client: anthropic.Anthropic, prompt: str, max_tokens: int = 8000):
+def _call_claude(client: anthropic.Anthropic, prompt: str, max_tokens: int = 16000):
     """
     Inline API call — returns (raw_text, parsed_dict, input_tokens, output_tokens).
     Unlike call_claude_deep, preserves the raw response text for display.
