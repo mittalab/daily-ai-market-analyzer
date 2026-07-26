@@ -291,9 +291,11 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
     s.direction === 'LONG' ? '↑ LONG' : s.direction === 'SHORT' ? '↓ SHORT' : s.direction || 'AUTO';
 
   const recInstrument = s.instrument_recommendation || 'NONE';
-  const recColor = 
+  const notActionable = s.actionable_now === false;
+  const recColor =
+    notActionable               ? 'bg-amber-100 text-amber-800'   :
     recInstrument === 'OPTIONS' ? 'bg-purple-100 text-purple-800' :
-    recInstrument === 'FUT' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800';
+    recInstrument === 'FUT'     ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800';
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-2 shadow-sm">
@@ -307,8 +309,11 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${dirClass}`}>
               {dirLabel}
             </span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${recColor}`}>
-              {recInstrument}
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-medium ${recColor}`}
+              title={notActionable ? (s.actionable_note ?? '') : ''}
+            >
+              {notActionable ? '⚠ NONE' : recInstrument}
             </span>
             {s.setup_summary?.pattern_name && (
               <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-semibold">
@@ -369,7 +374,17 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
             </div>
             <div>
               <p className="text-gray-400 mb-0.5 font-medium">Recomm. Instrument</p>
-              <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_reason || 'N/A'}</p>
+              {s.actionable_now === false ? (
+                <div className="flex items-start gap-1">
+                  <span className="text-amber-500 text-xs leading-none mt-0.5">⚠</span>
+                  <div>
+                    <p className="font-semibold text-gray-800">NONE — not actionable</p>
+                    {s.actionable_note && <p className="text-[10px] text-amber-700 mt-0.5">{s.actionable_note}</p>}
+                  </div>
+                </div>
+              ) : (
+                <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_reason || 'N/A'}</p>
+              )}
             </div>
             <div>
               <p className="text-gray-400 mb-0.5 font-medium">Hard Gate Status</p>

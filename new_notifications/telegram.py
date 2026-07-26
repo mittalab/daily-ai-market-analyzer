@@ -539,10 +539,15 @@ def send_deep_analysis_complete(
     on_radar: int,
     skipped: int,
     cost_usd: float,
+    trade_ready_blocked: int = 0,
 ) -> int | None:
+    if trade_ready_blocked:
+        ready_label = f"{trade_ready - trade_ready_blocked} actionable, {trade_ready_blocked} blocked (OI wall / no instrument)"
+    else:
+        ready_label = str(trade_ready)
     text = (
         f"🧠 <b>Deep Analysis Complete — {trade_date}</b>\n"
-        f"🟢 Trade Ready: <code>{trade_ready}</code>\n"
+        f"🟢 Trade Ready: <code>{ready_label}</code>\n"
         f"🟡 Watch: <code>{watch}</code>\n"
         f"🔵 On Radar: <code>{on_radar}</code>\n"
         f"⚪ Skipped: <code>{skipped}</code>\n\n"

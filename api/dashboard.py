@@ -375,6 +375,8 @@ async def get_active_trades():
                 "conviction_multiplier_applied": setup_row.get("conviction_multiplier"),
                 "instrument_recommendation": setup_row.get("instrument") or "OPTIONS",
                 "instrument_reason": setup_row.get("instrument_reason"),
+                "actionable_now": (setup_row.get("instrument") or "OPTIONS") not in ("NONE", None, ""),
+                "actionable_note": None if (setup_row.get("instrument") or "OPTIONS") not in ("NONE", None, "") else "Instrument not recommended for this setup",
                 "hard_gate_triggered": setup_row.get("hard_gate_triggered"),
                 "hard_gate_reason": setup_row.get("hard_gate_reason"),
                 "setup_summary": {

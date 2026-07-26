@@ -2241,8 +2241,7 @@ def _build_turn3_data(
     pcr_near = None
     max_pain = None
     atm_strike = None
-    iv_available = False
-    iv_atm = None
+    summary_atm_iv = None
     options_note = ""
     ce_walls = []
     pe_walls = []
@@ -2283,13 +2282,7 @@ def _build_turn3_data(
                 
             ce_atm = [r for r in options if r.get("option_type") == "CE" and float(r["strike"]) == atm_strike]
             if ce_atm and ce_atm[0].get("implied_volatility") is not None:
-                iv_atm = float(ce_atm[0]["implied_volatility"])
-                iv_available = True
-            else:
-                iv_available = any(r.get("implied_volatility") is not None for r in options)
-                
-            if not iv_available:
-                options_note = "IV unavailable — Kite fallback used. OI data available but IV null. Use VIX as vol proxy."
+                summary_atm_iv = float(ce_atm[0]["implied_volatility"])
                 
             try:
                 from pipeline.deep_analysis import oi_walls
@@ -2304,8 +2297,7 @@ def _build_turn3_data(
         "pcr_near": pcr_near,
         "max_pain": max_pain,
         "atm_strike": atm_strike,
-        "iv_available": iv_available,
-        "iv_atm": iv_atm,
+        "summary_atm_iv": summary_atm_iv,
         "options_note": options_note,
         "ce_walls": ce_walls,
         "pe_walls": pe_walls,
@@ -2451,12 +2443,19 @@ def _build_turn3_prompt(data_package: dict) -> str:
 - PCR Near Month: {sec5['pcr_near']}
 - Max Pain: {sec5['max_pain']}
 - ATM Strike: {sec5['atm_strike']}
-- IV Available: {sec5['iv_available']}
-- IV ATM: {sec5['iv_atm'] or 'null — use VIX as proxy'}
-- Options Note: {sec5['options_note']}
+- Summary ATM IV: {sec5['summary_atm_iv'] if sec5['summary_atm_iv'] is not None else 'null'}
+- Options Note: {sec5['options_note'] if sec5['options_note'] else 'None'}
 - CE Walls (resistance): {json.dumps(sec5['ce_walls'])}
 - PE Walls (support): {json.dumps(sec5['pe_walls'])}
-- Option Chain Last Day: {chain_compact}"""
+- Option Chain Last Day: {chain_compact}
+
+[IV SOURCE RULE] Summary ATM IV above is the Kite-summary ATM value (null when Kite did not return it).
+Before concluding IV is unavailable: inspect Option Chain Last Day — if any row has a non-null implied_volatility,
+treat the chain as the authoritative IV source; set options_setup.iv_source_used = "chain_iv" and state in
+iv_note which strikes were used to estimate IV level. Only fall back to VIX proxy when BOTH summary_atm_iv
+is null AND all per-strike implied_volatility values in the chain are null — set iv_source_used = "vix_proxy".
+If summary_atm_iv is populated, set iv_source_used = "summary_atm_iv". Never write "IV unavailable" when
+chain-level IV exists."""
     else:
         options_text = "- Options: NOT AVAILABLE — use VIX as IV proxy for premium estimation"
 
@@ -2531,7 +2530,7 @@ Evaluate the stock setup across 4 dimensions (100 Points Total) using the follow
 
 4. Dimension 4: Stock F&O Context (5 pts)
    - Futures Basis (2 pts): Positive carry = 2 pts, negative carry = 0-1 pts.
-   - PCR Context (2 pts): Contrarian extreme PCR checks.
+   - PCR Context (2 pts): Contrarian extreme PCR checks. OI-WALL DEDUCTION: If oi_wall_proximity_check.pass == false, deduct 1 point from this sub-score (minimum 0, does not cascade to other dimensions). Show the math explicitly in dimension_4_narrative (e.g., "PCR Context: 2 pts − 1 pt OI wall deduction = 1 pt").
    - Rollover + DTE (1 pt): DTE < 6 trading days triggers options REJECT.
 
 SCORING CALCULATIONS:
@@ -2554,6 +2553,63 @@ Enforce operational hard gates. Any trigger of these gates forces the stage to R
 [SECTION G: OUTPUT SPECIFICATION]
 Provide your analysis ONLY as a single valid JSON object. Do not include any markdown styling, conversational text, introduction, or wrap it in anything other than the JSON format.
 
+[INSTRUMENT_DECISION COMPUTATION — evaluate ONLY when hard_gate_triggered == false]
+
+HARD GATE SHORT-CIRCUIT: If hard_gate_triggered == true (stage == REJECT), skip all checks below.
+Set instrument_decision to: {{ "oi_wall_proximity_check": null, "theta_cost_check": null,
+  "liquidity_check": null, "criteria_passed_count": null, "instrument_recommendation": "NONE",
+  "margin_efficiency_note": null, "none_reason": "Hard gate triggered: <value from hard_gate_reason>" }}.
+Set all numeric and string fields inside options_setup and fut_setup to null (keep the object structures, null the values).
+Set actionable_now = false, actionable_note = "Rejected — <hard_gate_reason value>".
+Then skip directly to writing the output schema.
+
+1. OI_WALL_PROXIMITY_CHECK — always runs first; its result gates ALL instrument paths:
+   - walls_checked_side is derived deterministically: direction=LONG → "CE", direction=SHORT → "PE". Not a free choice.
+   - From the Option Chain Last Day data (Section E), filter to the walls_checked_side type. Keep only strikes STRICTLY between entry_mid (=(entry_low+entry_high)/2) and target_2, in the direction of the trade. Discard strikes behind the entry and beyond target_2.
+   - For each candidate strike in that filtered set, find its two immediate neighbors in the full chain (the next strike above and next strike below it by price). Compute average OI of those two neighbors.
+   - A strike is "obstructing" if its OI > 3× that neighbor average.
+   - nearest_obstructing_wall_strike = the obstructing strike closest to entry_mid; null if none qualifies.
+   - pass = true if no filtered strike is obstructing; pass = false if at least one is.
+   - HARD BLOCK: pass = false blocks BOTH OPTIONS and FUT — instrument_recommendation must be "NONE" whenever this check fails. There is no FUT fallback when the wall check fails. Populate none_reason and name the wall in dimension_4_narrative.
+
+2. THETA_COST_CHECK — options-specific:
+   - Assess whether theta decay is manageable over the expected holding period given DTE and IV level.
+   - Set pass = null and note = "N/A — FUT path" if Gate 3 is triggered (DTE < 6) or no options path is viable.
+
+3. LIQUIDITY_CHECK — options-specific:
+   - Assess whether ATM OI and estimated bid-ask spread support a reasonable fill.
+   - Set pass = null and note = "N/A — FUT path" if Gate 3 is triggered or no options path is viable.
+
+4. DECISION RULE (apply in order, stop at first match):
+   - criteria_passed_count = count of checks where pass = true (null values excluded from count).
+   - instrument_recommendation = "OPTIONS" if: oi_wall_proximity_check.pass == true AND criteria_passed_count >= 2.
+   - instrument_recommendation = "FUT" if: oi_wall_proximity_check.pass == true AND the futures basis is not severely unfavorable (a basis that is both negative AND on an expanding-negative trend per fut_setup.basis_note is "severely unfavorable").
+   - instrument_recommendation = "NONE" in all other cases: oi_wall_proximity_check.pass == false (wall hard-blocks both paths), OR OPTIONS criteria fail AND FUT basis is severely unfavorable. When NONE, set actionable_now = false and populate none_reason.
+
+[SETUP_DELTA COMPUTATION — compare against previous_setups from Section B]
+Identify the most recent entry in previous_setups (index 0, highest setup_date). If previous_setups is empty or null, set all fields to null and direction_changed = false.
+Otherwise:
+- previous_direction = previous_setups[0].direction
+- previous_score    = previous_setups[0].conviction_score  (may be null for legacy records)
+- score_delta       = (current conviction_score) − previous_score; set null if previous_score is null. When direction_changed == true this is a magnitude comparison across two different directional theses — a positive delta does not mean the thesis improved, only that today's score is numerically higher. Reflect this distinction in justification.
+- direction_changed = true if current direction != previous_direction; false otherwise
+- justification: Required only when direction_changed == true. Cite the specific new data visible in this session's inputs that was absent or contradicted the prior direction (e.g., "PCR contracted from 1.8 to 0.5; CE wall at 24500 present in prior chain is now absent from today's chain"). If you cannot identify specific new evidence from the data, write exactly: "NONE — treat with caution". Write null when direction_changed == false.
+
+[PRICE_OI_REGIME COMPUTATION — uses futures_30d from Section E: F&O DATA]
+Requires at least 4 rows in futures_30d to produce 3 day-over-day comparisons. If futures_30d has fewer than 4 rows or futures data is unavailable, set price_oi_regime_last_3 = [].
+Otherwise, take the last 4 rows (rows[-4:], ascending by date) and classify the last 3:
+  price_change_pct = (futures_price[i] − futures_price[i−1]) / futures_price[i−1] × 100  (round to 2 dp)
+  oi_change_pct:   if near_month_oi[i−1] is zero or null, set oi_change_pct = null and regime = "UNAVAILABLE" for that day and skip classification below; otherwise = (near_month_oi[i] − near_month_oi[i−1]) / near_month_oi[i−1] × 100  (round to 2 dp)
+
+Classification rule:
+  price >= prev AND oi >  prev  →  LONG_BUILDUP    (fresh longs added, bullish)
+  price >= prev AND oi <= prev  →  SHORT_COVERING  (shorts exiting on price rise, fading strength)
+  price <  prev AND oi >  prev  →  SHORT_BUILDUP   (fresh shorts added, bearish)
+  price <  prev AND oi <= prev  →  LONG_UNWINDING  (longs exiting on price fall, bearish)
+  NOTE: zero price change is treated as non-negative (groups with LONG_BUILDUP or SHORT_COVERING); zero OI change is treated as non-positive (groups with SHORT_COVERING or LONG_UNWINDING). Deliberate tie-break, not an oversight.
+
+Output the 3 classified sessions most-recent-first in price_oi_regime_last_3.
+
 Your JSON output must match this exact schema:
 {{
   "symbol": "{symbol}",
@@ -2568,6 +2624,13 @@ Your JSON output must match this exact schema:
     "key_candle": "<Key candle description, e.g. Hammer or Inside Bar>",
     "key_candle_location": "AT_SUPPORT | AT_RESISTANCE | MID_RANGE | NONE",
     "key_candle_significance": "HIGH | MEDIUM | LOW | NONE"
+  }},
+  "setup_delta_vs_previous": {{
+    "previous_direction": "LONG | SHORT | null",
+    "previous_score": <number_or_null>,
+    "score_delta": <number_or_null — positive means score improved vs previous>,
+    "direction_changed": <true_or_false>,
+    "justification": "<specific new evidence justifying direction flip; 'NONE — treat with caution' if none; null if direction_changed == false>"
   }},
   "key_levels": {{
     "support_zone_low": <number>,
@@ -2590,7 +2653,7 @@ Your JSON output must match this exact schema:
     "rr_t2": <number_ratio>
   }},
   "options_setup": {{
-    "strike": <number_or_null_if_fut_only>,
+    "strike": <number_or_null>,
     "option_type": "CE | PE | null",
     "expiry": "<YYYY-MM-DD_or_null>",
     "days_to_expiry": <number_or_null>,
@@ -2600,21 +2663,51 @@ Your JSON output must match this exact schema:
     "sl_premium": <number_or_null>,
     "target_1_premium": <number_or_null>,
     "target_2_premium": <number_or_null>,
-    "iv_note": "<note about IV and VIX proxy>"
+    "iv_note": "<IV level assessment (LOW/MEDIUM/HIGH) and which source was used>",
+    "iv_source_used": "chain_iv | summary_atm_iv | vix_proxy"
   }},
   "fut_setup": {{
+    "expiry": "<YYYY-MM-DD_or_null — near-month contract expiry>",
+    "days_to_expiry": <number_or_null>,
     "entry_low": <number_or_null>,
     "entry_high": <number_or_null>,
+    "sl_pct": <number_or_null — percentage distance from entry_mid to stop_loss>,
     "stop_loss": <number_or_null>,
     "target_1": <number_or_null>,
     "target_2": <number_or_null>,
-    "lots": null,
-    "lot_size": null,
-    "risk_inr": null,
-    "risk_pct_capital": null
+    "basis_note": "<futures basis value and implication: positive = contango/bullish carry, negative = backwardation>"
   }},
-  "instrument_recommendation": "OPTIONS | FUT | NONE",
-  "instrument_reason": "<reasons for recommending options or futures based on IV and index bias>",
+  "price_oi_regime_last_3": [
+    {{
+      "date": "<YYYY-MM-DD — most recent session first>",
+      "price_change_pct": <number — rounded to 2 dp>,
+      "oi_change_pct": <number_or_null — null when prior-day OI is zero or missing>,
+      "regime": "LONG_BUILDUP | SHORT_BUILDUP | LONG_UNWINDING | SHORT_COVERING | UNAVAILABLE"
+    }}
+  ],
+  "instrument_decision": {{
+    "oi_wall_proximity_check": {{
+      "walls_checked_side": "<CE if direction=LONG, PE if direction=SHORT — derived from direction, not chosen freely>",
+      "walls_between_entry_and_target2": [ {{ "strike": <number>, "oi": <number> }} ],
+      "nearest_obstructing_wall_strike": <number_or_null>,
+      "nearest_obstructing_wall_oi": <number_or_null>,
+      "wall_oi_vs_neighbors_ratio": <number_or_null>,
+      "pass": <true_or_false>,
+      "note": "<one line: obstructing wall strike and OI vs neighbors ratio and impact on premium expansion or underlying pinning; or 'no obstructing wall between entry and T2'>"
+    }},
+    "theta_cost_check": {{
+      "pass": <true_or_false_or_null>,
+      "note": "<theta decay assessment vs premium paid over holding period; or 'N/A — FUT path' if Gate 3 triggered>"
+    }},
+    "liquidity_check": {{
+      "pass": <true_or_false_or_null>,
+      "note": "<ATM OI and estimated bid-ask spread assessment; or 'N/A — FUT path' if Gate 3 triggered>"
+    }},
+    "criteria_passed_count": <0_to_3 — count_of_checks_where_pass_is_true_excluding_nulls>,
+    "instrument_recommendation": "OPTIONS | FUT | NONE",
+    "margin_efficiency_note": "<one concise observation on the capital or margin efficiency advantage of the recommended instrument; null if instrument_recommendation = NONE>",
+    "none_reason": "<concise explanation of why neither OPTIONS nor FUT is recommended; null if instrument_recommendation != NONE>"
+  }},
   "hard_gate_triggered": <true_or_false>,
   "hard_gate_reason": "<name of hard gate triggered or null>",
   "scoring_breakdown": {{
@@ -2628,12 +2721,14 @@ Your JSON output must match this exact schema:
   "dimension_1_narrative": "<Meticulous detail. Assess S/R confluence, completed/forming patterns with dates/prices, candle body/wicks close position, candlestick patterns with location context, RSI divergence check, and volume trend. Every number/date must be chart-verifiable. Do not generalize.>",
   "dimension_2_narrative": "<Describe SL structural invalidation logic with ATR validation. Detail T1 and T2 levels and R:R parameters. Describe entry zone confluence basis.>",
   "dimension_3_narrative": "<Connect Nifty regime stance and bias to this trade's execution. Assess sector tailwind/headwind and stock relative strength/performance vs sector.>",
-  "dimension_4_narrative": "<Assess F&O context: basis current/trend, PCR contrarian reading with any thin OI warning, and DTE/rollover phase significance.>",
+  "dimension_4_narrative": "<REQUIRED OPENING: name each of the last 3 sessions' Price-OI regimes by label with supporting numbers, e.g. 'Jul-16→17: LONG_BUILDUP (price +0.7%, OI +0.9%); Jul-15→16: SHORT_COVERING (price +0.3%, OI −1.2%); Jul-14→15: SHORT_BUILDUP (price −0.5%, OI +2.1%)'. Then assess basis current/trend, PCR contrarian reading with any thin OI warning, and DTE/rollover phase significance. If instrument_decision.oi_wall_proximity_check.pass = false, explicitly name the obstructing wall strike, its OI vs neighbors ratio, and explain the impact on target_2 achievability (premium compression for options; gamma-pinning resistance for futures/spot) — state this even when instrument_recommendation = FUT.>",
   "mentor_notes": "<Educational swing-trading takeaways taught by this specific setup. Why does it work and what visual cues verify it on the chart.>",
   "why_could_be_wrong": "<Three highly specific bearish scenarios with exact invalidation price levels where the trade goes wrong (e.g. 'If closes below 1828 on high volume'). No generic disclaimers.>",
   "key_thing_to_watch": "<Single, most critical actionable observation for the morning market open (e.g. entry boundary trigger, gap opens).>",
   "spot_price": <underlying_close_price_for_session_date_as_number>,
-  "rejection_reason": "<Detail reasons for REJECT or null>"
+  "rejection_reason": "<Detail reasons for REJECT or null>",
+  "actionable_now": <true_or_false — false when instrument_decision.instrument_recommendation == "NONE", otherwise true>,
+  "actionable_note": "<one line explaining why not actionable now; null if actionable_now is true>"
 }}
 """
     return prompt
@@ -2648,7 +2743,9 @@ def _validate_position_sizing_turn3(analysis: dict, config: dict) -> dict:
     max_risk_inr = capital * max_risk_pct
     
     symbol = analysis.get("symbol")
-    rec = analysis.get("instrument_recommendation", "NONE")
+    # instrument_recommendation now lives inside instrument_decision; fall back to flat key for backward compat
+    instr_dec = analysis.get("instrument_decision") or {}
+    rec = instr_dec.get("instrument_recommendation") or analysis.get("instrument_recommendation") or "NONE"
     
     from database.queries import get_all_lot_sizes
     lot_sizes = get_all_lot_sizes()
@@ -2760,7 +2857,11 @@ def _validate_position_sizing_turn3(analysis: dict, config: dict) -> dict:
         analysis["max_risk_inr"] = 0.0
         analysis["risk_pct_capital"] = 0.0
         analysis["risk_reward"] = 0.0
-        
+
+    # Lift nested instrument_decision fields to flat keys for DB / frontend backward compat
+    analysis["instrument_recommendation"] = rec
+    analysis.setdefault("instrument_reason", instr_dec.get("margin_efficiency_note", ""))
+
     return analysis
 
 
@@ -3276,15 +3377,16 @@ def run_claude_session(
         6,
     )
 
-    trade_ready = sum(1 for d in deep_results if d.get("stage") == "TRADE_READY")
-    watch       = sum(1 for d in deep_results if d.get("stage") == "WATCH")
-    on_radar    = sum(1 for d in deep_results if d.get("stage") == "ON_RADAR")
-    skipped     = sum(1 for d in deep_results if d.get("stage") == "SKIP")
-    prescan_fwd = sum(1 for s in turn2_results if s.get("forward_to_deep"))
+    trade_ready         = sum(1 for d in deep_results if d.get("stage") == "TRADE_READY")
+    trade_ready_blocked = sum(1 for d in deep_results if d.get("stage") == "TRADE_READY" and d.get("actionable_now") is False)
+    watch               = sum(1 for d in deep_results if d.get("stage") == "WATCH")
+    on_radar            = sum(1 for d in deep_results if d.get("stage") == "ON_RADAR")
+    skipped             = sum(1 for d in deep_results if d.get("stage") == "SKIP")
+    prescan_fwd         = sum(1 for s in turn2_results if s.get("forward_to_deep"))
 
     try:
         from new_notifications.telegram import send_deep_analysis_complete
-        send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped, cost3_usd)
+        send_deep_analysis_complete(str(session_date), trade_ready, watch, on_radar, skipped, cost3_usd, trade_ready_blocked)
     except Exception as _exc:
         logger.warning("Deep analysis complete notification failed: %s", _exc)
 

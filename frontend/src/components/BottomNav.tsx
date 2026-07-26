@@ -7,7 +7,7 @@ const TABS: Tab[] = [
   { id: 'deep',        label: 'Deep',    icon: '🧠' },
   { id: 'active',      label: 'Active',  icon: '💼' },
   { id: 'analyse',     label: 'Analyse', icon: '🔍' },
-  { id: 'status',      label: 'Status',  icon: '⚙️' },
+  { id: 'status',      label: 'Settings',  icon: '⚙️' },
 ];
 
 interface Props { active: Screen; onChange: (s: Screen) => void; }
