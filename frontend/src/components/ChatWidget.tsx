@@ -158,7 +158,7 @@ export default function ChatWidget() {
 
   // ── Intro flow ────────────────────────────────────────────────────────────
 
-  async function handleLoad() {
+  async function handleLoad(openClaude = true) {
     cancelRef.current = false;
     setLoadState('loading');
     try {
@@ -173,7 +173,7 @@ export default function ChatWidget() {
       setLastLoadedDate(sessionDate);
       setLastLoadedAt(Date.now());
       setLoadState('success');
-      window.open('https://claude.ai', '_blank');
+      if (openClaude) window.open('https://claude.ai', '_blank');
     } catch (err: unknown) {
       if (cancelRef.current) return;
       const e = err as { code?: string; message?: string };
@@ -328,7 +328,7 @@ export default function ChatWidget() {
                 >
                   <option value="full_context">All-in-one Full Context</option>
                   <option value="market_context">Market Context (Turn 1)</option>
-                  <option value="pre_ scan">Prescan (Turn 2)</option>
+                  <option value="pre_scan">Prescan (Turn 2)</option>
                   <option value="deep_analysis">Deep Analysis Stock (Turn 3)</option>
                 </select>
               </div>
@@ -358,21 +358,33 @@ export default function ChatWidget() {
               )}
             </div>
 
-            <button
-              onClick={handleLoad}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 px-4 text-xs transition-colors"
-            >
-              {selectedTurnType === 'full_context' && 'Load Full Context & Open Claude.ai'}
-              {selectedTurnType === 'market_context' && 'Load Market Context & Open Claude.ai'}
-              {selectedTurnType === 'prescan' && 'Load Prescan Context & Open Claude.ai'}
-              {selectedTurnType === 'deep_analysis' && `Load ${selectedSymbol || 'Stock'} Context & Open Claude.ai`}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleLoad(false)}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl py-3 px-3 text-xs transition-colors"
+              >
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy Context
+              </button>
+              <button
+                onClick={() => handleLoad(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 px-3 text-xs transition-colors"
+              >
+                {selectedTurnType === 'full_context' && 'Full Context'}
+                {selectedTurnType === 'market_context' && 'Market Context'}
+                {selectedTurnType === 'pre_scan' && 'Prescan'}
+                {selectedTurnType === 'deep_analysis' && (selectedSymbol || 'Stock')}
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </button>
+            </div>
             <p className="text-[10px] text-gray-400 text-center leading-relaxed">
-              Copies selection prompt to clipboard and opens a fresh Claude.ai tab.
+              Orange copies to clipboard only · Blue copies and opens Claude.ai
             </p>
 
             <div className="relative flex items-center gap-2">
