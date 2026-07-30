@@ -2683,8 +2683,8 @@ Identify the most recent entry in previous_setups (index 0, highest setup_date).
 Otherwise:
 - previous_direction = previous_setups[0].direction
 - previous_score    = previous_setups[0].conviction_score  (may be null for legacy records)
-- score_delta       = (current conviction_score) − previous_score; set null if previous_score is null. When direction_changed == true this is a magnitude comparison across two different directional theses — a positive delta does not mean the thesis improved, only that today's score is numerically higher. Reflect this distinction in justification.
 - direction_changed = true if current direction != previous_direction; false otherwise
+- score_delta       = (current conviction_score) − previous_score; set null if previous_score is null. When direction_changed == true this is a magnitude comparison across two different directional theses — a positive delta does not mean the thesis improved, only that today's score is numerically higher. Reflect this distinction in justification.
 - justification: Required only when direction_changed == true. Cite the specific new data visible in this session's inputs that was absent or contradicted the prior direction (e.g., "PCR contracted from 1.8 to 0.5; CE wall at 24500 present in prior chain is now absent from today's chain"). If you cannot identify specific new evidence from the data, write exactly: "NONE — treat with caution". Write null when direction_changed == false.
 
 [PRICE_OI_REGIME COMPUTATION — uses futures_30d_near_month from Section E: F&O DATA]

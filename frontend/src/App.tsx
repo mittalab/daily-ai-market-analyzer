@@ -21,7 +21,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="w-full max-w-lg md:max-w-4xl lg:max-w-6xl mx-auto flex flex-col relative">
+      <div className="w-full md:max-w-4xl lg:max-w-6xl mx-auto flex flex-col relative">
         {showBanner && (
           <div className="flex items-center justify-between px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs">
             <span className="text-amber-700 flex items-center gap-1.5">

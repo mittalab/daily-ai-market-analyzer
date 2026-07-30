@@ -1127,7 +1127,7 @@ export default function DeepAnalysisScreen({ refreshKey = 0 }: { refreshKey?: nu
         </p>
       </div>
 
-      <div className="px-4 max-w-5xl mx-auto">
+      <div className="px-4">
         {totalStocks > 0 ? (
           <>
             {STAGE_ORDER.map(stage =>
