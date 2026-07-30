@@ -426,6 +426,16 @@ export default function ChatWidget() {
       case 'success':
         return (
           <div className="space-y-4">
+            <button
+              onClick={handleReload}
+              className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+              aria-label="Back to context selection"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
             {stalenessEl}
 
             <div className="bg-green-50 rounded-xl p-4">
