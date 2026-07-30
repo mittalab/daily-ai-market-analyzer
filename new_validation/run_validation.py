@@ -516,6 +516,7 @@ def run_daily_validation(
     target_date: date,
     symbol: str | None = None,
     include_indexes: bool = True,
+    kite_validation_mandatory: bool = True,
 ) -> bool:
     """
     Validate symbols with pre-flight checks and (on full runs) FII/DII ingestion.
@@ -544,7 +545,8 @@ def run_daily_validation(
     if not kite_ok:
         logger.warning("Kite token check failed: %s", kite_msg)
         send_token_reminder()
-        return False
+        if kite_validation_mandatory:
+            return False
 
     logger.info("Kite token OK: %s", kite_msg)
 
@@ -558,7 +560,7 @@ def run_daily_validation(
     core_indices = ["INDIA_VIX", "NIFTY_50"] + list(other_indices)
 
     if symbol is None:
-        stocks_dict = get_stock_list_for_analysis(include_kite_trades=True)
+        stocks_dict = get_stock_list_for_analysis(include_kite_trades=kite_ok)
         # Get a unique, alphabetized list of stocks
         sorted_stocks = sorted(set(stocks_dict.keys()))
         universe = core_indices + sorted_stocks
@@ -636,7 +638,7 @@ def _ensure_file_logging() -> Path:
 
     return log_file
 
-def run_validation_now() -> bool:
+def run_validation_now(kite_validation_mandatory: bool = True) -> bool:
     """
     Determine the correct validation target date and run full validation.
 
@@ -664,7 +666,7 @@ def run_validation_now() -> bool:
         target_date,
         log_file,
     )
-    return run_daily_validation(target_date)
+    return run_daily_validation(target_date, kite_validation_mandatory=kite_validation_mandatory)
 
 
 def run_validation_now_for_symbol(symbol: str, include_indexes: bool = True,) -> bool:

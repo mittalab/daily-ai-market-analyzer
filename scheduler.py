@@ -1,13 +1,5 @@
 """
 APScheduler job definitions — all times in IST.
-
-Schedule:
-  06:00 daily        — Supabase keepalive
-  06:30 Mon-Fri      — Morning bhavcopy (equity + FO) for last trading day, no overwrite
-  07:00 daily        — Morning brief + Kite token check (loud if invalid)
-  09:00 Mon-Fri      — Kite token check (notify only if invalid, trading days only)
-  13:00 Mon-Fri      — Kite token check (notify only if invalid, trading days only)
-  16:00 Mon-Fri      — Full validation + Claude analysis pipeline
 """
 import logging
 from datetime import date, timedelta
@@ -50,7 +42,7 @@ def job_keepalive() -> None:
         logger.warning("Keepalive: Supabase ping failed")
 
 
-# ── Job 2: Morning bhavcopy ────────────────────────────────────────────────────
+# ── Job 2: Evening bhavcopy ────────────────────────────────────────────────────
 
 def job_evening_bhavcopy() -> None:
     """
@@ -63,43 +55,14 @@ def job_evening_bhavcopy() -> None:
       1. Validation started          (send_validation_start)
       2. Validation complete + fails (send_validation_complete)
     """
-    #today = date.today()
-    # if not is_trading_day(today):
-    #     logger.info("Morning bhavcopy skipped — %s is not a trading day", today)
-    #     return
 
     from new_data_ingestion.nse_bhavcopy import last_trading_day
     from new_notifications.telegram import send_validation_start, send_validation_complete
 
     target_date = last_trading_day()
-    logger.info("Morning bhavcopy: fetching equity + FO data for %s", target_date)
+    logger.info("Evening bhavcopy: fetching equity + FO data for %s", target_date)
 
     send_validation_start(str(target_date), label="F&O Universe")
-
-    # # Equity + indices bhavcopy — no_overwrite preserves yesterday's Kite data
-    # try:
-    #     from new_data_ingestion.ingestion_utils import ingest_today_bhavcopy
-    #     summary = ingest_today_bhavcopy(target_date, no_overwrite=True)
-    #     if summary["ok"]:
-    #         logger.info(
-    #             "Morning equity bhavcopy OK: equity=%d index=%d for %s",
-    #             summary["equity_rows"], summary["index_rows"], target_date,
-    #         )
-    #     else:
-    #         logger.warning("Morning equity bhavcopy partial errors: %s", summary.get("errors"))
-    # except Exception as exc:
-    #     logger.error("Morning equity bhavcopy failed: %s", exc)
-    #
-    # # FO bhavcopy (options + futures for all symbols) — overwrite is fine here
-    # try:
-    #      from new_data_ingestion.fo_bhavcopy import run_backfill as run_fo_backfill
-    #      fo_summary = run_fo_backfill([target_date])
-    #     if target_date in fo_summary.get("failed", []):
-    #         logger.warning("Morning FO bhavcopy failed for %s", target_date)
-    #     else:
-    #         logger.info("Morning FO bhavcopy OK for %s", target_date)
-    # except Exception as exc:
-    #     logger.error("Morning FO bhavcopy failed: %s", exc)
 
     # Post-ingestion validation: confirm all F&O stocks landed correctly
     try:
@@ -107,7 +70,7 @@ def job_evening_bhavcopy() -> None:
         passed, total, failed = run_fo_stocks_validation(target_date)
         send_validation_complete(str(target_date), passed, total, failed, label="F&O Universe")
     except Exception as exc:
-        logger.error("Morning FO stocks validation failed: %s", exc)
+        logger.error("Evening FO stocks validation failed: %s", exc)
         send_validation_complete(str(target_date), 0, 0, [f"ERROR: {str(exc)[:100]}"], label="F&O Universe")
 
 

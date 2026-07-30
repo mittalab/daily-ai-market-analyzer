@@ -70,7 +70,7 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None, 
     from database.queries import get_validation_state
     logger.info("Running pre-flight data validation and self-healing for all symbols...")
     try:
-        run_validation_now()
+        run_validation_now(kite_validation_mandatory=False)
     except Exception as exc:
         logger.error("Error during daily validation execution: %s", exc)
 

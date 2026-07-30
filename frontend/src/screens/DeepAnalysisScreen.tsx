@@ -335,6 +335,20 @@ function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () 
         </div>
       </div>
 
+      {/* Direction Flip Alert */}
+      {s.setup_delta_vs_previous?.direction_changed && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+          <p className="text-[10px] font-bold text-amber-700 uppercase mb-1">Direction Flip</p>
+          <p className="text-xs font-semibold text-amber-900">
+            {s.setup_delta_vs_previous.previous_direction} → {s.direction}
+            {s.setup_delta_vs_previous.score_delta != null && ` · Score Δ: ±${s.setup_delta_vs_previous.score_delta}`}
+          </p>
+          {s.setup_delta_vs_previous.justification && (
+            <p className="text-[10px] text-amber-700 mt-1">{s.setup_delta_vs_previous.justification}</p>
+          )}
+        </div>
+      )}
+
       {/* 3 — Instrument Recommendation (compact + expand) */}
       <div>
         {s.actionable_now === false ? (
@@ -371,14 +385,29 @@ function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () 
           </>
         )}
         {s.options_setup && (
-          <p className="text-[10px] text-gray-500 mt-1">
-            {s.options_setup.strike} {s.options_setup.option_type} · {s.options_setup.expiry} · {s.options_setup.days_to_expiry} DTE
-          </p>
+          <div className="mt-1 space-y-0.5">
+            <p className="text-[10px] text-gray-500">
+              {s.options_setup.strike} {s.options_setup.option_type} · {s.options_setup.expiry} · {s.options_setup.days_to_expiry} DTE
+            </p>
+            {s.options_setup.iv_used_for_trade != null && (
+              <p className="text-[10px] text-purple-600 font-medium">
+                IV (traded side): {s.options_setup.iv_used_for_trade}
+                {s.options_setup.atm_iv_skew != null && ` · Skew: ${s.options_setup.atm_iv_skew > 0 ? '+' : ''}${s.options_setup.atm_iv_skew}`}
+                {' · '}<span className="text-gray-400">{s.options_setup.iv_source_used}</span>
+              </p>
+            )}
+          </div>
         )}
         {!s.options_setup && s.fut_setup && (
-          <p className="text-[10px] text-gray-500 mt-1">
-            Futures · Lot: {s.fut_setup.lot_size ?? s.lot_size ?? '—'} · {s.fut_setup.lots ?? s.lots ?? '—'} lot(s)
-          </p>
+          <div className="mt-1 space-y-0.5">
+            <p className="text-[10px] text-gray-500">
+              Futures · {s.fut_setup.contract_selected === 'next_month' ? 'Next-Month' : 'Near-Month'}
+              {s.fut_setup.expiry ? ` · Expiry: ${s.fut_setup.expiry} (${s.fut_setup.days_to_expiry} DTE)` : ''}
+            </p>
+            {s.fut_setup.contract_selection_note && (
+              <p className="text-[10px] text-indigo-600">{s.fut_setup.contract_selection_note}</p>
+            )}
+          </div>
         )}
       </div>
 
@@ -489,6 +518,39 @@ function AnalysisView({ s }: { s: any }) {
             {s.hard_gate_triggered ? `TRIGGERED (${s.hard_gate_reason})` : 'PASSED'}
           </p>
         </div>
+        {/* OI Wall Check */}
+        {s.instrument_decision?.oi_wall_proximity_check && (
+          <div>
+            <p className="text-gray-400 mb-0.5 font-medium">OI Wall Check</p>
+            {(() => {
+              const wall = s.instrument_decision.oi_wall_proximity_check;
+              return (
+                <div>
+                  <p className={`font-semibold ${wall.pass ? 'text-green-600' : 'text-red-600'}`}>
+                    {wall.pass ? 'PASS' : 'FAIL'}
+                    {wall.nearest_obstructing_wall_strike != null && ` · Wall @ ${wall.nearest_obstructing_wall_strike}`}
+                  </p>
+                  {wall.wall_oi_vs_neighbors_ratio != null && (
+                    <p className="text-[10px] text-gray-400">Ratio: {wall.wall_oi_vs_neighbors_ratio}×</p>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+        {/* Direction Flip */}
+        {s.setup_delta_vs_previous?.direction_changed && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 col-span-1 md:col-span-2">
+            <p className="text-[9px] font-bold text-amber-700 uppercase mb-1">Direction Flip</p>
+            <p className="font-semibold text-amber-900">
+              {s.setup_delta_vs_previous.previous_direction} → {s.direction}
+              {s.setup_delta_vs_previous.score_delta != null && ` · Score Δ: ±${s.setup_delta_vs_previous.score_delta}`}
+            </p>
+            {s.setup_delta_vs_previous.justification && (
+              <p className="text-[10px] text-amber-700 mt-1">{s.setup_delta_vs_previous.justification}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2 — Spot Levels & Trade Parameters */}
@@ -549,9 +611,31 @@ function AnalysisView({ s }: { s: any }) {
               <span>Contract: <strong>{s.options_setup.strike} {s.options_setup.option_type}</strong></span>
               <span>Expiry: <strong>{s.options_setup.expiry}</strong> ({s.options_setup.days_to_expiry} DTE)</span>
             </div>
-            <div className="flex justify-between pt-1 border-t border-purple-100/50">
-              <span>IV Status: <strong>{s.options_setup.iv_note || 'N/A'}</strong></span>
+            {/* IV breakdown grid */}
+            <div className="grid grid-cols-4 gap-1 text-center mt-1.5 pt-1.5 border-t border-purple-100/50">
+              {([
+                ['ATM CE IV',  s.options_setup.atm_ce_iv      != null ? String(s.options_setup.atm_ce_iv) : '—'],
+                ['ATM PE IV',  s.options_setup.atm_pe_iv      != null ? String(s.options_setup.atm_pe_iv) : '—'],
+                ['IV Skew',    s.options_setup.atm_iv_skew    != null
+                  ? (s.options_setup.atm_iv_skew > 0 ? '+' : '') + s.options_setup.atm_iv_skew : '—'],
+                ['IV (Trade)', s.options_setup.iv_used_for_trade != null ? String(s.options_setup.iv_used_for_trade) : '—'],
+              ] as [string, string][]).map(([lbl, val]) => (
+                <div key={lbl}>
+                  <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
+                  <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
+                </div>
+              ))}
             </div>
+            <div className="flex justify-between pt-1.5 mt-1.5 border-t border-purple-100/50">
+              <span className="text-purple-400">IV Source:</span>
+              <span className="font-medium text-purple-800">{s.options_setup.iv_source_used || 'N/A'}</span>
+            </div>
+            {s.options_setup.iv_note && (
+              <div className="pt-1.5 mt-1.5 border-t border-purple-100/50">
+                <p className="text-purple-400 mb-0.5">IV Note:</p>
+                <p className="text-purple-800 leading-relaxed">{s.options_setup.iv_note}</p>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-4 gap-1.5 text-center">
             {([
@@ -577,8 +661,33 @@ function AnalysisView({ s }: { s: any }) {
             Futures Trade Setup
           </p>
           <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs mb-2.5">
+            {/* Contract selection */}
             <div className="flex justify-between mb-1.5">
-              <span>Contract Lot Size: <strong>{s.fut_setup.lot_size || s.lot_size || '—'}</strong></span>
+              <span>
+                Contract:{' '}
+                <strong>
+                  {s.fut_setup.contract_selected === 'next_month' ? 'Next-Month ↩' :
+                   s.fut_setup.contract_selected === 'near_month' ? 'Near-Month' : '—'}
+                </strong>
+              </span>
+              <span>
+                Expiry: <strong>{s.fut_setup.expiry || '—'}</strong>
+                {s.fut_setup.days_to_expiry != null && ` (${s.fut_setup.days_to_expiry} DTE)`}
+              </span>
+            </div>
+            {s.fut_setup.contract_selection_note && (
+              <div className="pt-1 border-t border-indigo-100/50 mb-1.5">
+                <span className="text-indigo-600 italic">{s.fut_setup.contract_selection_note}</span>
+              </div>
+            )}
+            {s.fut_setup.basis_note && (
+              <div className="pt-1 border-t border-indigo-100/50 mb-1.5">
+                <span className="text-indigo-400">Basis: </span>
+                <span className="font-medium text-indigo-800">{s.fut_setup.basis_note}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-1 border-t border-indigo-100/50">
+              <span>Lot Size: <strong>{s.fut_setup.lot_size || s.lot_size || '—'}</strong></span>
               <span>Sized Lots: <strong>{s.fut_setup.lots || s.lots || '—'} lot(s)</strong></span>
             </div>
             <div className="flex justify-between pt-1 border-t border-indigo-100/50">
@@ -651,6 +760,38 @@ function AnalysisView({ s }: { s: any }) {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Price/OI Regime Last 3 */}
+      {Array.isArray(s.price_oi_regime_last_3) && s.price_oi_regime_last_3.length > 0 && (
+        <div className="py-3">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Price / OI Regime (Last 3 Sessions)
+          </p>
+          <div className="space-y-1.5">
+            {s.price_oi_regime_last_3.map((r: any, i: number) => {
+              const regimeCls =
+                r.regime === 'LONG_BUILDUP'   ? 'bg-green-100 text-green-800' :
+                r.regime === 'SHORT_BUILDUP'  ? 'bg-red-100 text-red-800' :
+                r.regime === 'LONG_UNWINDING' ? 'bg-amber-100 text-amber-800' :
+                r.regime === 'SHORT_COVERING' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700';
+              return (
+                <div key={i} className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-400 font-mono text-[10px] w-20 shrink-0">{r.date}</span>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 ${regimeCls}`}>
+                    {(r.regime || '').replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-gray-500 text-[10px]">
+                    Δprice {r.price_change_pct != null ? `${r.price_change_pct > 0 ? '+' : ''}${r.price_change_pct}%` : '—'}
+                  </span>
+                  <span className="text-gray-400 text-[10px]">
+                    ΔOI {r.oi_change_pct != null ? `${r.oi_change_pct > 0 ? '+' : ''}${r.oi_change_pct}%` : '—'}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -801,18 +942,25 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
 
       {/* Toggle + Content */}
       {isExpanded && (
-        <>
-          {/* Chart panel — TRADE_READY expanded, WATCH minimised, others hidden */}
+        /* Unfolded Z Fold / tablet: chart left, analysis right. Mobile: stacked. */
+        <div className="sm:flex sm:flex-row sm:divide-x sm:divide-gray-100">
+
+          {/* Left column: chart (sm+: 50% width; mobile: full width above analysis) */}
           {(s.stage === 'TRADE_READY' || s.stage === 'WATCH') && (
-            <StockChartPanel
-              symbol={symbol ?? ''}
-              analysisData={s}
-              ohlcvData={s.ohlcv_data ?? []}
-              defaultMinimised={s.stage === 'WATCH'}
-            />
+            <div className="sm:w-1/2 sm:flex-shrink-0">
+              <StockChartPanel
+                symbol={symbol ?? ''}
+                analysisData={s}
+                ohlcvData={s.ohlcv_data ?? []}
+                defaultMinimised={s.stage === 'WATCH'}
+              />
+            </div>
           )}
 
-          <div className="overflow-y-auto max-h-[60vh]">
+          {/* Right column: analysis (sm+: 50% when chart present, else full width) */}
+          <div className={`overflow-y-auto max-h-[60vh] sm:max-h-[560px] ${
+            (s.stage === 'TRADE_READY' || s.stage === 'WATCH') ? 'sm:w-1/2' : 'w-full'
+          }`}>
             {/* View mode toggle — sticky within the scroll container */}
             <div className="sticky top-0 z-10 bg-white px-4 py-2 border-b border-gray-100 flex gap-2">
               {(['action', 'analysis'] as const).map(mode => (
@@ -834,7 +982,7 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
               ? <ActionView s={s} onSwitchToAnalysis={() => switchView('analysis')} />
               : <AnalysisView s={s} />}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -905,7 +1053,7 @@ function StageGroup({ stage, turns }: { stage: string; turns: DeepAnalysisTurn[]
       </button>
 
       {open && (
-        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="mt-2 grid grid-cols-1 gap-3">
           {turns.map(turn => (
             <StockCard key={turn.turn_number} turn={turn} />
           ))}
@@ -979,7 +1127,7 @@ export default function DeepAnalysisScreen({ refreshKey = 0 }: { refreshKey?: nu
         </p>
       </div>
 
-      <div className="px-4">
+      <div className="px-4 max-w-5xl mx-auto">
         {totalStocks > 0 ? (
           <>
             {STAGE_ORDER.map(stage =>

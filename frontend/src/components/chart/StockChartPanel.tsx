@@ -80,29 +80,9 @@ export default function StockChartPanel({
     ? `${currentPnlPct >= 0 ? '+' : ''}${currentPnlPct.toFixed(1)}%`
     : null;
 
-  // ── Minimised slim bar ──────────────────────────────────────────────────────
-  if (minimised) {
-    return (
-      <div className="flex items-center justify-between px-4 h-11 bg-gray-50 border-b border-gray-100 text-xs">
-        <div className="flex items-center gap-2 font-mono text-gray-600">
-          <span className="font-semibold text-gray-800">{tvSymbol}</span>
-          {spotPrice != null && (
-            <span className="text-gray-500">₹{Number(spotPrice).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
-          )}
-        </div>
-        <button
-          onClick={handleExpand}
-          className="text-[11px] text-blue-600 font-semibold flex items-center gap-1 hover:text-blue-800"
-        >
-          <span>⤢</span> Expand chart
-        </button>
-      </div>
-    );
-  }
-
-  // ── Expanded panel ──────────────────────────────────────────────────────────
-  return (
-    <div className="border-b border-gray-100">
+  // ── Expanded panel (always rendered on sm+; on mobile only when not minimised) ─
+  const expandedPanel = (
+    <div className={`border-b border-gray-100 ${minimised ? 'hidden sm:block' : ''}`}>
       {/* Mode toggle row */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
         <div className="flex gap-1">
@@ -116,7 +96,7 @@ export default function StockChartPanel({
                   : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-100'
               }`}
             >
-              {m === 'tradingview' ? '📈 TradingView ↗' : '🔍 Analysis'}
+              {m === 'tradingview' ? '📈 Live' : '🔍 Analysis'}
             </button>
           ))}
         </div>
@@ -131,8 +111,8 @@ export default function StockChartPanel({
         )}
       </div>
 
-      {/* Chart area */}
-      <div className="h-[420px] md:h-[500px] w-full relative">
+      {/* Chart area — sm:h-[500px] matches the split layout analysis panel max-h */}
+      <div className="h-[420px] sm:h-[500px] w-full relative">
         {mode === 'tradingview' ? (
           <TradingViewChart symbol={symbol} spotPrice={analysisData?.spot_price} />
         ) : (
@@ -145,10 +125,10 @@ export default function StockChartPanel({
         )}
       </div>
 
-      {/* Minimise button */}
+      {/* Minimise button — hidden on sm+ (split mode always shows chart) */}
       <button
         onClick={handleMinimise}
-        className="w-full flex items-center justify-center gap-1 py-2 bg-gray-50 border-t border-gray-100 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        className="sm:hidden w-full flex items-center justify-center gap-1 py-2 bg-gray-50 border-t border-gray-100 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
       >
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -156,5 +136,28 @@ export default function StockChartPanel({
         Minimise chart
       </button>
     </div>
+  );
+
+  return (
+    <>
+      {/* Slim bar — only on mobile when minimised */}
+      {minimised && (
+        <div className="sm:hidden flex items-center justify-between px-4 h-11 bg-gray-50 border-b border-gray-100 text-xs">
+          <div className="flex items-center gap-2 font-mono text-gray-600">
+            <span className="font-semibold text-gray-800">{tvSymbol}</span>
+            {spotPrice != null && (
+              <span className="text-gray-500">₹{Number(spotPrice).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+            )}
+          </div>
+          <button
+            onClick={handleExpand}
+            className="text-[11px] text-blue-600 font-semibold flex items-center gap-1 hover:text-blue-800"
+          >
+            <span>⤢</span> Expand chart
+          </button>
+        </div>
+      )}
+      {expandedPanel}
+    </>
   );
 }

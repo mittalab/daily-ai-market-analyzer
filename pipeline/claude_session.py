@@ -2568,7 +2568,7 @@ You must apply the 100-point Conviction Scoring Framework and enforce all operat
 - Sector Context:
 {sector_picture_text}
 
-[SECTION D: PRICE DATA]
+[SECTION D: STOCK PRICE DATA]
 - 180 Days OHLCV Time Series:
 {ohlcv_compact}
 - Volume Ratio (20d): {sec2["volume_ratio_20d"]}

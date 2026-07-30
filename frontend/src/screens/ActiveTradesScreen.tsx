@@ -337,19 +337,25 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
 
       {/* Expanded content */}
       {isExpanded && (
-        <>
-          {/* Chart panel — all active positions expanded by default */}
-          <StockChartPanel
-            symbol={symbol ?? ''}
-            analysisData={s}
-            ohlcvData={s.ohlcv_data ?? []}
-            defaultMinimised={false}
-            entryPrice={holding?.avg}
-            currentPnl={holding?.pnl}
-            currentPnlPct={holding != null ? (holding.ltp - holding.avg) / holding.avg * 100 : undefined}
-          />
+        /* Unfolded Z Fold / tablet: chart left, analysis right. Mobile: stacked. */
+        <div className="sm:flex sm:flex-row sm:divide-x sm:divide-gray-100">
 
-        <div className="px-4 py-3 divide-y divide-gray-100 overflow-y-auto max-h-[60vh]">
+          {/* Left column: chart */}
+          <div className="sm:w-1/2 sm:flex-shrink-0">
+            <StockChartPanel
+              symbol={symbol ?? ''}
+              analysisData={s}
+              ohlcvData={s.ohlcv_data ?? []}
+              defaultMinimised={false}
+              entryPrice={holding?.avg}
+              currentPnl={holding?.pnl}
+              currentPnlPct={holding != null ? (holding.ltp - holding.avg) / holding.avg * 100 : undefined}
+            />
+          </div>
+
+          {/* Right column: analysis */}
+          <div className="sm:w-1/2 overflow-y-auto max-h-[60vh] sm:max-h-[560px]">
+        <div className="px-4 py-3 divide-y divide-gray-100">
 
           {/* Zerodha Holdings / Positions status panel inside card */}
           {(holding || (positions && (Array.isArray(positions) ? positions.length > 0 : true))) && (
@@ -445,9 +451,31 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
                   <span>Contract: <strong>{s.options_setup.strike} {s.options_setup.option_type}</strong></span>
                   <span>Expiry: <strong>{s.options_setup.expiry}</strong> ({s.options_setup.days_to_expiry} DTE)</span>
                 </div>
-                <div className="flex justify-between pt-1 border-t border-purple-100/50">
-                  <span>IV Status: <strong>{s.options_setup.iv_note || 'N/A'}</strong></span>
+                {/* IV breakdown grid */}
+                <div className="grid grid-cols-4 gap-1 text-center mt-1.5 pt-1.5 border-t border-purple-100/50">
+                  {([
+                    ['ATM CE IV',  s.options_setup.atm_ce_iv       != null ? String(s.options_setup.atm_ce_iv) : '—'],
+                    ['ATM PE IV',  s.options_setup.atm_pe_iv       != null ? String(s.options_setup.atm_pe_iv) : '—'],
+                    ['IV Skew',    s.options_setup.atm_iv_skew     != null
+                      ? (s.options_setup.atm_iv_skew > 0 ? '+' : '') + s.options_setup.atm_iv_skew : '—'],
+                    ['IV (Trade)', s.options_setup.iv_used_for_trade != null ? String(s.options_setup.iv_used_for_trade) : '—'],
+                  ] as [string, string][]).map(([lbl, val]) => (
+                    <div key={lbl}>
+                      <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
+                      <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
+                    </div>
+                  ))}
                 </div>
+                <div className="flex justify-between pt-1.5 mt-1.5 border-t border-purple-100/50">
+                  <span className="text-purple-400">IV Source:</span>
+                  <span className="font-medium text-purple-800">{s.options_setup.iv_source_used || 'N/A'}</span>
+                </div>
+                {s.options_setup.iv_note && (
+                  <div className="pt-1.5 mt-1.5 border-t border-purple-100/50">
+                    <p className="text-purple-400 mb-0.5">IV Note:</p>
+                    <p className="text-purple-800 leading-relaxed">{s.options_setup.iv_note}</p>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-4 gap-1.5 text-center">
                 {[
@@ -470,8 +498,33 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
             <div className="py-3">
               <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Futures Trade Setup</p>
               <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs mb-2.5">
+                {/* Contract selection */}
                 <div className="flex justify-between mb-1.5">
-                  <span>Contract Lot Size: <strong>{s.fut_setup.lot_size || s.lot_size || '—'}</strong></span>
+                  <span>
+                    Contract:{' '}
+                    <strong>
+                      {s.fut_setup.contract_selected === 'next_month' ? 'Next-Month ↩' :
+                       s.fut_setup.contract_selected === 'near_month' ? 'Near-Month' : '—'}
+                    </strong>
+                  </span>
+                  <span>
+                    Expiry: <strong>{s.fut_setup.expiry || '—'}</strong>
+                    {s.fut_setup.days_to_expiry != null && ` (${s.fut_setup.days_to_expiry} DTE)`}
+                  </span>
+                </div>
+                {s.fut_setup.contract_selection_note && (
+                  <div className="pt-1 border-t border-indigo-100/50 mb-1.5">
+                    <span className="text-indigo-600 italic">{s.fut_setup.contract_selection_note}</span>
+                  </div>
+                )}
+                {s.fut_setup.basis_note && (
+                  <div className="pt-1 border-t border-indigo-100/50 mb-1.5">
+                    <span className="text-indigo-400">Basis: </span>
+                    <span className="font-medium text-indigo-800">{s.fut_setup.basis_note}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-1 border-t border-indigo-100/50">
+                  <span>Lot Size: <strong>{s.fut_setup.lot_size || s.lot_size || '—'}</strong></span>
                   <span>Sized Lots: <strong>{s.fut_setup.lots || s.lots || '—'} lot(s)</strong></span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-indigo-100/50">
@@ -597,7 +650,8 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
           )}
 
         </div>
-        </>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -680,7 +734,7 @@ function StageGroup({
 
       {/* Stock cards */}
       {open && (
-        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="mt-2 grid grid-cols-1 gap-3">
           {turns.map(turn => {
             const sym = turn.symbol || '';
             return (
