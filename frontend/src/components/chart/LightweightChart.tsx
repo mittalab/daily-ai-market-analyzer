@@ -60,7 +60,7 @@ export default function LightweightChart({
         mouseWheel: true,
         pressedMouseMove: true,
         horzTouchDrag: true,
-        vertTouchDrag: false,
+        vertTouchDrag: true,   // allows dragging the price axis to zoom vertically on touch
       },
       handleScale: {
         mouseWheel: true,
@@ -110,22 +110,27 @@ export default function LightweightChart({
     const ema50Val  = lastValid(ema50Arr);
     const ema200Val = lastValid(ema200Arr);
 
-    if (ema20Val  != null) candleSeries.createPriceLine({ price: ema20Val,  color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'EMA20' });
-    if (ema50Val  != null) candleSeries.createPriceLine({ price: ema50Val,  color: '#FF9800', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'EMA50' });
-    if (ema200Val != null) candleSeries.createPriceLine({ price: ema200Val, color: '#9C27B0', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'EMA200' });
+    // EMAs — LargeDashed so they're visually distinct from trade-level lines
+    if (ema20Val  != null) candleSeries.createPriceLine({ price: ema20Val,  color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA20' });
+    if (ema50Val  != null) candleSeries.createPriceLine({ price: ema50Val,  color: '#FF9800', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA50' });
+    if (ema200Val != null) candleSeries.createPriceLine({ price: ema200Val, color: '#9C27B0', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA200' });
 
-    // Analysis level lines
+    // Trade level lines — solid/dashed with distinct colors, thicker than EMAs
     const sl  = analysisData?.key_levels?.stop_loss;
     const el  = analysisData?.trade_parameters?.entry_low;
     const eh  = analysisData?.trade_parameters?.entry_high;
     const t1  = analysisData?.trade_parameters?.target_1;
     const t2  = analysisData?.trade_parameters?.target_2;
 
-    if (sl  != null) candleSeries.createPriceLine({ price: sl,  color: '#F44336', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'SL' });
-    if (el  != null) candleSeries.createPriceLine({ price: el,  color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'Entry Low' });
-    if (eh  != null) candleSeries.createPriceLine({ price: eh,  color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'Entry High' });
-    if (t1  != null) candleSeries.createPriceLine({ price: t1,  color: '#4CAF50', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'T1' });
-    if (t2  != null) candleSeries.createPriceLine({ price: t2,  color: '#4CAF50', lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'T2' });
+    // SL: red solid — most critical, most prominent
+    if (sl  != null) candleSeries.createPriceLine({ price: sl,  color: '#EF5350', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'SL' });
+    // Entry zone: cyan/teal — clearly different from EMA20 blue
+    if (el  != null) candleSeries.createPriceLine({ price: el,  color: '#00ACC1', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'Entry Low' });
+    if (eh  != null) candleSeries.createPriceLine({ price: eh,  color: '#00ACC1', lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'Entry High' });
+    // T1: light green dashed; T2: dark green solid — solid makes T2 the definitive target
+    if (t1  != null) candleSeries.createPriceLine({ price: t1,  color: '#66BB6A', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'T1' });
+    if (t2  != null) candleSeries.createPriceLine({ price: t2,  color: '#2E7D32', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'T2' });
+    // Active entry (Active tab): dark blue solid
     if (entryPrice != null) candleSeries.createPriceLine({ price: entryPrice, color: '#1565C0', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'Your Entry' });
 
     // ── Volume chart ────────────────────────────────────────────────────────────
@@ -284,13 +289,16 @@ export default function LightweightChart({
       {/* Legend overlay */}
       {showLegend && (
         <div className="absolute top-7 left-1 z-20 bg-white/90 border border-gray-100 rounded shadow-sm p-2 text-[9px] space-y-1 pointer-events-none">
-          <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-dashed border-blue-500 inline-block" />EMA20</div>
-          <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-dashed border-orange-500 inline-block" />EMA50</div>
-          <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-dashed border-purple-500 inline-block" />EMA200</div>
-          {sl != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-red-500 inline-block" />SL</div>}
-          {t1 != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-dashed border-green-500 inline-block" />T1</div>}
-          {t2 != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-dashed border-green-600 inline-block" />T2</div>}
-          {entryPrice != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-blue-800 inline-block" />Your Entry</div>}
+          {/* EMAs — LargeDashed, thinner */}
+          <div className="flex items-center gap-1"><span className="w-5 border-b border-dashed" style={{ borderColor: '#2196F3' }} />EMA20</div>
+          <div className="flex items-center gap-1"><span className="w-5 border-b border-dashed" style={{ borderColor: '#FF9800' }} />EMA50</div>
+          <div className="flex items-center gap-1"><span className="w-5 border-b border-dashed" style={{ borderColor: '#9C27B0' }} />EMA200</div>
+          {/* Trade levels — distinct colors */}
+          {sl != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2" style={{ borderColor: '#EF5350' }} />SL</div>}
+          <div className="flex items-center gap-1"><span className="w-5 border-b-2 border-dashed" style={{ borderColor: '#00ACC1' }} />Entry</div>
+          {t1 != null && <div className="flex items-center gap-1"><span className="w-5 border-b border-dashed" style={{ borderColor: '#66BB6A' }} />T1</div>}
+          {t2 != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2" style={{ borderColor: '#2E7D32' }} />T2</div>}
+          {entryPrice != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2" style={{ borderColor: '#1565C0' }} />Your Entry</div>}
         </div>
       )}
 
