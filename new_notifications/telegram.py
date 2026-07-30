@@ -556,6 +556,16 @@ def send_deep_analysis_complete(
     return send_silent(text)
 
 
+def send_kite_fo_fetch_failed(error: str, fallback_count: int, trade_date: str) -> int | None:
+    text = (
+        f"⚠️ <b>Kite F&amp;O Stock Fetch Failed — {trade_date}</b>\n"
+        f"Could not fetch F&amp;O instruments from Kite API.\n"
+        f"<b>Error:</b> <code>{error}</code>\n"
+        f"Falling back to cached list ({fallback_count} symbols from config/fo_stocks_fallback.json)."
+    )
+    return send_loud(text)
+
+
 def send_fii_dii_data_missing(target_date: str, found_date: str) -> int | None:
     text = (
         f"❌ <b>FII/DII Data Missing — {target_date}</b>\n"

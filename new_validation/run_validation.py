@@ -701,6 +701,15 @@ _FO_VALIDATION_MAX_RETRIES = 3
 _FO_VALIDATION_RETRY_DELAY = 10  # seconds between retries
 
 
+_FO_STOCKS_FALLBACK_PATH = Path(__file__).parent.parent / "config" / "fo_stocks_fallback.json"
+
+
+def _load_fo_stocks_fallback() -> list[str]:
+    """Load the saved F&O stock list from config/fo_stocks_fallback.json."""
+    data = json.loads(_FO_STOCKS_FALLBACK_PATH.read_text(encoding="utf-8"))
+    return data.get("symbols", [])
+
+
 def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
     """
     Validate all Kite F&O stocks for target_date (OHLCV + futures + options).
@@ -714,18 +723,40 @@ def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
     fii_dii_insertion_validation(target_date)
 
     from new_utils.stock_list import fetch_kite_fo_stocks
+    from new_notifications.telegram import send_kite_fo_fetch_failed
 
     holidays = get_holiday_dates()
     other_indices = get_other_indices()
 
+    kite_error: str | None = None
+    symbols: list[str] = []
     try:
         symbols = fetch_kite_fo_stocks()
+        if not symbols:
+            kite_error = "fetch_kite_fo_stocks returned an empty list"
+            logger.warning("run_fo_stocks_validation: Kite returned no F&O stocks")
     except Exception as exc:
-        logger.error("run_fo_stocks_validation: failed to fetch F&O stocks: %s", exc)
-        return 0, 0, []
+        kite_error = str(exc)
+        logger.error("run_fo_stocks_validation: Kite fetch failed: %s", exc)
+
+    if kite_error:
+        try:
+            symbols = _load_fo_stocks_fallback()
+            logger.warning(
+                "run_fo_stocks_validation: using fallback list (%d symbols from %s)",
+                len(symbols), _FO_STOCKS_FALLBACK_PATH.name,
+            )
+            send_kite_fo_fetch_failed(
+                error=kite_error,
+                fallback_count=len(symbols),
+                trade_date=str(target_date),
+            )
+        except Exception as fallback_exc:
+            logger.error("run_fo_stocks_validation: fallback also failed: %s", fallback_exc)
+            return 0, 0, []
 
     if not symbols:
-        logger.warning("run_fo_stocks_validation: no F&O stocks returned")
+        logger.error("run_fo_stocks_validation: no symbols available even from fallback")
         return 0, 0, []
 
     passed_count = 0
