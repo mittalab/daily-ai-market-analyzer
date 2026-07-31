@@ -2591,34 +2591,308 @@ You must apply the 100-point Conviction Scoring Framework and enforce all operat
 {options_text}
 
 [SECTION F: SCORING INSTRUCTIONS]
-Evaluate the stock setup across 4 dimensions (100 Points Total) using the following rubrics:
+═══════════════════════════════════════════════════
+DIMENSION SCORING — MANDATORY CALCULATION FORMAT
+═══════════════════════════════════════════════════
 
-1. Dimension 1: Price Structure (55 pts)
-   - S/R Zones (15 pts): EMA dynamic support + horizontal swing levels confluence. 14-15 = major confluence, 10-13 = clear S/R from 2 sources, 6-9 = single level, 2-5 = weak, 0-1 = no basis.
-   - Chart Patterns (13 pts): Completion, textbook shape, mechanical target. 12-13 = complete/clean, 8-11 = clear but imperfect, 4-7 = forming, 1-3 = ambiguous, 0 = none.
-   - Buyer/Seller Analysis (12 pts): Body vs range, close position, last 5 candles control. 11-12 = clear control, 7-10 = biased, 4-6 = contested, 1-3 = opposing building, 0 = absorption.
-   - Candlestick Patterns (8 pts): Named candlestick patterns at key levels. 7-8 = high significance, 5-6 = medium, 3-4 = low, 1-2 = conflicting, 0 = none.
-   - RSI + MACD (4 pts): RSI divergence (only divergence, not overbought/oversold) and MACD momentum direction.
-   - Volume (3 pts): Volume ratio and trend confirming the price movement.
+For EVERY dimension, you MUST write an
+explicit labelled score calculation block
+at the END of that dimension's narrative,
+BEFORE writing the scoring_breakdown JSON.
 
-2. Dimension 2: Risk/Reward (25 pts)
-   - Stop Loss Quality (10 pts): Invalidation logic clarity and ATR check (sweet spot 0.75x-1.5x ATR). 0 = no structural SL (triggers REJECT).
-   - Target Logic (8 pts): Targets T1/T2 at structural S/R. T2 must yield >= 1:1.5 R:R. 0 = R:R < 1:1.5 (triggers REJECT).
-   - Entry Zone Quality (5 pts): Zone confluence and tightness (< 1% width).
-   - R:R Ratio Score (2 pts): >= 2.5 R:R = 2 pts, >= 2.0 = 1.5 pts, >= 1.5 = 1 pt, < 1.5 = 0 pts (triggers REJECT).
+The number written in scoring_breakdown
+for each dimension MUST exactly match the
+SUM written in that dimension's calculation
+block. If they differ, recompute before
+writing the JSON output.
 
-3. Dimension 3: Market + Sector Context (15 pts)
-   - Index Context (8 pts): Mapped from Nifty bias (Supportive = 7-8 pts, Neutral = 4-5 pts, Resistant = 1-2 pts).
-   - Sector Context (7 pts): Tailwind Strong = 6-7 pts, Tailwind Moderate = 4-5 pts, Neutral = 3 pts, Headwind = 0-2 pts. Adjust for Relative Strength: +1 pt if stock outperforms sector return by 2%+, -1 pt if it underperforms by 2%+.
+These calculation blocks are not optional
+commentary — they are mandatory arithmetic
+anchors that prevent score drift between
+your analysis and your JSON output.
 
-4. Dimension 4: Stock F&O Context (5 pts)
-   - Futures Basis (2 pts): Positive carry = 2 pts, negative carry = 0-1 pts.
-   - PCR Context (2 pts): Contrarian extreme PCR checks. OI-WALL DEDUCTION: If oi_wall_proximity_check.pass == false, deduct 1 point from this sub-score (minimum 0, does not cascade to other dimensions). Show the math explicitly in dimension_4_narrative (e.g., "PCR Context: 2 pts − 1 pt OI wall deduction = 1 pt").
-   - Rollover + DTE (1 pt): DTE < 6 trading days triggers options REJECT.
+───────────────────────────────────────────
+DIMENSION 1: PRICE STRUCTURE (max 55 pts)
+───────────────────────────────────────────
 
-SCORING CALCULATIONS:
-Calculate raw_total_score = Sum of Dimension 1 + 2 + 3 + 4.
-Calculate adjusted_score = raw_total_score * conviction_multiplier (from Turn 1, currently {sec7["conviction_multiplier"]}).
+Sub-components are scored independently.
+No deductions or adjustments exist.
+Each sub-score is bounded by its maximum.
+
+  S/R Zones (15 pts): EMA dynamic support + horizontal swing levels confluence.
+    14-15 = major confluence, 10-13 = clear S/R from 2 sources,
+    6-9 = single level, 2-5 = weak, 0-1 = no basis.
+  Chart Patterns (13 pts): Completion, textbook shape, mechanical target.
+    12-13 = complete/clean, 8-11 = clear but imperfect,
+    4-7 = forming, 1-3 = ambiguous, 0 = none.
+  Buyer/Seller Analysis (12 pts): Body vs range, close position, last 5 candles control.
+    11-12 = clear control, 7-10 = biased, 4-6 = contested,
+    1-3 = opposing building, 0 = absorption.
+  Candlestick Patterns (8 pts): Named candlestick patterns at key levels.
+    7-8 = high significance, 5-6 = medium, 3-4 = low,
+    1-2 = conflicting, 0 = none.
+  RSI + MACD (4 pts): RSI divergence (only divergence, not overbought/oversold)
+    and MACD momentum direction.
+  Volume (3 pts): Volume ratio and trend confirming the price movement.
+
+At the END of dimension_1_narrative,
+write this block exactly:
+
+  "DIMENSION 1 FINAL SCORE:
+   S/R Zones:           __/15
+   Chart Patterns:      __/13
+   Buyer/Seller:        __/12
+   Candlestick:         __/8
+   RSI + MACD:          __/4
+   Volume:              __/3
+   ─────────────────────────
+   SUM:                 __/55
+   Verify each sub-score ≤ its max ✓
+   Verify SUM = sum of above six ✓"
+
+Constraints:
+  Each sub-score must be ≤ its maximum.
+  SUM must equal the arithmetic total of
+  all six sub-scores.
+  SUM must be ≤ 55.
+  No sub-score can be negative.
+
+───────────────────────────────────────────
+DIMENSION 2: RISK/REWARD (max 25 pts)
+───────────────────────────────────────────
+
+  Stop Loss Quality (10 pts): Invalidation logic clarity and ATR check
+    (sweet spot 0.75x-1.5x ATR). 0 = no structural SL (triggers REJECT).
+  Target Logic (8 pts): Targets T1/T2 at structural S/R.
+    T2 must yield >= 1:1.5 R:R. 0 = R:R < 1:1.5 (triggers REJECT).
+  Entry Zone Quality (5 pts): Zone confluence and tightness (< 1% width).
+  R:R Ratio Score (2 pts): >= 2.5 R:R = 2 pts, >= 2.0 = 1.5 pts,
+    >= 1.5 = 1 pt, < 1.5 = 0 pts (triggers REJECT).
+
+FORCED ZERO RULE — MANDATORY:
+  If Gate 2 fires (rr_t2 < 1.5),
+  the following sub-scores are
+  automatically forced to zero
+  regardless of qualitative assessment:
+    Target Logic:    0/8  (forced)
+    R:R Ratio Score: 0/2  (forced)
+
+  No partial credit on these two
+  sub-components when Gate 2 fires.
+  Stop Loss Quality and Entry Zone Quality
+  are still scored normally.
+
+  This is not a deduction — these
+  sub-components are zeroed because
+  the R:R failure makes targets invalid.
+
+At the END of dimension_2_narrative,
+write this block exactly:
+
+  "DIMENSION 2 FINAL SCORE:
+   Stop Loss Quality:   __/10
+   Target Logic:        __/8  [0 if Gate 2 fires]
+   Entry Zone Quality:  __/5
+   R:R Ratio Score:     __/2  [0 if Gate 2 fires]
+   ─────────────────────────
+   SUM:                 __/25
+   Gate 2 status:       FIRED / NOT FIRED
+   Verify each sub-score ≤ its max ✓
+   Verify SUM = sum of above four ✓"
+
+Constraints:
+  If Gate 2 fires:
+    Target Logic = 0 (not 1, not 2, not 4 — zero)
+    R:R Ratio Score = 0
+    SUM can only be SL_score + EZQ_score (max 15)
+  If Gate 2 does not fire:
+    All sub-scores scored normally
+    SUM must be ≤ 25
+  No sub-score can be negative.
+
+───────────────────────────────────────────
+DIMENSION 3: MARKET + SECTOR (max 15 pts)
+───────────────────────────────────────────
+
+  Index Context (8 pts): Mapped from Nifty bias
+    (Supportive = 7-8 pts, Neutral = 4-5 pts, Resistant = 1-2 pts).
+  Sector Context (7 pts): Tailwind Strong = 6-7 pts,
+    Tailwind Moderate = 4-5 pts, Neutral = 3 pts, Headwind = 0-2 pts.
+
+RELATIVE STRENGTH ADJUSTMENT — MANDATORY:
+  The Sector Context sub-score has an
+  explicit adjustment rule:
+
+  Step 1: Determine base sector score
+    Tailwind Strong:    6-7 pts base
+    Tailwind Moderate:  4-5 pts base
+    Neutral:            3 pts base
+    Headwind Moderate:  1-2 pts base
+    Headwind Strong:    0 pts base
+
+  Step 2: Compute relative strength
+    Compare stock's 20-day return
+    against sector's 20-day return
+
+    If stock outperforms sector by ≥ 2%:
+      adjustment = +1
+    If stock underperforms sector by ≥ 2%:
+      adjustment = −1
+    If difference is within 2%:
+      adjustment = 0
+
+  Step 3: Apply adjustment
+    sector_context_adjusted =
+      base_sector_score + adjustment
+
+    Floor at 0 (cannot go below 0)
+    Cap at 7 (cannot exceed sub-max)
+
+    Show the arithmetic explicitly:
+    e.g. "Base: 6 pts + adj: −1 = 5 pts"
+         "Base: 4 pts + adj: +1 = 5 pts"
+         "Base: 7 pts + adj: +1 = 7 pts (cap)"
+
+At the END of dimension_3_narrative,
+write this block exactly:
+
+  "DIMENSION 3 FINAL SCORE:
+   Index Context:            __/8
+   Sector Context base:      __/7
+   Relative strength adj:    +1 / −1 / 0
+   Sector Context adjusted:  __/7
+     (= base + adj, min 0, max 7)
+   ─────────────────────────────────
+   SUM:                      __/15
+     (= Index Context + Sector Context adjusted)
+   Verify Index Context ≤ 8 ✓
+   Verify Sector Context adjusted ≤ 7 ✓
+   Verify SUM = Index + Sector adjusted ✓"
+
+Constraints:
+  Index Context: 0-8, no adjustment
+  Sector Context adjusted: 0-7
+  SUM = Index Context + Sector Context adjusted
+  SUM must be ≤ 15
+  Do NOT add the adjustment separately —
+  it is already folded into
+  Sector Context adjusted
+
+COMMON ERROR TO AVOID:
+  ❌ SUM = Index (8) + base (6) + adj (−1)
+     = 8 + 6 + (−1) = 13
+     WRONG — adj is applied TO base, not added separately
+
+  ✅ SUM = Index (8) + adjusted (6−1=5) = 13
+     CORRECT
+
+───────────────────────────────────────────
+DIMENSION 4: STOCK F&O (max 5 pts)
+───────────────────────────────────────────
+
+  Futures Basis (2 pts): Positive carry = 2 pts, negative carry = 0-1 pts.
+  PCR Context (2 pts): Contrarian extreme PCR checks.
+  Rollover + DTE (1 pt): DTE < 6 trading days triggers options REJECT.
+
+OI WALL DEDUCTION — MANDATORY:
+  If oi_wall_proximity_check.pass == false:
+    PCR Context score is reduced by 1 pt
+    Minimum PCR Context score after
+    deduction = 0 (cannot go negative)
+
+    Show explicitly in narrative:
+    "PCR Context: X pts − 1 pt (OI wall
+     deduction) = Y pts"
+
+    Use Y (the adjusted value) in the
+    final sum — not X (the base value)
+    and NOT X + Y (both values)
+
+At the END of dimension_4_narrative,
+write this block exactly:
+
+  "DIMENSION 4 FINAL SCORE:
+   Futures Basis:              __/2
+   PCR Context base:           __/2
+   OI wall deduction:          −1 / 0
+     (−1 if wall check fails, 0 if passes)
+   PCR Context adjusted:       __/2
+     (= base − deduction, min 0)
+   Rollover + DTE:             __/1
+   ─────────────────────────────────────
+   SUM:                        __/5
+     (= Basis + PCR adjusted + DTE)
+   Verify Basis ≤ 2 ✓
+   Verify PCR adjusted ≤ 2 ✓
+   Verify DTE ≤ 1 ✓
+   Verify SUM = Basis + PCR adjusted + DTE ✓
+   Verify SUM ≤ 5 ✓"
+
+Constraints:
+  Futures Basis: 0-2
+  PCR Context base: 0-2
+  PCR Context adjusted: 0-2 (after deduction)
+  Rollover + DTE: 0-1
+  SUM = Basis + PCR_adjusted + DTE
+  SUM must be ≤ 5
+
+COMMON ERROR TO AVOID:
+  ❌ SUM = Basis(2) + PCR_base(2)
+           + deduction(−1) + DTE(1) = 4
+     WRONG — deduction is applied TO PCR,
+     not added as a separate term
+
+  ❌ SUM = Basis(2) + PCR_base(2)
+           + PCR_adjusted(1) + DTE(1) = 6
+     WRONG — do not add both base and adjusted
+
+  ✅ SUM = Basis(2) + PCR_adjusted(1) + DTE(1) = 4
+     CORRECT
+
+───────────────────────────────────────────
+SCORING_BREAKDOWN COMPUTATION
+───────────────────────────────────────────
+
+After completing all four dimension
+calculation blocks, compute:
+
+  raw_total_score =
+    dimension_1 SUM
+    + dimension_2 SUM
+    + dimension_3 SUM
+    + dimension_4 SUM
+
+  adjusted_score =
+    raw_total_score × conviction_multiplier
+    (currently {sec7["conviction_multiplier"]})
+
+Write this final block at the end of
+ALL dimension narratives, immediately
+before the JSON output:
+
+  "FINAL SCORE SUMMARY:
+   Dimension 1: __/55
+   Dimension 2: __/25
+   Dimension 3: __/15
+   Dimension 4: __/5
+   ──────────────────
+   Raw Total:   __/100
+   Multiplier:  __
+   Adjusted:    __ (= raw × multiplier)
+
+   Stage determination:
+   adjusted ≥ 72 → TRADE_READY
+   adjusted 52-71 → WATCH
+   adjusted 35-51 → ON_RADAR
+   adjusted < 35  → REJECT (score-based)
+   Any hard gate  → REJECT (gate-based)
+
+   Stage: ___________"
+
+The values in scoring_breakdown JSON MUST
+exactly match this final summary block.
+If any value differs, recompute before
+writing the JSON.
 
 Apply thresholds on adjusted_score to set the initial stage:
 - TRADE_READY : adjusted_score >= 72
@@ -2626,12 +2900,270 @@ Apply thresholds on adjusted_score to set the initial stage:
 - ON_RADAR    : adjusted_score 35-51
 - REJECT      : adjusted_score < 35 OR any hard gate triggered
 
-[HARD GATES]
-Enforce operational hard gates. GATES 1, 2, and 4 force stage to REJECT immediately (bypassing the score) and set hard_gate_triggered = true. GATE 3 is instrument-scoped only and NEVER sets hard_gate_triggered or changes stage:
-- GATE 1: No structural SL identified → stage = REJECT, hard_gate_triggered = true
-- GATE 2: R:R < 1:1.5 at Target 2 → stage = REJECT, hard_gate_triggered = true
-- GATE 3: DTE < 6 trading days → OPTIONS instrument path REJECTED; null out options_setup fields; set theta_cost_check and liquidity_check to null with note "N/A — Gate 3 (DTE < 6)". GATE 3 does NOT set hard_gate_triggered = true and does NOT force stage = REJECT. GATE 3 firing is fully compatible with any stage (TRADE_READY / WATCH / ON_RADAR) as long as GATES 1, 2, 4 and the adjusted_score threshold are clear. Futures instrument path is still evaluated normally.
-- GATE 4: Price chart directly contradicts Turn 2 direction hypothesis and no alternative valid direction is found → stage = REJECT, hard_gate_triggered = true
+───────────────────────────────────────────
+GENERAL ARITHMETIC RULES FOR ALL DIMENSIONS
+───────────────────────────────────────────
+
+1. USE ADJUSTED VALUES IN SUMS
+   When a deduction or adjustment exists,
+   use the POST-adjustment value in the sum.
+   Never add both the base and adjusted value.
+   Never add the deduction as a separate term.
+
+2. NO NEGATIVE SCORES
+   No sub-score can be negative.
+   No dimension total can be negative.
+   Floor all values at 0.
+
+3. NO SCORES EXCEEDING MAXIMUMS
+   If any sub-score would exceed its maximum,
+   cap it at the maximum.
+   If dimension SUM would exceed its maximum,
+   something is wrong — recheck sub-scores.
+
+4. ONE SOURCE OF TRUTH
+   The calculation block in the narrative
+   is the source of truth.
+   The scoring_breakdown JSON copies from it.
+   They must match exactly.
+   If they differ, the narrative block wins —
+   correct the JSON to match the narrative.
+
+5. INTEGER SCORES ONLY
+   All sub-scores and dimension totals
+   must be integers.
+   Adjusted score may be a decimal when
+   conviction_multiplier is not 1.0
+   (e.g. 78 × 0.97 = 75.66).
+
+═══════════════════════════════════════════════════
+[HARD GATES] — UNCONDITIONAL ENFORCEMENT
+═══════════════════════════════════════════════════
+
+Hard gates are binary and unconditional.
+When a gate condition is met, you MUST
+immediately set stage = REJECT and
+hard_gate_triggered = true.
+
+There are NO exceptions.
+There is NO reasoning around a gate.
+"The setup has merit" is NOT a valid
+reason to bypass a gate.
+"The gate is technically triggered but..."
+is a forbidden construction — if it is
+triggered, it is triggered, full stop.
+
+GATE 1: No structural SL identified
+  Condition: You cannot identify a clear
+    structural price level that, if broken,
+    definitively invalidates the trade thesis.
+    An arbitrary percentage or ATR-based SL
+    with no structural anchor does NOT pass.
+  Action:
+    stage = "REJECT"
+    hard_gate_triggered = true
+    hard_gate_reason = "GATE 1 — No structural SL identified"
+    rejection_reason = "No structural stop loss level identifiable from price data"
+  Then: Stop all further scoring.
+    Set all scoring_breakdown scores to
+    whatever you computed but mark stage REJECT.
+    Skip instrument_decision block entirely
+    (use hard gate short-circuit in that block).
+
+GATE 2: R:R < 1:1.5 at Target 2
+  Condition: The ratio (target_2 - entry_mid)
+    / (entry_mid - stop_loss) is less than 1.5,
+    calculated using YOUR OWN target_2,
+    entry_mid, and stop_loss values from the
+    trade_parameters and key_levels fields.
+
+  SELF-CHECK BEFORE FINALISING:
+    Compute this ratio explicitly:
+      rr_t2 = (target_2 - entry_mid) /
+               (entry_mid - stop_loss)
+    If rr_t2 < 1.5 → GATE 2 fires.
+    There is no entry adjustment that fixes
+    this retroactively. If your chosen entry,
+    SL, and T2 produce rr_t2 < 1.5,
+    GATE 2 fires for this setup tonight.
+    Do NOT re-derive a different entry_mid
+    or SL after the fact to try to pass
+    the gate — use the values you committed
+    to in key_levels and trade_parameters.
+
+  Action:
+    stage = "REJECT"
+    hard_gate_triggered = true
+    hard_gate_reason = "GATE 2 — RR at Target 2 = {rr_t2:.2f} < 1.5 minimum"
+    rejection_reason = "RR {rr_t2:.2f} at T2 below 1.5 minimum threshold"
+    rr_t2 field = the actual computed value (e.g. 1.02, not null)
+  Then: Stop all further scoring.
+    Complete scoring_breakdown with what
+    you scored before hitting the gate.
+    Skip instrument_decision block entirely
+    (use hard gate short-circuit).
+
+  COMMON GATE 2 MISTAKES TO AVOID:
+    ❌ "Gate 2 is technically triggered but
+        the setup has strong momentum"
+    ❌ "Applying the gate strictly while noting
+        the setup has merit from a structural
+        standpoint"
+    ❌ Re-computing entry_mid to a lower value
+       after finding rr_t2 < 1.5 in order to
+       pass the gate
+    ❌ Setting stage = WATCH when rr_t2 < 1.5
+    ❌ Setting hard_gate_triggered = false when
+       rr_t2 < 1.5
+    ✅ stage = REJECT, hard_gate_triggered = true,
+       full stop, no additional commentary
+       about setup merit
+
+GATE 3: DTE < 6 trading days
+  Scope: OPTIONS INSTRUMENT PATH ONLY.
+
+  GATE 3 DOES NOT:
+    Set hard_gate_triggered = true
+    Change stage from its score-based value
+    Block the FUT instrument path
+    Prevent TRADE_READY, WATCH, or ON_RADAR
+
+  GATE 3 ONLY DOES:
+    Null out all options_setup fields
+    Set theta_cost_check = null
+      with note "N/A — Gate 3 (DTE < 6)"
+    Set liquidity_check = null
+      with note "N/A — Gate 3 (DTE < 6)"
+    Force instrument_recommendation to
+      evaluate FUT path only
+
+  hard_gate_triggered remains false.
+  stage is determined solely by
+  adjusted_score thresholds.
+
+GATE 4: Chart directly contradicts direction
+  Condition: The price data in Section D
+    shows a clear, unambiguous structure
+    that directly opposes the Turn 2
+    preliminary direction, AND you cannot
+    identify any alternative valid thesis
+    in the same direction.
+
+  IMPORTANT: Gate 4 requires BOTH conditions:
+    (a) Chart contradicts the stated direction
+    AND
+    (b) No alternative valid direction exists
+
+    If the chart is mixed or uncertain,
+    Gate 4 does NOT fire — score it low
+    in Dimension 1 instead.
+
+    If you can find an alternative valid
+    thesis in the same direction, Gate 4
+    does NOT fire — note the revision.
+
+    Gate 4 fires ONLY when the chart is
+    unambiguously against the direction
+    and no valid bull/bear case exists.
+
+  Action:
+    stage = "REJECT"
+    hard_gate_triggered = true
+    hard_gate_reason = "GATE 4 — Chart structure directly contradicts LONG/SHORT direction with no valid alternative thesis"
+    rejection_reason = "Price structure contradicts stated direction — [specific evidence e.g. stock in confirmed downtrend with lower highs/lows while LONG is hypothesised]"
+  Then: Stop all further scoring.
+    Skip instrument_decision block.
+
+═══════════════════════════════════════════════════
+GATE SELF-CHECK — RUN BEFORE WRITING ANY OUTPUT
+═══════════════════════════════════════════════════
+
+Before writing a single field in the output
+JSON, run this internal checklist:
+
+STEP 1: GATE 1 CHECK
+  Can I identify a structural SL level?
+  If NO → set stage=REJECT, hard_gate_triggered=true
+           hard_gate_reason = "GATE 1..."
+           Skip to output.
+  If YES → continue.
+
+STEP 2: GATE 4 CHECK
+  Does the chart unambiguously contradict
+  the direction AND no alternative exists?
+  If YES → set stage=REJECT, hard_gate_triggered=true
+            hard_gate_reason = "GATE 4..."
+            Skip to output.
+  If NO → continue.
+
+STEP 3: COMPUTE ALL SCORES
+  Score Dimensions 1, 2, 3, 4 fully.
+
+STEP 4: GATE 2 CHECK
+  Compute rr_t2 = (target_2 - entry_mid)
+                  / (entry_mid - stop_loss)
+  Is rr_t2 < 1.5?
+  If YES → set stage=REJECT, hard_gate_triggered=true
+            hard_gate_reason = "GATE 2 — RR = {value} < 1.5"
+            Skip instrument_decision.
+  If NO → continue.
+
+STEP 5: APPLY SCORE THRESHOLDS
+  adjusted_score = raw_total * conviction_multiplier
+  If adjusted_score >= 72 → TRADE_READY
+  If adjusted_score 52-71 → WATCH
+  If adjusted_score 35-51 → ON_RADAR
+  If adjusted_score < 35  → REJECT
+                            hard_gate_triggered = false
+                            hard_gate_reason = null
+                            (score-based reject, not a gate)
+
+STEP 6: GATE 3 CHECK (independent of above)
+  Is near_month_dte < 6?
+  If YES → null out options_setup fields only
+            FUT path still evaluated normally
+            hard_gate_triggered unchanged
+
+STEP 7: PROCEED TO INSTRUMENT_DECISION
+  Only if hard_gate_triggered == false.
+  If hard_gate_triggered == true from any
+  gate above → use hard gate short-circuit
+  in instrument_decision block.
+
+═══════════════════════════════════════════════════
+FINAL CONSISTENCY CHECK — BEFORE CLOSING JSON
+═══════════════════════════════════════════════════
+
+Before closing the JSON object verify:
+
+  IF hard_gate_triggered == true:
+    stage MUST be "REJECT" ✅
+    hard_gate_reason MUST be non-null ✅
+    rejection_reason MUST be non-null ✅
+    instrument_recommendation MUST be "NONE" ✅
+    actionable_now MUST be false ✅
+    All instrument_decision numeric fields
+    MUST be null ✅
+
+  IF hard_gate_triggered == false AND
+     stage == "REJECT":
+    This is a score-based reject (score < 35)
+    hard_gate_reason MUST be null ✅
+    rejection_reason should explain the
+    low score, not cite a gate ✅
+
+  IF stage != "REJECT":
+    hard_gate_triggered MUST be false ✅
+    hard_gate_reason MUST be null ✅
+
+  IF rr_t2 < 1.5 AND stage != "REJECT":
+    THIS IS AN ERROR — go back to Step 4
+    Gate 2 must fire. Fix before output.
+
+  IF rr_t2 >= 1.5 AND hard_gate_triggered == true
+     AND hard_gate_reason contains "GATE 2":
+    THIS IS AN ERROR — Gate 2 misfired.
+    Recheck rr_t2 calculation.
 
 [SECTION G: OUTPUT SPECIFICATION]
 Provide your analysis ONLY as a single valid JSON object. Do not include any markdown styling, conversational text, introduction, or wrap it in anything other than the JSON format.
