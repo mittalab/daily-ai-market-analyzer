@@ -296,7 +296,7 @@ function CompactScenarioItem({ text, index }: { text: string; index: number }) {
 
 function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () => void }) {
   const [reasonExpanded, setReasonExpanded] = useState(false);
-  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument_recommendation || 'NONE';
+  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
   const scenarios     = s.why_could_be_wrong ? splitScenarios(s.why_could_be_wrong) : [];
 
   return (
@@ -505,7 +505,7 @@ function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () 
 }
 
 function AnalysisView({ s }: { s: any }) {
-  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument_recommendation || 'NONE';
+  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
 
   return (
     <div className="px-4 py-3 divide-y divide-gray-100">
@@ -949,7 +949,7 @@ function StockCard({ turn }: { turn: DeepAnalysisTurn }) {
     s.direction === 'LONG'  ? '↑ LONG'  :
     s.direction === 'SHORT' ? '↓ SHORT' : s.direction || 'AUTO';
 
-  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument_recommendation || 'NONE';
+  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
   const notActionable = s.actionable_now === false;
   const recColor =
     notActionable                ? 'bg-amber-100 text-amber-800'   :

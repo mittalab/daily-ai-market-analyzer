@@ -290,7 +290,7 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
   const dirLabel =
     s.direction === 'LONG' ? '↑ LONG' : s.direction === 'SHORT' ? '↓ SHORT' : s.direction || 'AUTO';
 
-  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument_recommendation || 'NONE';
+  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
   const notActionable = s.actionable_now === false;
   const recColor =
     notActionable               ? 'bg-amber-100 text-amber-800'   :
