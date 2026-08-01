@@ -160,6 +160,7 @@ def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] |
     #     summary["errors"].append(f"kite_options: {exc}")
     #
     # # B. NSE Scrape (Secondary/Enrichment for IVs)
+    failed: list[str] = []
     try:
         nse_session = make_nse_session()
         nse_rows: list[dict]
@@ -174,6 +175,33 @@ def ingest_today_options(snapshot_date: date | None = None, symbols: list[str] |
     except Exception as exc:
         logger.warning("NSE options enrichment failed (using Kite data): %s", exc)
         summary["errors"].append(f"nse_options_enrichment: {exc}")
+        failed = list(target_symbols)
+
+    # Bhavcopy OHLCV fallback for symbols that failed options scraping.
+    # Options data is missing but at minimum price_history should be populated.
+    if failed:
+        logger.warning(
+            "Options scrape failed for %d symbol(s): %s — attempting bhavcopy OHLCV fallback",
+            len(failed), failed,
+        )
+        try:
+            bhav_df, trade_date = fetch_equity_bhavcopy(snap_date)
+            failed_upper = {s.upper() for s in failed}
+            bhav_df_filtered = bhav_df[bhav_df["SYMBOL"].str.strip().str.upper().isin(failed_upper)]
+            fallback_rows = equity_bhavcopy_to_price_rows(bhav_df_filtered, trade_date)
+            if fallback_rows:
+                upsert_price_history_new_only(fallback_rows)
+                saved_syms = [r["symbol"] for r in fallback_rows]
+                summary["bhavcopy_fallback_symbols"] = saved_syms
+                logger.info(
+                    "Bhavcopy OHLCV fallback: %d row(s) saved for option-failed symbols: %s",
+                    len(fallback_rows), saved_syms,
+                )
+            else:
+                logger.warning("Bhavcopy fallback: no matching rows found for %s", failed)
+        except Exception as bhav_exc:
+            logger.error("Bhavcopy OHLCV fallback also failed: %s", bhav_exc)
+            summary["errors"].append(f"bhavcopy_fallback: {bhav_exc}")
 
     return summary
 

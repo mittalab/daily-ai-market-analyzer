@@ -117,10 +117,10 @@ export default function LightweightChart({
 
     // Trade level lines — solid/dashed with distinct colors, thicker than EMAs
     const sl  = analysisData?.key_levels?.stop_loss;
-    const el  = analysisData?.trade_parameters?.entry_low;
-    const eh  = analysisData?.trade_parameters?.entry_high;
-    const t1  = analysisData?.trade_parameters?.target_1;
-    const t2  = analysisData?.trade_parameters?.target_2;
+    const el  = analysisData?.key_levels?.support_zone_low;
+    const eh  = analysisData?.key_levels?.support_zone_high;
+    const t1  = analysisData?.key_levels?.resistance_1;
+    const t2  = analysisData?.key_levels?.resistance_2;
 
     // SL: red solid — most critical, most prominent
     if (sl  != null) candleSeries.createPriceLine({ price: sl,  color: '#EF5350', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'SL' });
@@ -264,8 +264,8 @@ export default function LightweightChart({
   }
 
   const sl = analysisData?.key_levels?.stop_loss;
-  const t1 = analysisData?.trade_parameters?.target_1;
-  const t2 = analysisData?.trade_parameters?.target_2;
+  const t1 = analysisData?.key_levels?.resistance_1;
+  const t2 = analysisData?.key_levels?.resistance_2;
 
   return (
     <div className="relative h-full w-full flex flex-col">

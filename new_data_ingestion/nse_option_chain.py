@@ -48,10 +48,17 @@ def make_nse_session() -> requests.Session:
     return s
 
 
-def warm_up_session(session: requests.Session, symbol: str, chain_type: str) -> None:
-    """Visit homepage + option-chain page to bypass Akamai WAF."""
+def warm_up_session(session: requests.Session, symbol: str, chain_type: str, force: bool = False) -> None:
+    """Visit homepage + option-chain page to bypass Akamai WAF.
+
+    Skips re-warm if the session already has NSE cookies unless force=True.
+    """
+    if not force and any("nsit" in c.name or "nseappid" in c.name for c in session.cookies):
+        logger.debug("Session already warmed up, skipping re-warm for %s", symbol)
+        return
+
     logger.debug("Warming up NSE session for %s...", symbol)
-    session.get(BASE_URL, timeout=15)
+    session.get(BASE_URL, timeout=25)
     time.sleep(random.uniform(1.5, 2.5))
 
     if chain_type == "Indices":
@@ -60,7 +67,7 @@ def warm_up_session(session: requests.Session, symbol: str, chain_type: str) -> 
         page_url = f"{BASE_URL}/get-quotes/derivatives?symbol={symbol.upper()}"
 
     session.headers.update({"Referer": BASE_URL + "/"})
-    session.get(page_url, timeout=15)
+    session.get(page_url, timeout=25)
     time.sleep(random.uniform(1.5, 2.5))
     session.headers.update({"Referer": page_url})
 
@@ -68,7 +75,7 @@ def warm_up_session(session: requests.Session, symbol: str, chain_type: str) -> 
 def fetch_contract_info(session: requests.Session, symbol: str) -> dict:
     """Get active contract expiries and strike info."""
     url = f"{BASE_URL}/api/option-chain-contract-info?symbol={symbol.upper()}"
-    r = session.get(url, timeout=15)
+    r = session.get(url, timeout=30)
     r.raise_for_status()
     return r.json()
 
@@ -82,7 +89,7 @@ def fetch_option_chain_v3(
     """Query the unified option-chain-v3 API for a single expiry."""
     url = f"{BASE_URL}/api/option-chain-v3?type={chain_type}&symbol={symbol.upper()}&expiry={expiry}"
     logger.info("GET %s", url)
-    r = session.get(url, timeout=20)
+    r = session.get(url, timeout=30)
     r.raise_for_status()
     return r.json()
 
@@ -164,6 +171,10 @@ def parse_snapshot_for_db(
     return rows
 
 
+_MAX_SYMBOL_RETRIES = 2
+_RETRY_BACKOFF_BASE = 8.0  # seconds before first retry
+
+
 def fetch_option_chain_symbol(
     session: requests.Session,
     symbol: str,
@@ -171,39 +182,60 @@ def fetch_option_chain_symbol(
 ) -> list[dict]:
     """
     Scrape and parse near and next month options data for a single symbol.
+    Retries up to _MAX_SYMBOL_RETRIES times on timeout/connection errors,
+    re-warming the session before each retry.
     """
     symbol_up = symbol.upper()
-    
+
     # NIFTY_50 symbol is used in DB, but NSE expects NIFTY
     nse_symbol = "NIFTY" if symbol_up == "NIFTY_50" else symbol_up
     chain_type = _chain_type(nse_symbol)
 
-    warm_up_session(session, nse_symbol, chain_type)
+    last_exc: Exception | None = None
+    for attempt in range(1 + _MAX_SYMBOL_RETRIES):
+        if attempt > 0:
+            backoff = _RETRY_BACKOFF_BASE * (2 ** (attempt - 1)) + random.uniform(0, 3)
+            logger.info("%s: retry %d/%d after %.1fs backoff", symbol_up, attempt, _MAX_SYMBOL_RETRIES, backoff)
+            time.sleep(backoff)
+            # Force re-warm on retry — session may have been flagged
+            warm_up_session(session, nse_symbol, chain_type, force=True)
+        else:
+            warm_up_session(session, nse_symbol, chain_type)
 
-    contract_info = fetch_contract_info(session, nse_symbol)
-    expiries = contract_info.get("expiryDates", [])
-    if not expiries:
-        raise ValueError(f"No expiries returned for {nse_symbol}")
-
-    # Keep near and next month expiries
-    target_expiries = expiries[:2]
-    logger.info("%s: fetching expiries %s", symbol_up, target_expiries)
-
-    parsed_rows = []
-    for expiry in target_expiries:
         try:
-            logger.debug("Querying v3 chain for %s (%s)...", symbol_up, expiry)
-            data = fetch_option_chain_v3(session, nse_symbol, chain_type, expiry)
-            
-            # Map symbol back to DB symbol (NIFTY_50)
-            rows = parse_snapshot_for_db(symbol_up, snapshot_date, expiry, data)
-            parsed_rows.extend(rows)
-            
-            time.sleep(random.uniform(1.0, 2.0))
-        except Exception as exc:
-            logger.warning("Failed to fetch v3 chain for %s (%s): %s", symbol_up, expiry, exc)
+            contract_info = fetch_contract_info(session, nse_symbol)
+            expiries = contract_info.get("expiryDates", [])
+            if not expiries:
+                raise ValueError(f"No expiries returned for {nse_symbol}")
 
-    return parsed_rows
+            # Keep near and next month expiries
+            target_expiries = expiries[:2]
+            logger.info("%s: fetching expiries %s", symbol_up, target_expiries)
+
+            parsed_rows = []
+            for expiry in target_expiries:
+                try:
+                    logger.debug("Querying v3 chain for %s (%s)...", symbol_up, expiry)
+                    data = fetch_option_chain_v3(session, nse_symbol, chain_type, expiry)
+
+                    # Map symbol back to DB symbol (NIFTY_50)
+                    rows = parse_snapshot_for_db(symbol_up, snapshot_date, expiry, data)
+                    parsed_rows.extend(rows)
+
+                    time.sleep(random.uniform(1.0, 2.0))
+                except Exception as exc:
+                    logger.warning("Failed to fetch v3 chain for %s (%s): %s", symbol_up, expiry, exc)
+
+            return parsed_rows
+
+        except requests.exceptions.Timeout as exc:
+            logger.warning("%s: timeout on attempt %d: %s", symbol_up, attempt + 1, exc)
+            last_exc = exc
+        except requests.exceptions.ConnectionError as exc:
+            logger.warning("%s: connection error on attempt %d: %s", symbol_up, attempt + 1, exc)
+            last_exc = exc
+
+    raise last_exc or RuntimeError(f"All retries exhausted for {symbol_up}")
 
 
 def run_snapshot_batch(

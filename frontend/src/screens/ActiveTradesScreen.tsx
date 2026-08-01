@@ -290,7 +290,7 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
   const dirLabel =
     s.direction === 'LONG' ? '↑ LONG' : s.direction === 'SHORT' ? '↓ SHORT' : s.direction || 'AUTO';
 
-  const recInstrument = s.instrument_recommendation || 'NONE';
+  const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument_recommendation || 'NONE';
   const notActionable = s.actionable_now === false;
   const recColor =
     notActionable               ? 'bg-amber-100 text-amber-800'   :
@@ -405,11 +405,11 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Spot (Underlying) Levels</p>
             <div className="grid grid-cols-4 gap-1.5 text-center mb-2.5">
               {[
-                ['Entry Zone', s.trade_parameters?.entry_low != null && s.trade_parameters?.entry_high != null
-                  ? `${s.trade_parameters.entry_low}–${s.trade_parameters.entry_high}` : '—'],
+                ['Entry Zone', s.key_levels?.support_zone_low != null && s.key_levels?.support_zone_high != null
+                  ? `${s.key_levels.support_zone_low}–${s.key_levels.support_zone_high}` : '—'],
                 ['Stop Loss', s.key_levels?.stop_loss != null ? String(s.key_levels.stop_loss) : '—'],
-                ['Target 1', s.trade_parameters?.target_1 != null ? String(s.trade_parameters.target_1) : '—'],
-                ['Target 2', s.trade_parameters?.target_2 != null ? String(s.trade_parameters.target_2) : '—'],
+                ['Target 1', s.key_levels?.resistance_1 != null ? String(s.key_levels.resistance_1) : '—'],
+                ['Target 2', s.key_levels?.resistance_2 != null ? String(s.key_levels.resistance_2) : '—'],
               ].map(([lbl, val]) => (
                 <div key={lbl} className="bg-gray-50 rounded-lg py-2">
                   <p className="text-[9px] text-gray-400 uppercase mb-0.5">{lbl}</p>
@@ -430,13 +430,21 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
               <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
                 <span className="text-gray-400 font-medium">Target 1 R:R Ratio:</span>
                 <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
-                  {s.trade_parameters?.rr_t1 != null ? `1:${s.trade_parameters.rr_t1.toFixed(2)}` : '—'}
+                  {recInstrument === 'OPTIONS'
+                    ? (s.options_setup?.rr_premium_t1 != null ? `1:${Number(s.options_setup.rr_premium_t1).toFixed(2)}` : '—')
+                    : recInstrument === 'FUT'
+                    ? (s.fut_setup?.rr_t1 != null ? `1:${Number(s.fut_setup.rr_t1).toFixed(2)}` : '—')
+                    : '—'}
                 </span>
               </div>
               <div className="flex justify-between items-center border-t border-gray-200/50 pt-1.5">
                 <span className="text-gray-400 font-medium">Target 2 R:R Ratio:</span>
                 <span className="font-mono font-bold text-gray-900 bg-white border border-gray-150 px-1.5 py-0.5 rounded text-[10px]">
-                  {s.trade_parameters?.rr_t2 != null ? `1:${s.trade_parameters.rr_t2.toFixed(2)}` : '—'}
+                  {recInstrument === 'OPTIONS'
+                    ? (s.options_setup?.rr_premium_t2 != null ? `1:${Number(s.options_setup.rr_premium_t2).toFixed(2)}` : '—')
+                    : recInstrument === 'FUT'
+                    ? (s.fut_setup?.rr_t2 != null ? `1:${Number(s.fut_setup.rr_t2).toFixed(2)}` : '—')
+                    : '—'}
                 </span>
               </div>
             </div>
@@ -478,13 +486,26 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
                 )}
               </div>
               <div className="grid grid-cols-4 gap-1.5 text-center">
-                {[
+                {([
                   ['Premium Entry', s.options_setup.entry_premium_low != null && s.options_setup.entry_premium_high != null
                     ? `${s.options_setup.entry_premium_low}–${s.options_setup.entry_premium_high}` : '—'],
-                  ['Premium SL', s.options_setup.sl_premium != null ? String(s.options_setup.sl_premium) : '—'],
-                  ['Premium T1', s.options_setup.target_1_premium != null ? String(s.options_setup.target_1_premium) : '—'],
-                  ['Premium T2', s.options_setup.target_2_premium != null ? String(s.options_setup.target_2_premium) : '—'],
-                ].map(([lbl, val]) => (
+                  ['Mid', s.options_setup.entry_premium_mid != null ? String(s.options_setup.entry_premium_mid) : '—'],
+                  ['SL', s.options_setup.sl_premium != null ? String(s.options_setup.sl_premium) : '—'],
+                  ['SL%', s.options_setup.sl_pct != null ? `${s.options_setup.sl_pct}%` : '—'],
+                ] as [string, string][]).map(([lbl, val]) => (
+                  <div key={lbl} className="bg-purple-50/30 border border-purple-100/50 rounded-lg py-1.5">
+                    <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
+                    <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 text-center mt-1.5">
+                {([
+                  ['T1 Premium', s.options_setup.target_1_premium != null
+                    ? `${s.options_setup.target_1_premium}${s.options_setup.rr_premium_t1 != null ? ` · RR ${s.options_setup.rr_premium_t1}x` : ''}` : '—'],
+                  ['T2 Premium', s.options_setup.target_2_premium != null
+                    ? `${s.options_setup.target_2_premium}${s.options_setup.rr_premium_t2 != null ? ` · RR ${s.options_setup.rr_premium_t2}x` : ''}` : '—'],
+                ] as [string, string][]).map(([lbl, val]) => (
                   <div key={lbl} className="bg-purple-50/30 border border-purple-100/50 rounded-lg py-1.5">
                     <p className="text-[8px] text-purple-400 uppercase mb-0.5">{lbl}</p>
                     <p className="text-xs font-mono font-bold text-purple-900">{val}</p>
@@ -533,13 +554,26 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-1.5 text-center">
-                {[
+                {([
                   ['Futures Entry', s.fut_setup.entry_low != null && s.fut_setup.entry_high != null
                     ? `${s.fut_setup.entry_low}–${s.fut_setup.entry_high}` : '—'],
-                  ['Futures SL', s.fut_setup.stop_loss != null ? String(s.fut_setup.stop_loss) : '—'],
-                  ['Futures T1', s.fut_setup.target_1 != null ? String(s.fut_setup.target_1) : '—'],
-                  ['Futures T2', s.fut_setup.target_2 != null ? String(s.fut_setup.target_2) : '—'],
-                ].map(([lbl, val]) => (
+                  ['Mid', s.fut_setup.entry_mid != null ? String(s.fut_setup.entry_mid) : '—'],
+                  ['FUT SL', s.fut_setup.stop_loss != null ? String(s.fut_setup.stop_loss) : '—'],
+                  ['SL%', s.fut_setup.sl_pct != null ? `${s.fut_setup.sl_pct}%` : '—'],
+                ] as [string, string][]).map(([lbl, val]) => (
+                  <div key={lbl} className="bg-indigo-50/30 border border-indigo-100/50 rounded-lg py-1.5">
+                    <p className="text-[8px] text-indigo-400 uppercase mb-0.5">{lbl}</p>
+                    <p className="text-xs font-mono font-bold text-indigo-900">{val}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 text-center mt-1.5">
+                {([
+                  ['Target 1', s.fut_setup.target_1 != null
+                    ? `${s.fut_setup.target_1}${s.fut_setup.rr_t1 != null ? ` · RR ${s.fut_setup.rr_t1}x` : ''}` : '—'],
+                  ['Target 2', s.fut_setup.target_2 != null
+                    ? `${s.fut_setup.target_2}${s.fut_setup.rr_t2 != null ? ` · RR ${s.fut_setup.rr_t2}x` : ''}` : '—'],
+                ] as [string, string][]).map(([lbl, val]) => (
                   <div key={lbl} className="bg-indigo-50/30 border border-indigo-100/50 rounded-lg py-1.5">
                     <p className="text-[8px] text-indigo-400 uppercase mb-0.5">{lbl}</p>
                     <p className="text-xs font-mono font-bold text-indigo-900">{val}</p>

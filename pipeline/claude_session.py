@@ -3383,6 +3383,82 @@ Your JSON output must match this exact schema:
     return prompt
 
 
+def _build_recommended_trade(analysis: dict, lot_size: int) -> dict:
+    """Build a normalised recommended_trade object from the validated analysis."""
+    instr_dec = analysis.get("instrument_decision") or {}
+    instrument = instr_dec.get("instrument_recommendation") or analysis.get("instrument_recommendation") or "NONE"
+    levels = analysis.get("key_levels") or {}
+
+    if instrument == "OPTIONS":
+        setup = analysis.get("options_setup") or {}
+        entry_mid = setup.get("entry_premium_mid")
+        sl = setup.get("sl_premium")
+        if entry_mid and sl:
+            lots = analysis.get("lots", 1) or 1
+            risk_per_lot = (float(entry_mid) - float(sl)) * lot_size
+            return {
+                "instrument": "OPTIONS",
+                "action": "BUY",
+                "strike": setup.get("strike"),
+                "option_type": setup.get("option_type"),
+                "expiry": setup.get("expiry"),
+                "entry_premium_low": setup.get("entry_premium_low"),
+                "entry_premium_high": setup.get("entry_premium_high"),
+                "entry_premium_mid": entry_mid,
+                "sl_premium": sl,
+                "sl_pct": setup.get("sl_pct"),
+                "target_1_premium": setup.get("target_1_premium"),
+                "target_2_premium": setup.get("target_2_premium"),
+                "rr_premium_t1": setup.get("rr_premium_t1"),
+                "rr_premium_t2": setup.get("rr_premium_t2"),
+                "underlying_entry_low": levels.get("support_zone_low"),
+                "underlying_entry_high": levels.get("support_zone_high"),
+                "underlying_sl": levels.get("stop_loss"),
+                "underlying_t1": levels.get("resistance_1"),
+                "underlying_t2": levels.get("resistance_2"),
+                "lot_size": lot_size,
+                "lots": lots,
+                "capital_required": round(float(entry_mid) * lot_size * lots, 0),
+                "max_loss_inr": round(risk_per_lot * lots, 0),
+            }
+
+    elif instrument == "FUT":
+        setup = analysis.get("fut_setup") or {}
+        entry_mid = setup.get("entry_mid")
+        sl = setup.get("stop_loss")
+        if entry_mid and sl:
+            lots = analysis.get("lots", 1) or 1
+            risk_per_lot = abs(float(entry_mid) - float(sl)) * lot_size
+            return {
+                "instrument": "FUT",
+                "action": "BUY" if analysis.get("direction") == "LONG" else "SELL",
+                "expiry": setup.get("expiry"),
+                "entry_low": setup.get("entry_low"),
+                "entry_high": setup.get("entry_high"),
+                "entry_mid": entry_mid,
+                "stop_loss": sl,
+                "sl_pct": setup.get("sl_pct"),
+                "target_1": setup.get("target_1"),
+                "target_2": setup.get("target_2"),
+                "rr_t1": setup.get("rr_t1"),
+                "rr_t2": setup.get("rr_t2"),
+                "lot_size": lot_size,
+                "lots": lots,
+                "margin_required": None,
+                "max_loss_inr": round(risk_per_lot * lots, 0),
+            }
+
+    return {
+        "instrument": "NONE",
+        "reason": instr_dec.get("instrument_reason") or instr_dec.get("none_reason") or instr_dec.get("margin_efficiency_note"),
+        "reference_entry_low": levels.get("support_zone_low"),
+        "reference_entry_high": levels.get("support_zone_high"),
+        "reference_sl": levels.get("stop_loss"),
+        "reference_t1": levels.get("resistance_1"),
+        "reference_t2": levels.get("resistance_2"),
+    }
+
+
 def _validate_position_sizing_turn3(analysis: dict, config: dict) -> dict:
     """
     Validates position sizing for Turn 3 deep analysis (supporting Options vs Futures recommendation).
@@ -3449,8 +3525,9 @@ def _validate_position_sizing_turn3(analysis: dict, config: dict) -> dict:
             opt["lots"] = lots
             opt["risk_inr"] = round(actual_risk, 0)
             opt["risk_pct_capital"] = round((actual_risk / capital) * 100, 2)
-            opt["rr_t1"] = round((float(target_1) - entry_mid) / (entry_mid - float(stop_loss)), 2) if target_1 else 0.0
-            opt["rr_t2"] = round(actual_rr, 2)
+            opt["entry_premium_mid"] = round(entry_mid, 2)
+            opt["rr_premium_t1"] = round((float(target_1) - entry_mid) / (entry_mid - float(stop_loss)), 2) if target_1 else 0.0
+            opt["rr_premium_t2"] = round(actual_rr, 2)
             
     elif rec == "FUT":
         fut = analysis.get("fut_setup", {})
@@ -3497,6 +3574,7 @@ def _validate_position_sizing_turn3(analysis: dict, config: dict) -> dict:
             fut["lot_size"] = lot_size
             fut["risk_inr"] = round(actual_risk, 0)
             fut["risk_pct_capital"] = round((actual_risk / capital) * 100, 2)
+            fut["entry_mid"] = round(entry_mid, 2)
             fut["rr_t1"] = round((float(target_1) - entry_mid) / (entry_mid - float(stop_loss)), 2) if target_1 else 0.0
             fut["rr_t2"] = round(actual_rr, 2)
             
@@ -3510,6 +3588,27 @@ def _validate_position_sizing_turn3(analysis: dict, config: dict) -> dict:
     # Lift nested instrument_decision fields to flat keys for DB / frontend backward compat
     analysis["instrument_recommendation"] = rec
     analysis.setdefault("instrument_reason", instr_dec.get("margin_efficiency_note", ""))
+
+    # Gate 2 Python validation — catch any RR < 1.5 that Claude missed
+    if rec == "OPTIONS":
+        rr_t2_check = (analysis.get("options_setup") or {}).get("rr_premium_t2")
+    elif rec == "FUT":
+        rr_t2_check = (analysis.get("fut_setup") or {}).get("rr_t2")
+    else:
+        rr_t2_check = None
+
+    if rr_t2_check is not None and rr_t2_check < 1.5:
+        if not analysis.get("hard_gate_triggered"):
+            logger.warning(
+                f"Gate 2 missed by Claude for {symbol} — rr_t2={rr_t2_check} — forcing REJECT in Python"
+            )
+            analysis["stage"] = "REJECT"
+            analysis["hard_gate_triggered"] = True
+            analysis["hard_gate_reason"] = (
+                f"GATE 2 — rr_t2 = {rr_t2_check:.2f} < 1.5 (caught by Python validation)"
+            )
+
+    analysis["recommended_trade"] = _build_recommended_trade(analysis, lot_size)
 
     return analysis
 
@@ -3683,51 +3782,52 @@ def run_turn_deep_analysis(
     #         logger.info("New watchlist discovery synced: %s stage=%s", symbol, stage)
 
     # Save to trade_setups if actionable
-    if stage not in ("SKIP", None):
-        try:
-            setup_id = create_trade_setup({
-                "session_id":       session_id,
-                "setup_date":       str(session_date),
-                "symbol":           symbol,
-                "direction":        analysis.get("direction"),
-                "stage":            stage,
-                "setup_type":       analysis.get("setup_type"),
-                "setup_maturity":   analysis.get("setup_maturity"),
-                "conviction_score": analysis.get("conviction_score"),
-                "instrument":       analysis.get("instrument_recommendation"),
-                "strike":           analysis.get("strike"),
-                "option_type":      analysis.get("option_type"),
-                "expiry_date":      analysis.get("expiry_date"),
-                "entry_zone_low":   analysis.get("entry_premium_low"),
-                "entry_zone_high":  analysis.get("entry_premium_high"),
-                "stop_loss_premium": analysis.get("stop_loss_premium"),
-                "target_1_premium":  analysis.get("target_1_premium"),
-                "target_2_premium":  analysis.get("target_2_premium"),
-                "underlying_stop":  analysis.get("underlying_stop"),
-                "lots":             analysis.get("lots"),
-                "lot_size":         analysis.get("lot_size"),
-                "max_risk_inr":     analysis.get("max_risk_inr"),
-                "risk_reward":      analysis.get("risk_reward"),
-                "iv_assessment":    analysis.get("iv_assessment"),
-                "scoring_breakdown":    analysis.get("scoring_breakdown", {}),
-                "signals_contributing": analysis.get("signals_contributing", []),
-                "claude_full_rationale": analysis.get("claude_full_rationale"),
-                "mentor_explanation":   analysis.get("mentor_explanation"),
-                "key_learning_today":   analysis.get("key_learning_today"),
-                "why_could_be_wrong":   analysis.get("why_could_be_wrong"),
-
-                # Persistent regime dimensions
-                "market_regime":     index_ctx.get("regime"),
-                "market_trend":      index_ctx.get("market_trend"),
-                "market_volatility":  index_ctx.get("market_volatility"),
-                "market_structure":   index_ctx.get("market_structure"),
-                "execution_bias":     index_ctx.get("execution_bias"),
-                "fii_dii_stance":     index_ctx.get("fii_dii_stance"),
-            })
-            analysis["setup_id"] = setup_id
-            logger.info("Trade setup saved: %s stage=%s id=%s", symbol, stage, setup_id)
-        except Exception as exc:
-            logger.error("Failed to save trade setup for %s: %s", symbol, exc)
+    # if stage not in ("SKIP", None):
+    #     try:
+    #         setup_id = create_trade_setup({
+    #             "session_id":       session_id,
+    #             "setup_date":       str(session_date),
+    #             "symbol":           symbol,
+    #             "direction":        analysis.get("direction"),
+    #             "stage":            stage,
+    #             "setup_type":       analysis.get("setup_type"),
+    #             "setup_maturity":   analysis.get("setup_maturity"),
+    #             "conviction_score": analysis.get("conviction_score"),
+    #             "instrument":       analysis.get("instrument_recommendation"),
+    #             "strike":           analysis.get("strike"),
+    #             "option_type":      analysis.get("option_type"),
+    #             "expiry_date":      analysis.get("expiry_date"),
+    #             "entry_zone_low":   analysis.get("entry_premium_low"),
+    #             "entry_zone_high":  analysis.get("entry_premium_high"),
+    #             "stop_loss_premium": analysis.get("stop_loss_premium"),
+    #             "target_1_premium":  analysis.get("target_1_premium"),
+    #             "target_2_premium":  analysis.get("target_2_premium"),
+    #             "underlying_stop":  analysis.get("underlying_stop"),
+    #             "lots":             analysis.get("lots"),
+    #             "lot_size":         analysis.get("lot_size"),
+    #             "max_risk_inr":     analysis.get("max_risk_inr"),
+    #             "risk_reward":      analysis.get("risk_reward"),
+    #             "iv_assessment":    analysis.get("iv_assessment"),
+    #             "scoring_breakdown":    analysis.get("scoring_breakdown", {}),
+    #             "signals_contributing": analysis.get("signals_contributing", []),
+    #             "claude_full_rationale": analysis.get("claude_full_rationale"),
+    #             "mentor_explanation":   analysis.get("mentor_explanation"),
+    #             "key_learning_today":   analysis.get("key_learning_today"),
+    #             "why_could_be_wrong":   analysis.get("why_could_be_wrong"),
+    #
+    #             # Persistent regime dimensions
+    #             "market_regime":     index_ctx.get("regime"),
+    #             "market_trend":      index_ctx.get("market_trend"),
+    #             "market_volatility":  index_ctx.get("market_volatility"),
+    #             "market_structure":   index_ctx.get("market_structure"),
+    #             "execution_bias":     index_ctx.get("execution_bias"),
+    #             "fii_dii_stance":     index_ctx.get("fii_dii_stance"),
+    #             "recommended_trade":  analysis.get("recommended_trade"),
+    #         })
+    #         analysis["setup_id"] = setup_id
+    #         logger.info("Trade setup saved: %s stage=%s id=%s", symbol, stage, setup_id)
+    #     except Exception as exc:
+    #         logger.error("Failed to save trade setup for %s: %s", symbol, exc)
 
     deep_result = {
         "symbol":        symbol,
