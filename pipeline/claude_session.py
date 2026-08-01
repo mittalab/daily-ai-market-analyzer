@@ -3104,7 +3104,7 @@ STEP 4: GATE 2 CHECK
                   / (entry_mid - stop_loss)
   Is rr_t2 < 1.5?
   If YES → set stage=REJECT, hard_gate_triggered=true
-            hard_gate_reason = "GATE 2 — RR = {value} < 1.5"
+            hard_gate_reason = "GATE 2 — RR = {{value}} < 1.5"
             Skip instrument_decision.
   If NO → continue.
 
