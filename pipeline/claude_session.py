@@ -2994,8 +2994,8 @@ GATE 2: R:R < 1:1.5 at Target 2
   Action:
     stage = "REJECT"
     hard_gate_triggered = true
-    hard_gate_reason = "GATE 2 — RR at Target 2 = {rr_t2:.2f} < 1.5 minimum"
-    rejection_reason = "RR {rr_t2:.2f} at T2 below 1.5 minimum threshold"
+    hard_gate_reason = "GATE 2 — RR at Target 2 = {{rr_t2:.2f}} < 1.5 minimum"
+    rejection_reason = "RR {{rr_t2:.2f}} at T2 below 1.5 minimum threshold"
     rr_t2 field = the actual computed value (e.g. 1.02, not null)
   Then: Stop all further scoring.
     Complete scoring_breakdown with what
