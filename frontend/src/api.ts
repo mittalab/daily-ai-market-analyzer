@@ -126,6 +126,21 @@ export function fetchFoStocks(): Promise<string[]> {
   return apiFetch<string[]>('/api/fo-stocks');
 }
 
+// Module-level in-memory cache — one network call per browser session
+let _foStocksCache: string[] | null = null;
+let _foStocksFetching: Promise<string[]> | null = null;
+
+export function fetchFoStocksCached(): Promise<string[]> {
+  if (_foStocksCache) return Promise.resolve(_foStocksCache);
+  if (_foStocksFetching) return _foStocksFetching;
+  _foStocksFetching = apiFetch<string[]>('/api/fo-stocks').then(data => {
+    _foStocksCache = data;
+    _foStocksFetching = null;
+    return data;
+  });
+  return _foStocksFetching;
+}
+
 export function fetchIndicatorValidation(
   symbol: string,
   date?: string

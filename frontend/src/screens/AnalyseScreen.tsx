@@ -3,7 +3,7 @@ import Badge from '../components/Badge';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
 import { NIFTY50_STOCKS } from '../data/sectorMap';
-import { addToWatchlist, runAnalysis, fetchFoStocks } from '../api';
+import { addToWatchlist, runAnalysis, fetchFoStocksCached } from '../api';
 import type { AnalyseResponse, Direction } from '../types';
 
 const INR = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -33,7 +33,7 @@ const SCORING_ROWS: { key: keyof import('../types').ScoringBreakdown; label: str
   { key: 'market_context',   label: 'Market Context',     max: 10 },
 ];
 
-export default function AnalyseScreen() {
+export default function AnalyseScreen({ active }: { active: boolean }) {
   const [mode, setMode]               = useState<'nifty50' | 'custom'>('nifty50');
   const [selectedNifty, setSelected]  = useState('');
   const [customInput, setCustom]      = useState('');
@@ -48,18 +48,14 @@ export default function AnalyseScreen() {
 
   const [foStocks, setFoStocks]       = useState<string[]>([]);
   const [searchTerm, setSearchTerm]   = useState('');
+  const [foLoaded, setFoLoaded]       = useState(false);
 
   useEffect(() => {
-    fetchFoStocks()
-      .then(data => {
-        setFoStocks(data);
-      })
-      .catch(err => {
-        console.error('Failed to load F&O stocks list:', err);
-        // Fallback to NIFTY50 symbols
-        setFoStocks(NIFTY50_STOCKS.map(s => s.symbol));
-      });
-  }, []);
+    if (!active || foLoaded) return;
+    fetchFoStocksCached()
+      .then(data => { setFoStocks(data); setFoLoaded(true); })
+      .catch(() => setFoStocks(NIFTY50_STOCKS.map(s => s.symbol)));
+  }, [active, foLoaded]);
 
   const symbolToSector: Record<string, string> = {};
   NIFTY50_STOCKS.forEach(s => {

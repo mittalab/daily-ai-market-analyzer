@@ -44,7 +44,7 @@ export default function App() {
           <div className={screen !== 'today'   ? 'hidden' : ''}><TodayScreen  refreshKey={refreshKey} /></div>
           <div className={screen !== 'deep'    ? 'hidden' : ''}><DeepAnalysisScreen refreshKey={refreshKey} /></div>
           <div className={screen !== 'active'  ? 'hidden' : ''}><ActiveTradesScreen refreshKey={refreshKey} /></div>
-          <div className={screen !== 'analyse' ? 'hidden' : ''}><AnalyseScreen /></div>
+          <div className={screen !== 'analyse' ? 'hidden' : ''}><AnalyseScreen active={screen === 'analyse'} /></div>
           <div className={screen !== 'status'  ? 'hidden' : ''}><PerformanceScreen /></div>
         </main>
         <BottomNav active={screen} onChange={setScreen} />
