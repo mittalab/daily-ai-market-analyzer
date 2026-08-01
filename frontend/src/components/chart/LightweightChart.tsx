@@ -10,11 +10,23 @@ import {
 } from 'lightweight-charts';
 import { type OHLCVRow, computeEMA, computeRSI } from './chartUtils';
 
+export interface FutureLevels {
+  entryLow?:  number | null;
+  entryHigh?: number | null;
+  sl?:        number | null;
+  t1?:        number | null;
+  t2?:        number | null;
+}
+
 interface LightweightChartProps {
   symbol: string;
   analysisData: any;
   ohlcvData: OHLCVRow[];
   entryPrice?: number;
+  /** When set, price-level lines use these futures levels instead of key_levels. */
+  futureLevels?: FutureLevels;
+  /** Expiry date string (YYYY-MM-DD) shown as a badge on the chart. */
+  futureExpiry?: string;
 }
 
 export default function LightweightChart({
@@ -22,6 +34,8 @@ export default function LightweightChart({
   analysisData,
   ohlcvData,
   entryPrice,
+  futureLevels,
+  futureExpiry,
 }: LightweightChartProps) {
   const mainRef    = useRef<HTMLDivElement>(null);
   const volumeRef  = useRef<HTMLDivElement>(null);
@@ -115,18 +129,18 @@ export default function LightweightChart({
     if (ema50Val  != null) candleSeries.createPriceLine({ price: ema50Val,  color: '#FF9800', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA50' });
     if (ema200Val != null) candleSeries.createPriceLine({ price: ema200Val, color: '#9C27B0', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA200' });
 
-    // Trade level lines — solid/dashed with distinct colors, thicker than EMAs
-    const sl  = analysisData?.key_levels?.stop_loss;
-    const el  = analysisData?.key_levels?.support_zone_low;
-    const eh  = analysisData?.key_levels?.support_zone_high;
-    const t1  = analysisData?.key_levels?.resistance_1;
-    const t2  = analysisData?.key_levels?.resistance_2;
+    // Trade level lines — sourced from futureLevels (futures tabs) or key_levels (spot tab)
+    const sl = futureLevels ? futureLevels.sl  : analysisData?.key_levels?.stop_loss;
+    const el = futureLevels ? futureLevels.entryLow  : analysisData?.key_levels?.support_zone_low;
+    const eh = futureLevels ? futureLevels.entryHigh : analysisData?.key_levels?.support_zone_high;
+    const t1 = futureLevels ? futureLevels.t1  : analysisData?.key_levels?.resistance_1;
+    const t2 = futureLevels ? futureLevels.t2  : analysisData?.key_levels?.resistance_2;
 
     // SL: red solid — most critical, most prominent
     if (sl  != null) candleSeries.createPriceLine({ price: sl,  color: '#EF5350', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'SL' });
     // Entry zone: cyan/teal — clearly different from EMA20 blue
-    if (el  != null) candleSeries.createPriceLine({ price: el,  color: '#00ACC1', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'Entry Low' });
-    if (eh  != null) candleSeries.createPriceLine({ price: eh,  color: '#00ACC1', lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'Entry High' });
+    if (el  != null) candleSeries.createPriceLine({ price: el,  color: '#00ACC1', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: futureLevels ? 'FUT Entry Low'  : 'Entry Low' });
+    if (eh  != null) candleSeries.createPriceLine({ price: eh,  color: '#00ACC1', lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: futureLevels ? 'FUT Entry High' : 'Entry High' });
     // T1: light green dashed; T2: dark green solid — solid makes T2 the definitive target
     if (t1  != null) candleSeries.createPriceLine({ price: t1,  color: '#66BB6A', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'T1' });
     if (t2  != null) candleSeries.createPriceLine({ price: t2,  color: '#2E7D32', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'T2' });
@@ -247,7 +261,7 @@ export default function LightweightChart({
       syncCharts.forEach(c => c.remove());
       chartsRef.current = [];
     };
-  }, [symbol, ohlcvData, entryPrice]);
+  }, [symbol, ohlcvData, entryPrice, futureLevels]);
 
   const lastDate = ohlcvData.length > 0 ? ohlcvData[ohlcvData.length - 1].date : null;
 
@@ -263,9 +277,9 @@ export default function LightweightChart({
     );
   }
 
-  const sl = analysisData?.key_levels?.stop_loss;
-  const t1 = analysisData?.key_levels?.resistance_1;
-  const t2 = analysisData?.key_levels?.resistance_2;
+  const sl = futureLevels ? futureLevels.sl : analysisData?.key_levels?.stop_loss;
+  const t1 = futureLevels ? futureLevels.t1 : analysisData?.key_levels?.resistance_1;
+  const t2 = futureLevels ? futureLevels.t2 : analysisData?.key_levels?.resistance_2;
 
   return (
     <div className="relative h-full w-full flex flex-col">
@@ -299,6 +313,13 @@ export default function LightweightChart({
           {t1 != null && <div className="flex items-center gap-1"><span className="w-5 border-b border-dashed" style={{ borderColor: '#66BB6A' }} />T1</div>}
           {t2 != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2" style={{ borderColor: '#2E7D32' }} />T2</div>}
           {entryPrice != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2" style={{ borderColor: '#1565C0' }} />Your Entry</div>}
+        </div>
+      )}
+
+      {/* Futures expiry badge */}
+      {futureExpiry && (
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 bg-indigo-600 text-white text-[9px] font-semibold px-2 py-0.5 rounded pointer-events-none">
+          Expiry: {futureExpiry}
         </div>
       )}
 

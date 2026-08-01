@@ -65,6 +65,73 @@ def _is_stale(session: dict | None) -> bool:
     return hours is None or hours > 24
 
 
+def _backfill_futures_ohlcv(turns: list[dict], session_date_str: str) -> None:
+    """
+    For each symbol, fetch futures OHLCV from futures_snapshots for the two active
+    expiries (near and next month) and attach to the turn's analysis as:
+      near_futures_ohlcv / near_futures_expiry
+      next_futures_ohlcv / next_futures_expiry
+
+    Only called for stock symbols with F&O data; silently skips if nothing found.
+    """
+    from datetime import timedelta
+
+    symbols = [t["symbol"] for t in turns if t.get("symbol")]
+    if not symbols:
+        return
+    try:
+        from database.client import get_client
+        session_date = date.fromisoformat(session_date_str)
+        cutoff = str(session_date - timedelta(days=90))
+        client = get_client()
+
+        for turn in turns:
+            sym = turn.get("symbol")
+            if not sym:
+                continue
+
+            res = (
+                client
+                .table("futures_snapshots")
+                .select("snapshot_date,expiry_date,open_price,high_price,low_price,close_price,volume")
+                .eq("symbol", sym)
+                .gte("snapshot_date", cutoff)
+                .order("snapshot_date", desc=False)
+                .execute()
+            )
+            if not res.data:
+                continue
+
+            # Pick the two nearest expiries that haven't expired before session_date
+            min_expiry = str(session_date - timedelta(days=5))
+            active_expiries = sorted({r["expiry_date"] for r in res.data if r["expiry_date"] >= min_expiry})[:2]
+            if not active_expiries:
+                continue
+
+            def _rows(expiry: str) -> list[dict]:
+                return [
+                    {
+                        "date":   r["snapshot_date"],
+                        "open":   float(r["open_price"]  or 0),
+                        "high":   float(r["high_price"]  or 0),
+                        "low":    float(r["low_price"]   or 0),
+                        "close":  float(r["close_price"] or 0),
+                        "volume": int(r["volume"]        or 0),
+                    }
+                    for r in res.data
+                    if r["expiry_date"] == expiry and r["open_price"] and r["close_price"]
+                ]
+
+            turn["analysis"]["near_futures_expiry"] = active_expiries[0]
+            turn["analysis"]["near_futures_ohlcv"]  = _rows(active_expiries[0])
+            if len(active_expiries) > 1:
+                turn["analysis"]["next_futures_expiry"] = active_expiries[1]
+                turn["analysis"]["next_futures_ohlcv"]  = _rows(active_expiries[1])
+
+    except Exception as exc:
+        logger.warning("futures_ohlcv backfill failed: %s", exc)
+
+
 def _backfill_ohlcv(turns: list[dict], session_date_str: str) -> None:
     """
     Fetch the 120 most recent OHLCV rows per symbol from price_history.
@@ -247,6 +314,7 @@ async def get_deep_analysis_turns():
                 logger.warning("spot_price backfill failed: %s", price_exc)
 
         _backfill_ohlcv(turns, str(session["session_date"]))
+        _backfill_futures_ohlcv(turns, str(session["session_date"]))
 
         return {"turns": turns, "session_id": session_id, "session_date": str(session["session_date"])}
     except Exception as exc:
@@ -436,6 +504,7 @@ async def get_active_trades():
 
     if session and turns:
         _backfill_ohlcv(turns, str(session["session_date"]))
+        _backfill_futures_ohlcv(turns, str(session["session_date"]))
 
     return {
         "turns": turns,
