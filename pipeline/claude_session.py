@@ -3782,52 +3782,58 @@ def run_turn_deep_analysis(
     #         logger.info("New watchlist discovery synced: %s stage=%s", symbol, stage)
 
     # Save to trade_setups if actionable
-    # if stage not in ("SKIP", None):
-    #     try:
-    #         setup_id = create_trade_setup({
-    #             "session_id":       session_id,
-    #             "setup_date":       str(session_date),
-    #             "symbol":           symbol,
-    #             "direction":        analysis.get("direction"),
-    #             "stage":            stage,
-    #             "setup_type":       analysis.get("setup_type"),
-    #             "setup_maturity":   analysis.get("setup_maturity"),
-    #             "conviction_score": analysis.get("conviction_score"),
-    #             "instrument":       analysis.get("instrument_recommendation"),
-    #             "strike":           analysis.get("strike"),
-    #             "option_type":      analysis.get("option_type"),
-    #             "expiry_date":      analysis.get("expiry_date"),
-    #             "entry_zone_low":   analysis.get("entry_premium_low"),
-    #             "entry_zone_high":  analysis.get("entry_premium_high"),
-    #             "stop_loss_premium": analysis.get("stop_loss_premium"),
-    #             "target_1_premium":  analysis.get("target_1_premium"),
-    #             "target_2_premium":  analysis.get("target_2_premium"),
-    #             "underlying_stop":  analysis.get("underlying_stop"),
-    #             "lots":             analysis.get("lots"),
-    #             "lot_size":         analysis.get("lot_size"),
-    #             "max_risk_inr":     analysis.get("max_risk_inr"),
-    #             "risk_reward":      analysis.get("risk_reward"),
-    #             "iv_assessment":    analysis.get("iv_assessment"),
-    #             "scoring_breakdown":    analysis.get("scoring_breakdown", {}),
-    #             "signals_contributing": analysis.get("signals_contributing", []),
-    #             "claude_full_rationale": analysis.get("claude_full_rationale"),
-    #             "mentor_explanation":   analysis.get("mentor_explanation"),
-    #             "key_learning_today":   analysis.get("key_learning_today"),
-    #             "why_could_be_wrong":   analysis.get("why_could_be_wrong"),
-    #
-    #             # Persistent regime dimensions
-    #             "market_regime":     index_ctx.get("regime"),
-    #             "market_trend":      index_ctx.get("market_trend"),
-    #             "market_volatility":  index_ctx.get("market_volatility"),
-    #             "market_structure":   index_ctx.get("market_structure"),
-    #             "execution_bias":     index_ctx.get("execution_bias"),
-    #             "fii_dii_stance":     index_ctx.get("fii_dii_stance"),
-    #             "recommended_trade":  analysis.get("recommended_trade"),
-    #         })
-    #         analysis["setup_id"] = setup_id
-    #         logger.info("Trade setup saved: %s stage=%s id=%s", symbol, stage, setup_id)
-    #     except Exception as exc:
-    #         logger.error("Failed to save trade setup for %s: %s", symbol, exc)
+    if stage not in ("SKIP", None):
+        try:
+            setup_id = create_trade_setup({
+                "session_id":       session_id,
+                "setup_date":       str(session_date),
+                "symbol":           symbol,
+                "direction":        analysis.get("direction"),
+                "stage":            stage,
+                "setup_type":       analysis.get("setup_type"),
+                "setup_maturity":   analysis.get("setup_maturity"),
+                "conviction_score": analysis.get("conviction_score"),
+                "instrument":       analysis.get("instrument_recommendation"),
+                "strike":           analysis.get("strike"),
+                "option_type":      analysis.get("option_type"),
+                "expiry_date":      analysis.get("expiry_date"),
+                "entry_zone_low":   analysis.get("entry_premium_low"),
+                "entry_zone_high":  analysis.get("entry_premium_high"),
+                "stop_loss_premium": analysis.get("stop_loss_premium"),
+                "target_1_premium":  analysis.get("target_1_premium"),
+                "target_2_premium":  analysis.get("target_2_premium"),
+                "underlying_stop":  analysis.get("underlying_stop"),
+                "lots":             analysis.get("lots"),
+                "lot_size":         analysis.get("lot_size"),
+                "max_risk_inr":     analysis.get("max_risk_inr"),
+                "risk_reward":      analysis.get("risk_reward"),
+                "iv_assessment":    analysis.get("iv_assessment"),
+                "scoring_breakdown":    analysis.get("scoring_breakdown", {}),
+                "signals_contributing": analysis.get("signals_contributing", []),
+                "claude_full_rationale": analysis.get("claude_full_rationale"),
+                "mentor_explanation":   analysis.get("mentor_explanation"),
+                "key_learning_today":   analysis.get("key_learning_today"),
+                "why_could_be_wrong":   analysis.get("why_could_be_wrong"),
+
+                # Persistent regime dimensions
+                "market_regime":     index_ctx.get("regime"),
+                "market_trend":      index_ctx.get("market_trend"),
+                "market_volatility":  index_ctx.get("market_volatility"),
+                "market_structure":   index_ctx.get("market_structure"),
+                "execution_bias":     index_ctx.get("execution_bias"),
+                "fii_dii_stance":     index_ctx.get("fii_dii_stance"),
+
+                # Full nested analysis objects (JSONB)
+                "options_setup":       analysis.get("options_setup"),
+                "fut_setup":           analysis.get("fut_setup"),
+                "key_levels":          analysis.get("key_levels"),
+                "instrument_decision": analysis.get("instrument_decision"),
+                "recommended_trade":   analysis.get("recommended_trade"),
+            })
+            analysis["setup_id"] = setup_id
+            logger.info("Trade setup saved: %s stage=%s id=%s", symbol, stage, setup_id)
+        except Exception as exc:
+            logger.error("Failed to save trade setup for %s: %s", symbol, exc)
 
     deep_result = {
         "symbol":        symbol,
