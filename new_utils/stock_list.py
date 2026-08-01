@@ -40,6 +40,10 @@ class StockListBuilder:
         """
         Return the merged symbol universe with mandate flags.
 
+        Sources included are gated by the 'stock_sources' system_config key
+        (JSON array of "NIFTY_50", "KITE_ACTIVE_TRADES", "INTERESTED_STOCKS").
+        Defaults to all three when the key is absent.
+
         Args:
             include_kite_trades: Set False to skip the Kite positions call
                 (useful in offline / test environments where no token exists).
@@ -52,18 +56,30 @@ class StockListBuilder:
                     "sources": list[Source],
                 }
         """
+        import json as _json
+        try:
+            from database.queries import get_system_config
+            raw = get_system_config("stock_sources")
+            enabled: set[str] = set(_json.loads(raw)) if raw else {"NIFTY_50", "KITE_ACTIVE_TRADES", "INTERESTED_STOCKS"}
+        except Exception as exc:
+            logger.warning("Could not read stock_sources config, using all sources: %s", exc)
+            enabled = {"NIFTY_50", "KITE_ACTIVE_TRADES", "INTERESTED_STOCKS"}
+
         result: dict[str, dict] = {}
 
-        self._merge(result, self._nifty50_symbols(),      "nifty50",            mandate=False)
-        self._merge(result, self._interested_symbols(),   "interested_stocks",  mandate=False)
-        if include_kite_trades:
+        if "NIFTY_50" in enabled:
+            self._merge(result, self._nifty50_symbols(), "nifty50", mandate=False)
+        if "INTERESTED_STOCKS" in enabled:
+            self._merge(result, self._interested_symbols(), "interested_stocks", mandate=False)
+        if "KITE_ACTIVE_TRADES" in enabled and include_kite_trades:
             active = self._active_trade_symbols()
             self._merge(result, active, "active_trade", mandate=True)
 
         logger.info(
-            "Stock universe: %d symbols (%d mandated)",
+            "Stock universe: %d symbols (%d mandated) [sources=%s]",
             len(result),
             sum(1 for v in result.values() if v["mandate"]),
+            sorted(enabled),
         )
         return result
 
@@ -201,7 +217,7 @@ def fetch_kite_fo_stocks() -> list[str]:
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print(fetch_kite_fo_stocks())
+    print(get_stock_list_for_analysis())
     # import json
     # import sys
     # import argparse

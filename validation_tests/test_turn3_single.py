@@ -103,7 +103,7 @@ def main() -> None:
     #     sys.exit(1)
 
     #symbol = sys.argv[1].upper()
-    symbol = "HCLTECH"
+    symbol = "TCS"
     forced_direction: str | None = sys.argv[2].upper() if len(sys.argv) >= 3 else None
     if forced_direction and forced_direction not in ("LONG", "SHORT"):
         print(f"Error: direction must be LONG or SHORT, got '{forced_direction}'")

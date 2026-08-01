@@ -1277,6 +1277,111 @@ async def system_status():
     }
 
 
+# ── GET /api/pipeline/deep-analysis/status ───────────────────────────────────
+
+@router.get("/pipeline/deep-analysis/status")
+async def deep_analysis_status():
+    """
+    Check whether a pipeline session already exists for the last trading day.
+    The presence of a row in analysis_sessions is the sole indicator.
+    """
+    from new_data_ingestion.nse_bhavcopy import last_trading_day
+    from database.queries import get_client
+
+    trading_day = last_trading_day()
+
+    resp = (
+        get_client()
+        .table("analysis_sessions")
+        .select("session_id,session_date,status")
+        .eq("session_date", str(trading_day))
+        .limit(1)
+        .execute()
+    )
+
+    if not resp.data:
+        return {
+            "trading_day":    str(trading_day),
+            "session_id":     None,
+            "already_analyzed": False,
+        }
+
+    session = resp.data[0]
+    return {
+        "trading_day":    str(trading_day),
+        "session_id":     session["session_id"],
+        "session_status": session.get("status"),
+        "already_analyzed": True,
+    }
+
+
+@router.post("/pipeline/deep-analysis/run")
+async def run_deep_analysis():
+    """Run the complete pipeline for the last trading day in a background thread."""
+    import threading
+    from new_data_ingestion.nse_bhavcopy import last_trading_day
+    from database.queries import get_client
+
+    trading_day = last_trading_day()
+
+    # Refuse if a session already exists for this day
+    resp = (
+        get_client()
+        .table("analysis_sessions")
+        .select("session_id")
+        .eq("session_date", str(trading_day))
+        .limit(1)
+        .execute()
+    )
+    if resp.data:
+        raise HTTPException(status_code=409, detail=f"Session already exists for {trading_day}")
+
+    def _run():
+        try:
+            from pipeline.orchestrator import run_pipeline
+            result = run_pipeline(trading_day)
+            logger.info("Pipeline completed via API for %s: %s", trading_day, result)
+        except Exception as exc:
+            logger.error("Pipeline background run failed for %s: %s", trading_day, exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "message": f"Pipeline started for {trading_day}"}
+
+
+# ── GET /api/settings/stock-sources ──────────────────────────────────────────
+
+@router.get("/settings/stock-sources")
+async def get_stock_sources_config():
+    """Return stock_sources and interested_stocks config values."""
+    import json as _json
+    from database.queries import get_system_config
+    raw_sources = get_system_config("stock_sources")
+    if raw_sources:
+        try:
+            sources = _json.loads(raw_sources)
+        except Exception:
+            sources = ["NIFTY_50", "KITE_ACTIVE_TRADES", "INTERESTED_STOCKS"]
+    else:
+        sources = ["NIFTY_50", "KITE_ACTIVE_TRADES", "INTERESTED_STOCKS"]
+    raw_interested = get_system_config("interested_stocks") or ""
+    interested = [s.strip().upper() for s in raw_interested.split(",") if s.strip()]
+    return {"stock_sources": sources, "interested_stocks": interested}
+
+
+@router.post("/settings/stock-sources")
+async def save_stock_sources_config(body: dict):
+    """Persist stock_sources and interested_stocks to system_config."""
+    import json as _json
+    from database.queries import set_system_config
+    valid = {"NIFTY_50", "KITE_ACTIVE_TRADES", "INTERESTED_STOCKS"}
+    sources = [s for s in body.get("stock_sources", []) if s in valid]
+    interested_raw: list[str] = body.get("interested_stocks", [])
+    interested = [s.strip().upper() for s in interested_raw if s.strip()]
+    set_system_config("stock_sources", _json.dumps(sources))
+    set_system_config("interested_stocks", ",".join(interested))
+    return {"ok": True, "stock_sources": sources, "interested_stocks": interested}
+
+
 @router.get("/validate/indicators", tags=["validation"])
 def validate_indicators(symbol: str, date: str | None = None):
     """

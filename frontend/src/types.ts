@@ -252,3 +252,10 @@ export interface ActiveTradesResponse {
   session_date: string | null;
 }
 
+export interface DeepAnalysisStatus {
+  trading_day: string;
+  session_id: string | null;
+  session_status?: string | null;
+  already_analyzed: boolean;
+}
+

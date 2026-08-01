@@ -138,6 +138,37 @@ export function fetchActiveTrades(): Promise<ActiveTradesResponse> {
   return apiFetch<ActiveTradesResponse>('/api/active-trades');
 }
 
+export interface DeepAnalysisStatus {
+  trading_day: string;
+  session_id: string | null;
+  session_status?: string | null;
+  already_analyzed: boolean;
+}
+
+export function fetchDeepAnalysisStatusForRun(): Promise<DeepAnalysisStatus> {
+  return apiFetch<DeepAnalysisStatus>('/api/pipeline/deep-analysis/status');
+}
+
+export function triggerDeepAnalysis(): Promise<{ ok: boolean; message: string; session_id: string }> {
+  return apiFetch('/api/pipeline/deep-analysis/run', { method: 'POST' });
+}
+
+export interface StockSourcesConfig {
+  stock_sources: string[];
+  interested_stocks: string[];
+}
+
+export function fetchStockSources(): Promise<StockSourcesConfig> {
+  return apiFetch<StockSourcesConfig>('/api/settings/stock-sources');
+}
+
+export function saveStockSources(config: StockSourcesConfig): Promise<{ ok: boolean; stock_sources: string[]; interested_stocks: string[] }> {
+  return apiFetch('/api/settings/stock-sources', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
 // ── Cache-aware variants ───────────────────────────────────────────────────────
 
 export async function fetchTodayCached(): Promise<TodayResponse> {

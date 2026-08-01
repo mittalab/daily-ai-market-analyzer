@@ -232,5 +232,81 @@ def main():
     print(f"  Total cost  : ${total_cost:.4f}")
 
 
+def run_turn3_for_session(session_id: str, session_date: "date") -> dict:
+    """
+    Run Turn 3 deep analysis for the given session.
+    Raises ValueError if preconditions are not met.
+    Returns a summary dict on success.
+    Intended for API / background-task use (no sys.exit).
+    """
+    import os
+    import anthropic as _anthropic
+    from pipeline.claude_session import run_turn_deep_analysis as _run
+
+    turns = get_claude_turns(session_id)
+    deep_turns = [t for t in turns if t.get("turn_type") == "deep_analysis"]
+    turn1_row  = next((t for t in turns if t["turn_number"] == 1), None)
+    turn2_row  = next((t for t in turns if t["turn_number"] == 2), None)
+
+    if not turn1_row or not turn1_row.get("output_text"):
+        raise ValueError(f"Turn 1 (market_context) missing for session {session_id}")
+    if not turn2_row or not turn2_row.get("output_text"):
+        raise ValueError(f"Turn 2 (pre_scan) missing for session {session_id}")
+    if deep_turns:
+        raise ValueError(f"Session already has {len(deep_turns)} deep analysis turns — nothing to run")
+
+    turn1_result = _parse_json(turn1_row["output_text"])
+    t2_parsed    = _parse_json(turn2_row["output_text"])
+    index_ctx    = _build_index_ctx(turn1_result)
+    forward_list = _build_forward_list(t2_parsed)
+
+    if not forward_list:
+        return {"stocks_analyzed": 0, "total_cost_usd": 0.0, "message": "No stocks forwarded from Turn 2"}
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not set in environment")
+
+    client = _anthropic.Anthropic(api_key=api_key, max_retries=0)
+    config = get_all_system_config()
+
+    trade_ready_list: list[dict] = []
+    results:          list[dict] = []
+    total_cost = 0.0
+
+    for i, stock in enumerate(forward_list):
+        symbol    = stock["symbol"]
+        direction = stock["direction"]
+        turn_num  = 3 + i
+
+        deep_res, deep_cost = _run(
+            client=client,
+            session_id=session_id,
+            session_date=session_date,
+            symbol=symbol,
+            direction=direction,
+            is_re=False,
+            days_in=0,
+            index_ctx=index_ctx,
+            config=config,
+            turn_num=turn_num,
+            trade_ready_list=trade_ready_list,
+            turn1_result=turn1_result,
+            turn2_result=None,
+            max_tokens=16000,
+        )
+
+        results.append(deep_res)
+        total_cost += deep_cost.get("total_cost_usd", 0.0)
+        if deep_res.get("stage") == "TRADE_READY":
+            trade_ready_list.append(deep_res)
+
+    return {
+        "stocks_analyzed": len(results),
+        "total_cost_usd":  round(total_cost, 4),
+        "results": [{"symbol": r.get("symbol"), "stage": r.get("stage")} for r in results],
+    }
+
+
 if __name__ == "__main__":
     main()

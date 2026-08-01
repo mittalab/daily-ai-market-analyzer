@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchSystemStatus, fetchFoStocks, fetchIndicatorValidation } from '../api';
-import type { CostInfo, SessionTurn, SystemStatus, IndicatorValidation } from '../types';
+import { fetchSystemStatus, fetchFoStocks, fetchIndicatorValidation, fetchStockSources, saveStockSources, fetchDeepAnalysisStatusForRun, triggerDeepAnalysis } from '../api';
+import type { CostInfo, SessionTurn, SystemStatus, IndicatorValidation, DeepAnalysisStatus } from '../types';
 
 function StatusDot({ ok }: { ok: boolean }) {
   return (
@@ -139,19 +139,16 @@ function ContextQualitySection({ cq }: { cq: NonNullable<CostInfo['context_quali
 // ── Indicator Validation Section ──────────────────────────────────────────────
 
 function IndicatorValidationSection() {
-  const [stocks, setStocks] = useState<string[]>([]);
+  const [open, setOpen]           = useState(false);
+  const [stocks, setStocks]       = useState<string[]>([]);
+  const [stocksLoading, setStocksLoading] = useState(false);
+  const [stocksLoaded, setStocksLoaded]   = useState(false);
   const [selectedStock, setSelectedStock] = useState('HDFCBANK');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [valData, setValData] = useState<IndicatorValidation | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [tvInputs, setTvInputs] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    fetchFoStocks()
-      .then(setStocks)
-      .catch(err => console.error("Failed to load stocks:", err));
-  }, []);
+  const [selectedDate, setSelectedDate]   = useState('');
+  const [valData, setValData]     = useState<IndicatorValidation | null>(null);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [tvInputs, setTvInputs]   = useState<Record<string, string>>({});
 
   const loadValidation = useCallback((symbol: string, dateStr?: string) => {
     setLoading(true);
@@ -169,14 +166,26 @@ function IndicatorValidationSection() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Only load validation data after the section is first opened
   useEffect(() => {
-    if (selectedStock) {
+    if (open && !valData && !loading) {
       loadValidation(selectedStock, selectedDate || undefined);
     }
-  }, [selectedStock, loadValidation]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelectOpen = useCallback(() => {
+    if (stocksLoaded || stocksLoading) return;
+    setStocksLoading(true);
+    fetchFoStocks()
+      .then(data => { setStocks(data); setStocksLoaded(true); })
+      .catch(err => console.error("Failed to load stocks:", err))
+      .finally(() => setStocksLoading(false));
+  }, [stocksLoaded, stocksLoading]);
 
   const handleStockChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedStock(e.target.value);
+    const sym = e.target.value;
+    setSelectedStock(sym);
+    loadValidation(sym, selectedDate || undefined);
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,121 +201,399 @@ function IndicatorValidationSection() {
     if (systemVal === null || !tvStr) return '—';
     const tvVal = parseFloat(tvStr);
     if (isNaN(tvVal) || systemVal === 0) return '—';
-    const diff = (Math.abs(systemVal - tvVal) / Math.abs(systemVal)) * 100;
-    return diff.toFixed(2) + '%';
+    return ((Math.abs(systemVal - tvVal) / Math.abs(systemVal)) * 100).toFixed(2) + '%';
   };
 
   const isDiffWarning = (systemVal: number | null, tvStr: string): boolean => {
     if (systemVal === null || !tvStr) return false;
     const tvVal = parseFloat(tvStr);
     if (isNaN(tvVal) || systemVal === 0) return false;
-    const diff = (Math.abs(systemVal - tvVal) / Math.abs(systemVal)) * 100;
-    return diff > 1.0;
+    return (Math.abs(systemVal - tvVal) / Math.abs(systemVal)) * 100 > 1.0;
   };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 mx-4 md:mx-0 p-4 mb-3">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-        🔍 Indicator Validation
-      </p>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          🔍 Indicator Validation
+        </p>
+        <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
+      </button>
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Select Stock</label>
-          <select
-            value={selectedStock}
-            onChange={handleStockChange}
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            {stocks.length > 0 ? (
-              stocks.map(s => <option key={s} value={s}>{s}</option>)
-            ) : (
-              <option value="HDFCBANK">HDFCBANK</option>
-            )}
-          </select>
+      {open && (
+        <div className="mt-4">
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Select Stock</label>
+              <select
+                value={selectedStock}
+                onChange={handleStockChange}
+                onMouseDown={handleSelectOpen}
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                {stocksLoading ? (
+                  <option value={selectedStock}>{selectedStock} (loading…)</option>
+                ) : stocks.length > 0 ? (
+                  stocks.map(s => <option key={s} value={s}>{s}</option>)
+                ) : (
+                  <option value={selectedStock}>{selectedStock}</option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={handleDateChange}
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {loading && (
+            <div className="flex items-center justify-center py-6">
+              <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mb-3">
+              {error}
+            </div>
+          )}
+
+          {valData && !loading && (
+            <div>
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-3 bg-gray-50 rounded-lg p-2">
+                <span>Method: <strong className="text-gray-700">{valData.computation_method}</strong></span>
+                {valData.warnings.length > 0 && (
+                  <span className="text-amber-600 font-medium">⚠️ {valData.warnings[0]}</span>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-[11px] font-semibold text-gray-400 uppercase">
+                      <th className="py-2">Indicator</th>
+                      <th className="py-2 text-right">System</th>
+                      <th className="py-2 text-center w-24">TradingView</th>
+                      <th className="py-2 text-right">Diff%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {Object.entries(valData.indicators).map(([key, item]) => {
+                      const tvVal = tvInputs[key] || '';
+                      const diffVal = getDiffPct(item.system, tvVal);
+                      const isWarning = isDiffWarning(item.system, tvVal);
+                      return (
+                        <tr key={key} className="text-sm">
+                          <td className="py-2 font-mono text-xs text-gray-600">{key}</td>
+                          <td className="py-2 text-right font-semibold text-gray-800">
+                            {item.system !== null ? item.system.toFixed(2) : '—'}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <input
+                              type="text"
+                              placeholder="Manual"
+                              value={tvVal}
+                              onChange={(e) => handleTvInputChange(key, e.target.value)}
+                              className="w-16 text-center border border-gray-200 rounded p-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-800"
+                            />
+                          </td>
+                          <td className={`py-2 text-right font-medium font-mono text-xs ${
+                            isWarning ? 'text-red-500 font-semibold' : 'text-gray-500'
+                          }`}>
+                            {diffVal}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-[10px] text-gray-400 text-center mt-3 italic">
+                Enter TradingView manual values to compute variance. Red indicates &gt; 1% deviation.
+              </p>
+            </div>
+          )}
         </div>
+      )}
+    </div>
+  );
+}
 
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Date</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={handleDateChange}
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
+// ── Deep Analysis Modal ───────────────────────────────────────────────────────
+
+function DeepAnalysisModal({ onClose }: { onClose: () => void }) {
+  const [status, setStatus]   = useState<DeepAnalysisStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDeepAnalysisStatusForRun()
+      .then(setStatus)
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to fetch status'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleRun = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      await triggerDeepAnalysis();
+      setStarted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start analysis');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-base font-semibold text-gray-800 mb-4">Run Deep Analysis</h2>
+
+        {loading && (
+          <div className="flex items-center justify-center py-6">
+            <svg className="animate-spin h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mb-4">
+            {error}
+          </div>
+        )}
+
+        {!loading && status && (
+          <div className="space-y-3 mb-5">
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
+              <span className="text-xs text-gray-500">Trading day</span>
+              <span className="text-sm font-semibold text-gray-800 font-mono">{status.trading_day}</span>
+            </div>
+
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
+              <span className="text-xs text-gray-500">Analysis status</span>
+              {status.already_analyzed ? (
+                <span className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  ALREADY ANALYZED
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                  NOT YET RUN
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {started && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700 mb-4">
+            Pipeline started in the background. This will take several minutes.
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          {!loading && status && !status.already_analyzed && !started && (
+            <button
+              onClick={handleRun}
+              disabled={running}
+              className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors"
+            >
+              {running ? 'Starting…' : 'Run'}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-2.5 text-sm font-semibold transition-colors"
+          >
+            Close
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {loading && (
-        <div className="flex items-center justify-center py-6">
-          <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-          </svg>
-        </div>
-      )}
+// ── Stocks to Evaluate Section ────────────────────────────────────────────────
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mb-3">
-          {error}
-        </div>
-      )}
+function StocksToEvaluateSection() {
+  const [open, setOpen]           = useState(false);
+  const [loaded, setLoaded]       = useState(false);
+  const [sources, setSources]     = useState<string[]>([]);
+  const [interested, setInterested] = useState<string[]>(['']);
+  const [loading, setLoading]     = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [saved, setSaved]         = useState(false);
 
-      {valData && !loading && (
-        <div>
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-3 bg-gray-50 rounded-lg p-2">
-            <span>Method: <strong className="text-gray-700">{valData.computation_method}</strong></span>
-            {valData.warnings.length > 0 && (
-              <span className="text-amber-600 font-medium">⚠️ {valData.warnings[0]}</span>
-            )}
-          </div>
+  useEffect(() => {
+    if (!open || loaded) return;
+    setLoading(true);
+    setError(null);
+    fetchStockSources()
+      .then(data => {
+        setSources(data.stock_sources);
+        setInterested(data.interested_stocks.length > 0 ? data.interested_stocks : ['']);
+        setLoaded(true);
+      })
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+      .finally(() => setLoading(false));
+  }, [open, loaded]);
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-gray-100 text-[11px] font-semibold text-gray-400 uppercase">
-                  <th className="py-2">Indicator</th>
-                  <th className="py-2 text-right">System</th>
-                  <th className="py-2 text-center w-24">TradingView</th>
-                  <th className="py-2 text-right">Diff%</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {Object.entries(valData.indicators).map(([key, item]) => {
-                  const tvVal = tvInputs[key] || '';
-                  const diffVal = getDiffPct(item.system, tvVal);
-                  const isWarning = isDiffWarning(item.system, tvVal);
-                  
-                  return (
-                    <tr key={key} className="text-sm">
-                      <td className="py-2 font-mono text-xs text-gray-600">{key}</td>
-                      <td className="py-2 text-right font-semibold text-gray-800">
-                        {item.system !== null ? item.system.toFixed(2) : '—'}
-                      </td>
-                      <td className="py-2 px-2 text-center">
-                        <input
-                          type="text"
-                          placeholder="Manual"
-                          value={tvVal}
-                          onChange={(e) => handleTvInputChange(key, e.target.value)}
-                          className="w-16 text-center border border-gray-200 rounded p-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-800"
-                        />
-                      </td>
-                      <td className={`py-2 text-right font-medium font-mono text-xs ${
-                        isWarning ? 'text-red-500 font-semibold' : 'text-gray-500'
-                      }`}>
-                        {diffVal}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+  const toggleSource = (source: string) => {
+    setSources(prev => prev.includes(source) ? prev.filter(s => s !== source) : [...prev, source]);
+  };
 
-          <p className="text-[10px] text-gray-400 text-center mt-3 italic">
-            Enter TradingView manual values to compute variance. Red indicates &gt; 1% deviation.
-          </p>
+  const updateInterested = (idx: number, val: string) => {
+    setInterested(prev => prev.map((s, i) => i === idx ? val.toUpperCase() : s));
+  };
+
+  const removeInterested = (idx: number) => {
+    setInterested(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      return next.length > 0 ? next : [''];
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      await saveStockSources({
+        stock_sources: sources,
+        interested_stocks: interested.filter(s => s.trim()),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          Stocks to Evaluate
+        </p>
+        <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="mt-4">
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            </div>
+          )}
+
+          {!loading && (
+            <>
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-2 font-medium">Sources</p>
+                {(['NIFTY_50', 'KITE_ACTIVE_TRADES'] as const).map(src => (
+                  <label key={src} className="flex items-center gap-2 py-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sources.includes(src)}
+                      onChange={() => toggleSource(src)}
+                      className="w-4 h-4 rounded text-blue-500 focus:ring-blue-400"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {src === 'NIFTY_50' ? 'Nifty 50' : 'Kite Active Trades'}
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500 font-medium">Interested Stocks</p>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sources.includes('INTERESTED_STOCKS')}
+                      onChange={() => toggleSource('INTERESTED_STOCKS')}
+                      className="w-4 h-4 rounded text-blue-500 focus:ring-blue-400"
+                    />
+                    <span className="text-xs text-gray-500">Enable</span>
+                  </label>
+                </div>
+                <div className="space-y-2">
+                  {interested.map((sym, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={sym}
+                        onChange={e => updateInterested(idx, e.target.value)}
+                        placeholder="e.g. TATAMOTORS"
+                        className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={() => removeInterested(idx)}
+                        className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors text-sm font-bold"
+                        title="Remove"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setInterested(prev => [...prev, ''])}
+                    className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-medium mt-1"
+                  >
+                    <span className="text-base leading-none font-bold">+</span> Add stock
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 mb-3">
+                  {error}
+                </div>
+              )}
+
+              {saved && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-xs text-green-700 mb-3">
+                  Settings saved successfully
+                </div>
+              )}
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -316,9 +603,10 @@ function IndicatorValidationSection() {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function PerformanceScreen() {
-  const [status, setStatus]   = useState<SystemStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [status, setStatus]         = useState<SystemStatus | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [showRunModal, setShowRunModal] = useState(false);
 
   useEffect(() => {
     fetchSystemStatus()
@@ -514,6 +802,19 @@ export default function PerformanceScreen() {
           )}
         </div>
       </div>
+
+      <div className="px-4 mt-4 space-y-3">
+        <StocksToEvaluateSection />
+
+        <button
+          onClick={() => setShowRunModal(true)}
+          className="w-full bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-xl py-3 text-sm font-medium transition-colors shadow-sm"
+        >
+          Run Deep Analysis Again
+        </button>
+      </div>
+
+      {showRunModal && <DeepAnalysisModal onClose={() => setShowRunModal(false)} />}
 
       <p className="text-xs text-gray-400 text-center mt-4 mb-4">
         Server time: {fmtTime(status?.server_time_ist)}
