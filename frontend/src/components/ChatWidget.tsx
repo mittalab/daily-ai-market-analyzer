@@ -263,7 +263,7 @@ export default function ChatWidget() {
             You loaded {formatBadgeDate(lastLoadedDate!)} context earlier.
             Tonight's analysis ({formatBadgeDate(sessionDate!)}) is now ready.
           </div>
-          <button onClick={handleLoad} className="mt-2 text-blue-600 font-medium text-sm hover:underline">
+          <button onClick={() => handleLoad()} className="mt-2 text-blue-600 font-medium text-sm hover:underline">
             Load Tonight's Analysis
           </button>
         </div>

@@ -3187,28 +3187,648 @@ adjusted_score threshold (< 35). If you find hard_gate_reason referencing GATE 3
 correct it: set hard_gate_triggered = false, restore the appropriate stage from the adjusted_score thresholds,
 and move the GATE 3 / wall information to instrument_decision.none_reason and actionable_now / actionable_note only.
 
-1. OI_WALL_PROXIMITY_CHECK — always runs first; its result gates ALL instrument paths:
-   - walls_checked_side is derived deterministically: direction=LONG → "CE", direction=SHORT → "PE". Not a free choice.
-   - From the Option Chain Last Day data (Section E), filter to the walls_checked_side type. Keep only strikes STRICTLY between entry_mid (=(entry_low+entry_high)/2) and target_2, in the direction of the trade. Discard strikes behind the entry and beyond target_2.
-   - For each candidate strike in that filtered set, find its two immediate neighbors in the full chain (the next strike above and next strike below it by price). Compute average OI of those two neighbors.
-   - A strike is "obstructing" if its OI > 3× that neighbor average.
-   - nearest_obstructing_wall_strike = the obstructing strike closest to entry_mid; null if none qualifies.
-   - pass = true if no filtered strike is obstructing; pass = false if at least one is.
-   - HARD BLOCK: pass = false blocks BOTH OPTIONS and FUT — instrument_recommendation must be "NONE" whenever this check fails. There is no FUT fallback when the wall check fails. Populate none_reason and name the wall in dimension_4_narrative.
+═══════════════════════════════════════════════════
+STEP 0: FUTURES CONTRACT SELECTION AND
+        CHART ANALYSIS
+═══════════════════════════════════════════════════
 
-2. THETA_COST_CHECK — options-specific:
-   - Assess whether theta decay is manageable over the expected holding period given DTE and IV level.
-   - Set pass = null and note = "N/A — FUT path" if Gate 3 is triggered (DTE < 6) or no options path is viable.
+─────────────────────────────────────────────
+STEP 0A: CONTRACT SELECTION
+─────────────────────────────────────────────
 
-3. LIQUIDITY_CHECK — options-specific:
-   - Assess whether ATM OI and estimated bid-ask spread support a reasonable fill.
-   - Set pass = null and note = "N/A — FUT path" if Gate 3 is triggered or no options path is viable.
+Determine which futures contract to use
+for ALL subsequent analysis, rules, and
+fut_setup population.
 
-4. DECISION RULE (apply in order, stop at first match):
-   - criteria_passed_count = count of checks where pass = true (null values excluded from count).
-   - instrument_recommendation = "OPTIONS" if: oi_wall_proximity_check.pass == true AND criteria_passed_count >= 2.
-   - instrument_recommendation = "FUT" if: oi_wall_proximity_check.pass == true AND the futures basis is not severely unfavorable (a basis that is both negative AND on an expanding-negative trend per fut_setup.basis_note is "severely unfavorable").
-   - instrument_recommendation = "NONE" in all other cases: oi_wall_proximity_check.pass == false (wall hard-blocks both paths), OR OPTIONS criteria fail AND FUT basis is severely unfavorable. When NONE, set actionable_now = false and populate none_reason.
+Read near_month_dte from Section E.
+
+IF near_month_dte >= 6:
+  ACTIVE CONTRACT = near_month
+
+  Use futures_30d_near_month series for:
+    Chart analysis (Step 0B)
+    All fut_setup levels
+    All FUT rule evaluations
+    fut_setup.expiry = near month expiry date
+    fut_setup.days_to_expiry = near_month_dte
+    fut_setup.contract_selected = "near_month"
+    fut_setup.contract_selection_note = null
+
+  Do NOT analyse or populate next_month levels.
+  next_month data is available but not used.
+
+IF near_month_dte < 6:
+  ACTIVE CONTRACT = next_month
+
+  Near month is too close to expiry for a
+  2-5 day swing trade — settlement risk,
+  theta acceleration, and price discovery
+  distortion make near month unsuitable.
+
+  Use futures_30d_next_month series for:
+    Chart analysis (Step 0B)
+    All fut_setup levels (primary recommendation)
+    All FUT rule evaluations
+    fut_setup.expiry = next month expiry date
+    fut_setup.days_to_expiry = next_month_dte
+    fut_setup.contract_selected = "next_month"
+    fut_setup.contract_selection_note =
+      "Near-month has [near_month_dte] DTE —
+       below 6-day minimum for 2-5 day hold.
+       Using next-month contract for all
+       analysis and recommendation."
+
+  ADDITIONALLY when near_month_dte < 6:
+    Provide near_month levels as reference
+    in a separate block within
+    dimension_2_narrative:
+
+    "NEAR-MONTH REFERENCE (not recommended
+     — [near_month_dte] DTE remaining):
+     Near-month entry zone: [level]
+     Near-month SL: [level]
+     Near-month T1: [level]
+     Near-month T2: [level]
+     Near-month fut_rr_t2: [value]
+     Note: Near-month levels shown for
+     reference only. All rules evaluated
+     and fut_setup populated using
+     next-month contract."
+
+    This reference is informational only.
+    It does NOT affect fut_setup fields.
+    It does NOT affect any rule evaluation.
+    All instrument rules use next_month data.
+
+SCOPE OF CONTRACT SELECTION:
+  Contract selection affects ONLY:
+    fut_setup fields
+    FUT rule evaluations (Steps 4A-4D)
+    fut_rr_t2 computation (Step 1)
+
+  Contract selection does NOT affect:
+    hard_gate_triggered
+    stage
+    underlying_rr_t2 (always spot-based)
+    options_setup fields
+    OPTIONS rule evaluations
+    scoring_breakdown
+    key_levels
+
+─────────────────────────────────────────────
+STEP 0B: FUTURES CHART ANALYSIS
+─────────────────────────────────────────────
+
+Using the ACTIVE CONTRACT series identified
+in Step 0A, read the futures OHLCV data
+as an independent price chart.
+
+ACTIVE SERIES:
+  near_month_dte >= 6 → futures_30d_near_month
+  near_month_dte < 6  → futures_30d_next_month
+
+From this series, identify independently:
+
+FUTURES SUPPORT ZONES:
+  Recent swing lows in futures prices
+  Where futures price found buyers
+  High-volume accumulation days on futures
+  OI-confirmed demand zones from futures OI data
+
+FUTURES ENTRY ZONE:
+  Where to enter the futures position
+  Based on futures price structure
+  Typically: recent futures consolidation range
+  or pullback to futures support zone
+
+FUTURES STOP LOSS:
+  The structural futures price level whose
+  breach invalidates the trade thesis
+  Based on futures swing lows or breakdown
+  below futures support structure
+
+FUTURES TARGET 1:
+  Nearest meaningful futures resistance
+  Recent futures swing high
+  Or futures OI wall that creates ceiling
+
+FUTURES TARGET 2:
+  Next meaningful futures resistance beyond T1
+  Prior futures distribution zone
+  Or next major futures swing high
+
+CRITICAL RULES FOR FUTURES CHART ANALYSIS:
+
+  DO NOT use spot_level + basis arithmetic.
+  DO NOT copy key_levels into fut_setup.
+  DO NOT reference spot OHLCV for fut_setup levels.
+
+  The futures levels will resemble spot levels
+  because both track the same underlying asset.
+  But they must come from the futures series
+  independently — futures has its own:
+    Open gaps that act as support/resistance
+    OI-weighted price memory at specific levels
+    Rollover artifacts visible as volume spikes
+    Basis-driven deviations at key sessions
+
+  Where futures chart diverges from spot chart,
+  note explicitly in dimension_2_narrative.
+
+POPULATE fut_setup with futures-derived levels:
+  entry_low:  futures structural entry low
+  entry_high: futures structural entry high
+  entry_mid:  (entry_low + entry_high) / 2
+  stop_loss:  futures structural SL level
+  target_1:   futures structural T1 level
+  target_2:   futures structural T2 level
+
+WHEN near_month_dte < 6:
+  Analyse futures_30d_next_month as the
+  primary chart for fut_setup levels.
+
+  ALSO analyse futures_30d_near_month
+  to produce near-month reference levels
+  for the reference block in narrative.
+
+  The next_month series may have fewer
+  data points and lower volume in early
+  sessions — note this in analysis:
+  "Next-month series shows [X] sessions
+   of data. Earlier sessions have lower
+   volume and wider spreads — placing
+   more weight on recent [Y] sessions
+   for level identification."
+
+─────────────────────────────────────────────
+STEP 0C: FUTURES BASIS ASSESSMENT
+─────────────────────────────────────────────
+
+Assess basis from the ACTIVE CONTRACT:
+
+near_month_dte >= 6:
+  basis_current = last row of
+    futures_30d_near_month.basis
+  basis_trend: compare last 5 rows of
+    futures_30d_near_month.basis
+    EXPANDING = basis moving more negative
+                or more positive each day
+                in the unfavorable direction
+    CONTRACTING = basis moving toward zero
+                  or in the favorable direction
+    STABLE = no clear trend in last 5 sessions
+
+near_month_dte < 6:
+  basis_current = last row of
+    futures_30d_next_month.basis
+  basis_trend: from last 5 rows of
+    futures_30d_next_month.basis
+
+  Note: Next-month basis is typically
+  more positive (higher contango) than
+  near-month due to additional carry cost.
+  This is expected and not a bearish signal.
+
+Populate fut_setup.basis_note:
+  "Near/Next-month basis: [value] pts
+   ([EXPANDING/CONTRACTING/STABLE] trend).
+   [One sentence on what this means for
+   the trade direction — positive = longs
+   willing to carry, negative = shorts
+   carrying or dividend expectation]."
+
+═══════════════════════════════════════════════════
+STEP 1: THREE RR COMPUTATIONS
+═══════════════════════════════════════════════════
+
+Compute all three explicitly before
+running any gates or instrument rules.
+
+COMPUTATION 1: UNDERLYING RR (spot-based)
+  Purpose: Gate 2 enforcement only
+  Source: key_levels (spot OHLCV)
+
+  underlying_entry_mid =
+    (key_levels.support_zone_low
+     + key_levels.support_zone_high) / 2
+
+  underlying_rr_t2 =
+    (key_levels.resistance_2
+     - underlying_entry_mid)
+    / (underlying_entry_mid
+       - key_levels.stop_loss)
+
+  Used for: Gate 2 only.
+  NOT used for FUT or OPTIONS rules.
+
+COMPUTATION 2: FUTURES RR
+  Purpose: FUT instrument rule (F4)
+  Source: fut_setup levels from Step 0B
+
+  Uses ACTIVE CONTRACT levels only.
+
+  fut_entry_mid = (fut_setup.entry_low
+                   + fut_setup.entry_high) / 2
+
+  fut_rr_t2 = (fut_setup.target_2
+               - fut_entry_mid)
+              / (fut_entry_mid
+                 - fut_setup.stop_loss)
+
+  Store as: fut_setup.rr_t2
+  Used for: FUT rule F4 only.
+
+COMPUTATION 3: PREMIUM RR
+  Purpose: OPTIONS instrument rule (O6)
+  Source: options_setup premium levels
+
+  entry_premium_mid =
+    (options_setup.entry_premium_low
+     + options_setup.entry_premium_high) / 2
+
+  rr_premium_t2 =
+    (options_setup.target_2_premium
+     - entry_premium_mid)
+    / (entry_premium_mid
+       - options_setup.sl_premium)
+
+  Store as: options_setup.rr_premium_t2
+  Used for: OPTIONS rule O6 only.
+
+Write all three explicitly at end of
+dimension_2_narrative:
+
+  "RR COMPUTATIONS:
+
+   Underlying RR (Gate 2 only):
+     entry_mid: __  sl: __  t2: __
+     underlying_rr_t2: __
+
+   Futures RR ([near/next]-month contract):
+     fut_entry_mid: __  fut_sl: __  fut_t2: __
+     fut_rr_t2: __
+
+   Premium RR (OPTIONS rule only):
+     entry_premium_mid: __  sl_premium: __
+     target_2_premium: __
+     rr_premium_t2: __"
+
+═══════════════════════════════════════════════════
+STEP 2: GATE 2 CHECK (underlying RR)
+═══════════════════════════════════════════════════
+
+If underlying_rr_t2 < 1.5:
+  stage = "REJECT"
+  hard_gate_triggered = true
+  hard_gate_reason = "GATE 2 — underlying_rr_t2
+    = [value] < 1.5 minimum"
+  instrument_recommendation = "NONE"
+  instrument_reason = "GATE 2 triggered —
+    underlying spot RR [value] < 1.5 minimum.
+    No instrument recommended.
+    Re-evaluate when entry or target levels
+    improve to achieve 1.5+ underlying RR."
+  Skip Steps 3-6.
+
+If underlying_rr_t2 >= 1.5:
+  Continue to Step 3.
+
+═══════════════════════════════════════════════════
+STEP 3: OI WALL PROXIMITY CHECK
+═══════════════════════════════════════════════════
+
+Always runs before instrument rules.
+If wall check fails → NONE immediately.
+
+walls_checked_side:
+  direction = LONG → CE walls
+  direction = SHORT → PE walls
+
+Filter Option Chain Last Day to
+walls_checked_side type.
+Keep strikes STRICTLY between
+entry_mid (underlying) and target_2
+(underlying) in trade direction.
+
+For each candidate strike:
+  Find two immediate chain neighbors
+  Compute average OI of neighbors
+  Strike is OBSTRUCTING if OI > 3× average
+
+nearest_obstructing_wall_strike =
+  closest obstructing strike to entry_mid
+  null if none qualifies
+
+pass = true if no strike obstructs
+pass = false if any strike obstructs
+
+If pass == false:
+  instrument_recommendation = "NONE"
+  instrument_reason = "[strike] [CE/PE] wall —
+    OI [value] (~[ratio]x neighbor average [calc]).
+    OPTIONS: suppresses premium expansion toward
+    target_2. FUT: gamma-pinning resistance makes
+    [target_2] structurally difficult within
+    2-5 days. Neither path recommended.
+    Re-evaluate when [level] cleared on volume."
+  none_reason = "[strike] wall blocks both paths.
+    Revisit when cleared on volume."
+  actionable_now = false
+  Skip Steps 4 and 5.
+
+If pass == true:
+  Continue to Step 4.
+
+═══════════════════════════════════════════════════
+STEP 4: FUTURES RULES
+═══════════════════════════════════════════════════
+
+All four rules evaluated using ACTIVE CONTRACT
+data (near or next month per Step 0A).
+
+If ALL four pass → FUT recommended. Stop.
+If ANY fails → evaluate OPTIONS in Step 5.
+
+RULE F1: BASIS NOT NEGATIVE AND EXPANDING
+  From fut_setup.basis_note (ACTIVE CONTRACT).
+
+  PASS:
+    basis_current >= 0
+    OR basis_current < 0 AND CONTRACTING
+
+  FAIL:
+    basis_current < 0 AND EXPANDING
+
+RULE F2: PRICE-OI REGIME NOT CONSISTENTLY BEARISH
+  From price_oi_regime_last_3.
+  These are always computed from near_month
+  series regardless of active contract —
+  near_month has more liquidity and reflects
+  current institutional positioning better
+  even when near expiry.
+
+  PASS:
+    At least 1 of last 3 valid sessions shows
+    LONG_BUILDUP or SHORT_COVERING
+
+  FAIL:
+    ALL valid sessions show
+    SHORT_BUILDUP or LONG_UNWINDING
+
+RULE F3: OI TREND ALIGNED WITH DIRECTION
+  From near_month_oi_trend in Section E.
+  Always uses near_month OI trend for
+  institutional positioning signal
+  regardless of active contract.
+
+  LONG setup:
+    PASS: near_month_oi_trend = INCREASING or STABLE
+    FAIL: near_month_oi_trend = DECREASING
+
+  SHORT setup:
+    PASS: near_month_oi_trend = INCREASING or STABLE
+    FAIL: near_month_oi_trend = DECREASING
+
+RULE F4: FUTURES RR >= 2.0
+  From fut_setup.rr_t2 (ACTIVE CONTRACT).
+
+  PASS: fut_rr_t2 >= 2.0
+  FAIL: fut_rr_t2 < 2.0
+
+IF ALL FOUR PASS:
+  instrument_recommendation = "FUT"
+
+  fut_setup fields already populated
+  from Step 0B using ACTIVE CONTRACT.
+
+  instrument_reason = "FUT ([near/next]-month,
+    [DTE] days) — [basis value] basis ([trend]),
+    regime shows [bullish session summary],
+    OI trend [value], futures RR [fut_rr_t2].
+    All four FUT rules passed.
+    [If next_month: 'Near-month [near_month_dte]
+    DTE too short — using next-month contract.']
+    Clean directional exposure — full delta,
+    no theta, no IV drag."
+
+  none_reason = null
+  actionable_now = true
+  actionable_note = null
+
+IF ANY FAIL:
+  Note which rules failed.
+  Continue to Step 5.
+
+═══════════════════════════════════════════════════
+STEP 5: OPTIONS RULES
+═══════════════════════════════════════════════════
+
+Only reached if Step 4 had any failure.
+ALL eight must pass for OPTIONS.
+ANY failure → NONE.
+
+Note: OPTIONS always uses near-month expiry
+if DTE >= 6 (Gate 3 has not fired).
+If near_month_dte < 6, Gate 3 has already
+nulled options_setup. In this case
+OPTIONS path is unavailable — skip to NONE.
+
+IF near_month_dte < 6:
+  OPTIONS path unavailable (Gate 3).
+  instrument_recommendation = "NONE"
+  Document that OPTIONS path is blocked
+  by Gate 3 in addition to any FUT
+  rule failures.
+  Skip remaining OPTIONS rules.
+  Go directly to NONE outcome below.
+
+IF near_month_dte >= 6:
+  Evaluate all eight rules:
+
+RULE O1: STAGE IS TRADE_READY
+  PASS: stage == "TRADE_READY"
+  FAIL: any other stage
+
+RULE O2: ADJUSTED SCORE >= 80
+  PASS: adjusted_score >= 80
+  FAIL: adjusted_score < 80
+
+RULE O3: IV IS GENUINELY LOW
+  Use iv_used_for_trade (atm_ce_iv if LONG,
+  atm_pe_iv if SHORT) from options_setup.
+
+  If iv_source_used = "chain_iv":
+    PASS: iv_used_for_trade < 20
+    FAIL: iv_used_for_trade >= 20
+
+  If iv_source_used = "vix_proxy":
+    PASS: VIX < 13
+    FAIL: VIX >= 13
+
+RULE O4: DTE >= 15 TRADING DAYS
+  PASS: days_to_expiry >= 15
+  FAIL: days_to_expiry < 15
+  (Gate 3 handles < 6 — O4 sets higher bar)
+
+RULE O5: STOCK SUFFICIENTLY VOLATILE
+  PASS: atr_pct >= 2.5%
+  FAIL: atr_pct < 2.5%
+
+RULE O6: PREMIUM RR >= 3.0
+  From options_setup.rr_premium_t2 (Step 1).
+
+  PASS: rr_premium_t2 >= 3.0
+  FAIL: rr_premium_t2 < 3.0
+
+  Show calculation:
+  "rr_premium_t2 = ([target_2_premium] -
+   [entry_premium_mid]) / ([entry_premium_mid]
+   - [sl_premium]) = [value]"
+
+RULE O7: LIQUIDITY ADEQUATE
+  PASS: ATM OI >= 1000 contracts
+        AND estimated bid-ask <= 3% of premium
+  FAIL: either condition not met
+
+  Set liquidity_check.pass and note.
+
+RULE O8: THETA COST MANAGEABLE
+  Estimate total theta over 5-day max hold:
+
+  daily_theta ≈ iv_used_for_trade
+    × entry_premium_mid
+    × sqrt(1 / days_to_expiry) / 100
+
+  total_theta_5d = daily_theta × 5
+
+  PASS: total_theta_5d < 20% of entry_premium_mid
+  FAIL: total_theta_5d >= 20% of entry_premium_mid
+
+  Set theta_cost_check.pass and note with
+  explicit calculation shown.
+
+IF ALL EIGHT PASS:
+  instrument_recommendation = "OPTIONS"
+
+  instrument_reason = "OPTIONS — all 8 stringent
+    criteria met: TRADE_READY [score] >= 80,
+    IV [value] < 20 (LOW), DTE [value] >= 15,
+    ATR [value]% >= 2.5, premium RR
+    [rr_premium_t2] >= 3.0, liquidity
+    [ATM OI] adequate, theta [value]%
+    manageable over 5-day hold.
+    FUT disqualified: [specific rule and value
+    that caused FUT failure in Step 4]."
+
+  none_reason = null
+  actionable_now = true
+  actionable_note = null
+
+IF ANY FAIL:
+  instrument_recommendation = "NONE"
+
+  Build complete failure summary:
+
+  instrument_reason = "NONE —
+    FUT disqualified (Step 4):
+      [For each failed FUT rule:]
+      F[n]: [rule name] — [specific value
+      that failed, e.g. 'basis -11.5
+      expanding' or 'fut_rr_t2 1.8 < 2.0'].
+    OPTIONS disqualified (Step 5):
+      [For each failed OPTIONS rule:]
+      O[n]: [rule name] — [specific value
+      that failed, e.g. 'adjusted score
+      68 < 80' or 'rr_premium_t2 2.1 < 3.0'].
+    Re-evaluate when: [most actionable
+    condition — e.g. 'pullback to [level]
+    improves fut_rr_t2 to 2.0+' or
+    'price clears [level] to set new
+    T2 with better RR']."
+
+  none_reason = "FUT: [first failed rule].
+    OPTIONS: [first failed rule].
+    Revisit when [most actionable condition]."
+
+  margin_efficiency_note = null
+  actionable_now = false
+  actionable_note = "Neither FUT nor OPTIONS
+    passes instrument criteria — [single
+    most important reason]."
+
+═══════════════════════════════════════════════════
+STEP 6: CRITERIA_PASSED_COUNT
+═══════════════════════════════════════════════════
+
+criteria_passed_count = count of checks
+where pass == true (null excluded).
+
+Count:
+  oi_wall_proximity_check.pass
+  theta_cost_check.pass
+  liquidity_check.pass
+
+Range: 0-3. Null if hard_gate_triggered.
+
+═══════════════════════════════════════════════════
+INSTRUMENT DECISION SELF-CHECK
+═══════════════════════════════════════════════════
+
+Before writing instrument_decision JSON:
+
+IF near_month_dte < 6:
+  fut_setup.contract_selected = "next_month" ✓
+  fut_setup uses next_month levels ✓
+  All FUT rules use next_month data ✓
+  Near-month reference block in
+    dimension_2_narrative ✓
+  options_setup all nulled (Gate 3) ✓
+  OPTIONS rules skipped ✓
+  If FUT also fails → NONE ✓
+
+IF near_month_dte >= 6:
+  fut_setup.contract_selected = "near_month" ✓
+  fut_setup uses near_month levels ✓
+
+IF instrument_recommendation == "FUT":
+  All four FUT rules passed ✓
+  OI wall check passed ✓
+  instrument_reason cites contract
+    (near or next month) and DTE ✓
+  instrument_reason cites all four rules ✓
+  none_reason == null ✓
+  actionable_now == true ✓
+
+IF instrument_recommendation == "OPTIONS":
+  All eight OPTIONS rules passed ✓
+  OI wall check passed ✓
+  At least one FUT rule failed ✓
+  near_month_dte >= 6 ✓
+  instrument_reason cites all 8 rules ✓
+  instrument_reason states FUT failure ✓
+  none_reason == null ✓
+  actionable_now == true ✓
+
+IF instrument_recommendation == "NONE":
+  instrument_reason NEVER null ✓
+  instrument_reason lists specific failed
+    rules with actual values ✓
+  none_reason populated ✓
+  actionable_now == false ✓
+
+FORBIDDEN:
+  ❌ instrument_reason == null (ever)
+  ❌ none_reason == null when NONE chosen
+  ❌ Futures levels = spot + basis
+  ❌ FUT recommended when any F rule fails
+  ❌ OPTIONS recommended when any O rule fails
+  ❌ OPTIONS evaluated when near_month_dte < 6
+  ❌ FUT recommended when OI wall fails
+  ❌ OPTIONS recommended when OI wall fails
+  ❌ Next-month contract selected when
+     near_month_dte >= 6
+  ❌ Near-month contract used when
+     near_month_dte < 6
 
 [SETUP_DELTA COMPUTATION — compare against previous_setups from Section B]
 Identify the most recent entry in previous_setups (index 0, highest setup_date). If previous_setups is empty or null, set all fields to null and direction_changed = false.
@@ -3233,25 +3853,6 @@ Classification rule:
   NOTE: zero price change is treated as non-negative (groups with LONG_BUILDUP or SHORT_COVERING); zero OI change is treated as non-positive (groups with SHORT_COVERING or LONG_UNWINDING). Deliberate tie-break, not an oversight.
 
 Output the 3 classified sessions most-recent-first in price_oi_regime_last_3.
-
-[FUT_SETUP CONTRACT_SELECTION — determine which futures contract to use before populating fut_setup]
-
-Compare near_month_dte against the expected hold period upper bound plus a 2-day buffer (hold = 2–5 days → threshold = 7).
-
-Selection rule (apply before filling fut_setup fields):
-- near_month_dte >= 7: use NEAR-MONTH contract. Set contract_selected = "near_month", contract_selection_note = null.
-- near_month_dte < 7: evaluate NEXT-MONTH as an alternative.
-  - If futures_30d_next_month is non-empty: use next-month contract. Populate fut_setup.expiry, days_to_expiry,
-    and basis_note from the NEXT-MONTH contract's expiry date, DTE, and basis values. Set contract_selected = "next_month"
-    and contract_selection_note = a one-line explanation (e.g. "Using Aug-28 next-month contract instead of Jul-31
-    near-month due to 4 DTE remaining vs 2–5 day hold requirement").
-  - If futures_30d_next_month is empty or unavailable: fall back to near-month. Set contract_selected = "near_month",
-    contract_selection_note = "Near-month used by default — next-month data not available".
-
-SCOPE LIMIT: This selection only affects fut_setup fields (expiry, days_to_expiry, basis_note, contract_selected,
-contract_selection_note). It does NOT affect hard_gate_triggered, stage, or any score. GATE 3 concerns the OPTIONS
-path only — options remain unavailable when near_month_dte < 6 regardless of which futures contract is chosen,
-since no next-month options data is supplied.
 
 Your JSON output must match this exact schema:
 {{
