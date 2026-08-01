@@ -55,9 +55,7 @@ class StockListBuilder:
         result: dict[str, dict] = {}
 
         self._merge(result, self._nifty50_symbols(),      "nifty50",            mandate=False)
-        self._merge(result, self._watchlist_symbols(),    "watchlist",          mandate=False)
         self._merge(result, self._interested_symbols(),   "interested_stocks",  mandate=False)
-
         if include_kite_trades:
             active = self._active_trade_symbols()
             self._merge(result, active, "active_trade", mandate=True)

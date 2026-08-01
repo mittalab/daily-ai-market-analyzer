@@ -99,8 +99,8 @@ def _load_sector_map() -> dict:
 
 
 def get_nifty50_symbols() -> set[str]:
-    """Return the Nifty 50 symbol set from config/sector_map.json."""
-    return set(_load_sector_map()["stocks"].keys())
+    """Return the Nifty 50 symbol set from the 'nifty50' list in config/sector_map.json."""
+    return set(_load_sector_map()["nifty50"])
 
 
 def get_holiday_dates() -> set[date]:
