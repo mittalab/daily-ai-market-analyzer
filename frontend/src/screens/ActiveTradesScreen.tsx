@@ -389,7 +389,7 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
                   </div>
                 </div>
               ) : (
-                <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_reason || 'N/A'}</p>
+                <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_decision?.instrument_reason || 'N/A'}</p>
               )}
             </div>
             <div>
@@ -644,7 +644,7 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
               </Expander>
             )}
             {s.dimension_4_narrative && (
-              <Expander title="Dimension 4: Derivatives (Basis & PCR) Data">
+              <Expander title="Dimension 4: Derivatives (Basis & Price-OI Regime)">
                 {formatNarrative(s.dimension_4_narrative)}
               </Expander>
             )}

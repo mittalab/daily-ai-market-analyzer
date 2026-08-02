@@ -365,16 +365,16 @@ function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () 
           <>
             <p className="text-xs font-semibold text-gray-800">
               {recInstrument} recommended
-              {s.instrument_reason ? (
+              {s.instrument_decision?.instrument_reason ? (
                 <>
                   {' — '}
                   {reasonExpanded
-                    ? s.instrument_reason
-                    : s.instrument_reason.slice(0, 80) + (s.instrument_reason.length > 80 ? '…' : '')}
+                    ? s.instrument_decision.instrument_reason
+                    : s.instrument_decision.instrument_reason.slice(0, 80) + (s.instrument_decision.instrument_reason.length > 80 ? '…' : '')}
                 </>
               ) : ''}
             </p>
-            {s.instrument_reason && s.instrument_reason.length > 80 && (
+            {s.instrument_decision?.instrument_reason && s.instrument_decision.instrument_reason.length > 80 && (
               <button
                 onClick={() => setReasonExpanded(v => !v)}
                 className="text-[10px] text-gray-400 mt-0.5"
@@ -535,7 +535,7 @@ function AnalysisView({ s }: { s: any }) {
               </div>
             </div>
           ) : (
-            <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_reason || 'N/A'}</p>
+            <p className="font-semibold text-gray-800">{recInstrument} — {s.instrument_decision?.instrument_reason || 'N/A'}</p>
           )}
         </div>
         <div>
@@ -877,7 +877,7 @@ function AnalysisView({ s }: { s: any }) {
           </Expander>
         )}
         {s.dimension_4_narrative && (
-          <Expander title="Dimension 4: Derivatives (Basis & PCR) Data">
+          <Expander title="Dimension 4: Derivatives (Basis & Price-OI Regime)">
             {formatDimensionNarrative(s.dimension_4_narrative)}
           </Expander>
         )}
