@@ -824,14 +824,14 @@ function AnalysisView({ s }: { s: any }) {
         </div>
       )}
 
-      {/* Price/OI Regime Last 3 */}
-      {Array.isArray(s.price_oi_regime_last_3) && s.price_oi_regime_last_3.length > 0 && (
+      {/* Price/OI Regime Last 10 */}
+      {Array.isArray(s.price_oi_regime_last_10) && s.price_oi_regime_last_10.length > 0 && (
         <div className="py-3">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-            Price / OI Regime (Last 3 Sessions)
+            Price / OI Regime (Last 10 Sessions)
           </p>
           <div className="space-y-1.5">
-            {s.price_oi_regime_last_3.map((r: any, i: number) => {
+            {s.price_oi_regime_last_10.map((r: any, i: number) => {
               const regimeCls =
                 r.regime === 'LONG_BUILDUP'   ? 'bg-green-100 text-green-800' :
                 r.regime === 'SHORT_BUILDUP'  ? 'bg-red-100 text-red-800' :

@@ -75,6 +75,7 @@ def _call_claude(client: anthropic.Anthropic, prompt: str, max_tokens: int = 160
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = resp.content[0].text
+            print (raw)
             parsed = _parse_json(raw)
             return raw, parsed, resp.usage.input_tokens, resp.usage.output_tokens
         except (anthropic.APIConnectionError, anthropic.APITimeoutError) as exc:
@@ -199,60 +200,60 @@ def main() -> None:
     print(DIV2)
     print(f"Prompt: {len(prompt):,} chars")
 
-    # # ── 8. Call Claude ────────────────────────────────────────────────────────
-    # print(f"\nCalling Claude for {symbol}…")
-    # client = anthropic.Anthropic(api_key=api_key)
-    # raw_output, analysis, in_tok, out_tok = _call_claude(client, prompt)
-    #
-    # cost_usd = round(in_tok / 1_000_000 * 3.00 + out_tok / 1_000_000 * 15.00, 4)
-    #
-    # # ── 9. Print raw Claude response ──────────────────────────────────────────
-    # print(f"\n{DIV2}")
-    # print("CLAUDE OUTPUT — RAW RESPONSE")
-    # print(DIV2)
-    # print(raw_output)
-    # print(DIV2)
-    # print(f"Tokens — in: {in_tok:,}  out: {out_tok:,}  cost: ${cost_usd}")
-    #
-    # # ── 10. Position sizing (no DB writes) ────────────────────────────────────
-    # config = get_all_system_config()
-    # config.setdefault("claude_capital_inr", "500000")
-    #
-    # analysis["symbol"] = symbol
-    # analysis = _validate_position_sizing_turn3(analysis, config)
-    #
-    # # ── 11. Summary ───────────────────────────────────────────────────────────
-    # instr_dec = analysis.get("instrument_decision") or {}
-    # wall      = instr_dec.get("oi_wall_proximity_check") or {}
-    # delta     = analysis.get("setup_delta_vs_previous") or {}
-    # regimes   = analysis.get("price_oi_regime_last_3") or []
-    #
-    # print(f"\n{DIV2}")
-    # print("SUMMARY (post position-sizing)")
-    # print(DIV2)
-    # print(f"  Stage            : {analysis.get('stage')}")
-    # print(f"  Direction        : {analysis.get('direction')}")
-    # print(f"  Conviction       : {analysis.get('conviction_score')}  (adjusted: {analysis.get('adjusted_score')})")
-    # print(f"  Actionable Now   : {analysis.get('actionable_now')}  — {analysis.get('actionable_note')}")
-    # print(f"  Hard Gate        : {analysis.get('hard_gate_triggered')}  — {analysis.get('hard_gate_reason')}")
-    # print(f"  Instrument       : {analysis.get('instrument_recommendation')}")
-    # print(f"  OI Wall pass     : {wall.get('pass')}  nearest={wall.get('nearest_obstructing_wall_strike')}  ratio={wall.get('wall_oi_vs_neighbors_ratio')}")
-    # print(f"  Lots × Lot Size  : {analysis.get('lots')} × {analysis.get('lot_size')}")
-    # print(f"  Max Risk INR     : {analysis.get('max_risk_inr')}  ({analysis.get('risk_pct_capital')}%)")
-    # print(f"  R:R              : {analysis.get('risk_reward')}")
-    # if regimes:
-    #     regime_str = "  →  ".join(
-    #         f"{r.get('date', '?')} {r.get('regime', '?')} (Δprice {r.get('price_change_pct', '?')}% / ΔOI {r.get('oi_change_pct', '?')}%)"
-    #         for r in regimes
-    #     )
-    #     print(f"  Price/OI Regimes : {regime_str}")
-    # if delta.get("direction_changed"):
-    #     print(f"  Direction Flip   : {delta.get('previous_direction')} → {analysis.get('direction')}  Δscore={delta.get('score_delta')}")
-    #     print(f"  Flip Justific.   : {delta.get('justification')}")
-    # if analysis.get("rejection_reason"):
-    #     print(f"  Rejection Reason : {analysis.get('rejection_reason')}")
-    # print(DIV2)
-    # print("DB writes: NONE")
+    # ── 8. Call Claude ────────────────────────────────────────────────────────
+    print(f"\nCalling Claude for {symbol}…")
+    client = anthropic.Anthropic(api_key=api_key)
+    raw_output, analysis, in_tok, out_tok = _call_claude(client, prompt)
+
+    cost_usd = round(in_tok / 1_000_000 * 3.00 + out_tok / 1_000_000 * 15.00, 4)
+
+    # ── 9. Print raw Claude response ──────────────────────────────────────────
+    print(f"\n{DIV2}")
+    print("CLAUDE OUTPUT — RAW RESPONSE")
+    print(DIV2)
+    print(raw_output)
+    print(DIV2)
+    print(f"Tokens — in: {in_tok:,}  out: {out_tok:,}  cost: ${cost_usd}")
+
+    # ── 10. Position sizing (no DB writes) ────────────────────────────────────
+    config = get_all_system_config()
+    config.setdefault("claude_capital_inr", "500000")
+
+    analysis["symbol"] = symbol
+    analysis = _validate_position_sizing_turn3(analysis, config)
+
+    # ── 11. Summary ───────────────────────────────────────────────────────────
+    instr_dec = analysis.get("instrument_decision") or {}
+    wall      = instr_dec.get("oi_wall_proximity_check") or {}
+    delta     = analysis.get("setup_delta_vs_previous") or {}
+    regimes   = analysis.get("price_oi_regime_last_10") or []
+
+    print(f"\n{DIV2}")
+    print("SUMMARY (post position-sizing)")
+    print(DIV2)
+    print(f"  Stage            : {analysis.get('stage')}")
+    print(f"  Direction        : {analysis.get('direction')}")
+    print(f"  Conviction       : {analysis.get('conviction_score')}  (adjusted: {analysis.get('adjusted_score')})")
+    print(f"  Actionable Now   : {analysis.get('actionable_now')}  — {analysis.get('actionable_note')}")
+    print(f"  Hard Gate        : {analysis.get('hard_gate_triggered')}  — {analysis.get('hard_gate_reason')}")
+    print(f"  Instrument       : {analysis.get('instrument_recommendation')}")
+    print(f"  OI Wall pass     : {wall.get('pass')}  nearest={wall.get('nearest_obstructing_wall_strike')}  ratio={wall.get('wall_oi_vs_neighbors_ratio')}")
+    print(f"  Lots × Lot Size  : {analysis.get('lots')} × {analysis.get('lot_size')}")
+    print(f"  Max Risk INR     : {analysis.get('max_risk_inr')}  ({analysis.get('risk_pct_capital')}%)")
+    print(f"  R:R              : {analysis.get('risk_reward')}")
+    if regimes:
+        regime_str = "  →  ".join(
+            f"{r.get('date', '?')} {r.get('regime', '?')} (Δprice {r.get('price_change_pct', '?')}% / ΔOI {r.get('oi_change_pct', '?')}%)"
+            for r in regimes
+        )
+        print(f"  Price/OI Regimes : {regime_str}")
+    if delta.get("direction_changed"):
+        print(f"  Direction Flip   : {delta.get('previous_direction')} → {analysis.get('direction')}  Δscore={delta.get('score_delta')}")
+        print(f"  Flip Justific.   : {delta.get('justification')}")
+    if analysis.get("rejection_reason"):
+        print(f"  Rejection Reason : {analysis.get('rejection_reason')}")
+    print(DIV2)
+    print("DB writes: NONE")
 
 
 if __name__ == "__main__":

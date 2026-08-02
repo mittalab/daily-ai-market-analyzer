@@ -2803,10 +2803,13 @@ DIMENSION 4: STOCK F&O (max 5 pts)
     Use near_month series if near_month_dte >= 6.
     Use next_month series if near_month_dte < 6.
 
-    Do NOT use price_oi_regime_last_3 array
-    for scoring — that covers only 3 sessions.
-    Compute all 10 sessions yourself from
-    the raw futures_30d OHLCV data.
+    Use price_oi_regime_last_10 for scoring.
+    All 10 entries must be used for the
+    scoring computation.
+    Do NOT score using only the first 3
+    entries — the full 10-session window
+    is required for the scoring thresholds
+    to be meaningful.
 
     COMPUTATION PER SESSION:
     For each of the last 10 rows in the
@@ -3231,7 +3234,44 @@ Before closing the JSON object verify:
     Recheck rr_t2 calculation.
 
 [SECTION G: OUTPUT SPECIFICATION]
-Provide your analysis ONLY as a single valid JSON object. Do not include any markdown styling, conversational text, introduction, or wrap it in anything other than the JSON format.
+CRITICAL OUTPUT RULE — READ FIRST:
+
+Your ENTIRE response must be a single
+JSON object. Nothing else.
+
+Start your response with {{ immediately.
+End your response with }} immediately.
+No text before {{. No text after }}.
+No markdown. No code fences. No headers.
+No explanations. No preamble.
+No step-by-step narration.
+No 'let me analyze', 'I need to', or
+any thinking visible in the output.
+
+All reasoning, gate checks, RR
+computations, regime classifications,
+scoring deliberations, and
+self-corrections are INTERNAL.
+They must NEVER appear in your output.
+
+The dimension narratives, mentor notes,
+why_could_be_wrong, and key_thing_to_watch
+inside the JSON ARE the narrative output.
+They are JSON string values — not
+freeform text outside the JSON.
+
+If you realise mid-JSON that a value
+needs correction, correct it silently
+within the JSON. Do NOT restart the JSON.
+Do NOT write 'wait, let me reconsider'.
+Do NOT produce multiple JSON attempts.
+One JSON object. Complete. Final.
+
+SELF-CHECK BEFORE RESPONDING:
+Does my response begin with {{ ? ✓
+Does my response end with }} ? ✓
+Is there ANY text outside the JSON ? ✗
+If any text exists outside JSON → delete it.
 
 [INSTRUMENT_DECISION COMPUTATION — evaluate ONLY when hard_gate_triggered == false]
 
@@ -3603,19 +3643,24 @@ RULE F1: BASIS NOT NEGATIVE AND EXPANDING
     basis_current < 0 AND EXPANDING
 
 RULE F2: PRICE-OI REGIME NOT CONSISTENTLY BEARISH
-  From price_oi_regime_last_3.
-  These are always computed from near_month
-  series regardless of active contract —
-  near_month has more liquidity and reflects
-  current institutional positioning better
-  even when near expiry.
+  From price_oi_regime_last_10.
+
+  Use the last 3 entries from
+  price_oi_regime_last_10 for this rule
+  (most recent 3 sessions only).
+
+  These sessions are always from the
+  near_month series regardless of active
+  contract — near_month has more liquidity
+  and reflects current institutional
+  positioning better even when near expiry.
 
   PASS:
     At least 1 of last 3 valid sessions shows
     LONG_BUILDUP or SHORT_COVERING
 
   FAIL:
-    ALL valid sessions show
+    ALL 3 valid sessions show
     SHORT_BUILDUP or LONG_UNWINDING
 
 RULE F3: OI TREND ALIGNED WITH DIRECTION
@@ -3753,8 +3798,8 @@ Otherwise:
 - justification: Required only when direction_changed == true. Cite the specific new data visible in this session's inputs that was absent or contradicted the prior direction (e.g. e.g., "Basis turned from +4.5 to -2.1 — institutional longs no longer carrying; price_oi_regime_last_10 shows shift from LONG_BUILDUP dominant to SHORT_BUILDUP in last 3 sessions" OR "fut_rr_t2 improved from 1.4 to 2.3 following pullback to support zone; futures chart now shows clean entry at prior resistance-turned-support"). If you cannot identify specific new evidence from the data, write exactly: "NONE — treat with caution". Write null when direction_changed == false.
 
 [PRICE_OI_REGIME COMPUTATION — uses futures_30d_near_month from Section E: F&O DATA]
-Requires at least 4 rows in futures_30d_near_month to produce 3 day-over-day comparisons. If futures_30d_near_month has fewer than 4 rows or futures data is unavailable, set price_oi_regime_last_3 = [].
-Otherwise, take the last 4 rows (rows[-4:], ascending by date) and classify the last 3 using the `oi` field (near-month OI):
+Requires at least 11 rows in futures_30d_near_month to produce 10 day-over-day comparisons. If futures_30d_near_month has fewer than 11 rows or futures data is unavailable, set price_oi_regime_last_10 = [].
+Otherwise, take the last 11 rows (rows[-11:], ascending by date) and classify the last 10 using the `oi` field (near-month OI):
   price_change_pct = (futures_price[i] − futures_price[i−1]) / futures_price[i−1] × 100  (round to 2 dp)
   oi_change_pct:   if oi[i−1] is zero or null, set oi_change_pct = null and regime = "UNAVAILABLE" for that day and skip classification below; otherwise = (oi[i] − oi[i−1]) / oi[i−1] × 100  (round to 2 dp)
 
@@ -3765,19 +3810,16 @@ Classification rule:
   price <  prev AND oi <= prev  →  LONG_UNWINDING  (longs exiting on price fall, bearish)
   NOTE: zero price change is treated as non-negative (groups with LONG_BUILDUP or SHORT_COVERING); zero OI change is treated as non-positive (groups with SHORT_COVERING or LONG_UNWINDING). Deliberate tie-break, not an oversight.
 
-Output the 3 classified sessions most-recent-first in price_oi_regime_last_3.
+Output the 10 classified sessions most-recent-first in price_oi_regime_last_10.
 
-NOTE ON price_oi_regime_last_3:
-This pre-computed array covers the last 3 sessions only.
-It is provided as a quick reference for dimension_4_narrative
-opening context.
+NOTE ON price_oi_regime_last_10:
+This array covers the last 10 sessions of the near_month futures series.
+It is the primary source for two purposes:
+  Dimension 4 scoring:  use all 10 entries (7+ bullish = 2pts | 4-6 = 1pt | ≤3 = 0pts)
+  Rule F2 gate check:   use only the last 3 entries (most recent 3 sessions)
 
-For DIMENSION 4 SCORING, do NOT use this array.
-Compute all 10 sessions yourself from the raw futures_30d
-ACTIVE CONTRACT OHLCV data in Section E.
-
-The scoring threshold requires 10 sessions to be meaningful:
-7+ bullish = 2pts | 4-6 = 1pt | ≤3 = 0pts
+Use all 10 entries for Dimension 4 scoring — do NOT score using only the first 3.
+The scoring threshold requires the full 10-session window to be meaningful.
 
 Your JSON output must match this exact schema:
 {{
@@ -3831,7 +3873,7 @@ Your JSON output must match this exact schema:
     "contract_selected": "near_month | next_month | null",
     "contract_selection_note": "<one-line reason for choosing next-month; null when near_month is used by default>"
   }},
-  "price_oi_regime_last_3": [
+  "price_oi_regime_last_10": [
     {{
       "date": "<YYYY-MM-DD — most recent session first>",
       "price_change_pct": <number — rounded to 2 dp>,
@@ -3867,7 +3909,7 @@ Your JSON output must match this exact schema:
   "dimension_1_narrative": "<Meticulous detail. Assess S/R confluence, completed/forming patterns with dates/prices, candle body/wicks close position, candlestick patterns with location context, RSI divergence check, and volume trend. Every number/date must be chart-verifiable. Do not generalize.>",
   "dimension_2_narrative": "<Describe SL structural invalidation logic with ATR validation. Detail T1 and T2 levels and R:R parameters. Describe entry zone confluence basis.>",
   "dimension_3_narrative": "<Connect Nifty regime stance and bias to this trade's execution. Assess sector tailwind/headwind and stock relative strength/performance vs sector.>",
-  "dimension_4_narrative": "<Structure your narrative in this order: PRICE-OI REGIME (open with this): Compute and state all 10 sessions from active contract futures_30d series. Name each regime explicitly with supporting numbers: e.g. 'Jul-29→30: LONG_BUILDUP (price +0.85%, OI +2.76%); Jul-28→29: LONG_BUILDUP (price +1.33%, OI +2.43%); Jul-27→28: SHORT_COVERING (price +1.4%, OI -3.2%)...' After listing all 10 sessions state: 'Bullish sessions: X of Y valid. [Assessment: e.g. Sustained institutional accumulation over 10 sessions — strong LONG_BUILDUP pattern confirms smart money adding to longs consistently.]' Flag any rollover artifact sessions (OI change > 50% in one day) and note their limited interpretive value. FUTURES BASIS: State basis_current value and trend. Explain what it means for the trade: positive expanding = institutions paying premium to carry longs forward (bullish). Negative = backwardation warning. Reference basis_note from fut_setup. ROLLOVER AND DTE: State active contract (near or next month), days_to_expiry, rollover phase. Confirm sufficient time for 2-5 day hold. If next_month selected, explicitly state why near_month was unsuitable. OI WALL NOTE (always include): If oi_wall_proximity_check.pass = false: Name the obstructing wall strike, its OI vs neighbors ratio, and explain gamma-pinning resistance impact on target_2 achievability for futures. If oi_wall_proximity_check.pass = true: Briefly confirm no obstructing wall found between entry and target_2. Do NOT assess PCR anywhere. Do NOT reference options IV or premium. Do NOT use price_oi_regime_last_3 for scoring — compute all 10 sessions from raw futures_30d data. End with the mandatory calculation block.>",
+  "dimension_4_narrative": "<Structure your narrative in this order: PRICE-OI REGIME (open with this): Compute and state all 10 sessions from active contract futures_30d series. Name each regime explicitly with supporting numbers: e.g. 'Jul-29→30: LONG_BUILDUP (price +0.85%, OI +2.76%); Jul-28→29: LONG_BUILDUP (price +1.33%, OI +2.43%); Jul-27→28: SHORT_COVERING (price +1.4%, OI -3.2%)...' After listing all 10 sessions state: 'Bullish sessions: X of Y valid. [Assessment: e.g. Sustained institutional accumulation over 10 sessions — strong LONG_BUILDUP pattern confirms smart money adding to longs consistently.]' Flag any rollover artifact sessions (OI change > 50% in one day) and note their limited interpretive value. FUTURES BASIS: State basis_current value and trend. Explain what it means for the trade: positive expanding = institutions paying premium to carry longs forward (bullish). Negative = backwardation warning. Reference basis_note from fut_setup. ROLLOVER AND DTE: State active contract (near or next month), days_to_expiry, rollover phase. Confirm sufficient time for 2-5 day hold. If next_month selected, explicitly state why near_month was unsuitable. OI WALL NOTE (always include): If oi_wall_proximity_check.pass = false: Name the obstructing wall strike, its OI vs neighbors ratio, and explain gamma-pinning resistance impact on target_2 achievability for futures. If oi_wall_proximity_check.pass = true: Briefly confirm no obstructing wall found between entry and target_2. Do NOT assess PCR anywhere. Do NOT reference options IV or premium. Use all 10 entries of price_oi_regime_last_10 for Dimension 4 scoring — do NOT score using only the first 3 entries. End with the mandatory calculation block.>",
   "mentor_notes": "<Educational swing-trading takeaways taught by this specific setup. Why does it work and what visual cues verify it on the chart.>",
   "why_could_be_wrong": "<Three highly specific bearish scenarios with exact invalidation price levels where the trade goes wrong (e.g. 'If closes below 1828 on high volume'). No generic disclaimers.>",
   "key_thing_to_watch": "<Single, most critical actionable observation for the morning market open (e.g. entry boundary trigger, gap opens).>",
