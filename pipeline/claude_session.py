@@ -2499,53 +2499,26 @@ def _build_turn3_prompt(data_package: dict) -> str:
 
     if sec5["options_available"]:
         chain_compact = json.dumps(sec5['options_chain_last_day'], separators=(',', ':'))
-        _ce_iv_str = str(sec5['atm_ce_iv']) if sec5['atm_ce_iv'] is not None else 'null'
-        _pe_iv_str = str(sec5['atm_pe_iv']) if sec5['atm_pe_iv'] is not None else 'null'
-        options_text = f"""- Options Available: True
-- PCR Near Month: {sec5['pcr_near']}
-- Max Pain: {sec5['max_pain']}
-- ATM Strike: {sec5['atm_strike']}
-- ATM CE IV (from chain, at strike {sec5['atm_strike']}): {_ce_iv_str}
-- ATM PE IV (from chain, at strike {sec5['atm_strike']}): {_pe_iv_str}
-- Options Note: {sec5['options_note'] if sec5['options_note'] else 'None'}
+        options_text = f"""⚠ OPTIONS CHAIN DATA — FOR OI WALL PROXIMITY CHECK ONLY
+Options chain data is provided ONLY for the OI wall proximity check (Step 3 of instrument decision).
+Do NOT use it to recommend an options trade.
+The only instrument recommendation in this system is FUT or NONE.
+
+- PCR Near Month: {sec5['pcr_near']} (context only — not used for instrument selection)
+- Max Pain: {sec5['max_pain']} (context only — not used for instrument selection)
+- ATM Strike: {sec5['atm_strike']} (context only)
 - CE Walls (resistance): {json.dumps(sec5['ce_walls'])}
 - PE Walls (support): {json.dumps(sec5['pe_walls'])}
-- Option Chain Last Day: {chain_compact}
-
-[IV SOURCE RULE]
-iv_source_used = "chain_iv" if ANY row in Option Chain Last Day has a non-null iv value (even off-ATM).
-iv_source_used = "vix_proxy" ONLY when every row in the chain has null iv.
-A null ATM CE IV or ATM PE IV in the pre-computed values above does NOT mean the chain is empty —
-it only means that specific side was missing/null at the exact ATM strike. Apply the nearby-strike
-fallback in [ATM_IV_COMPUTATION] before concluding a side is unavailable.
-Never write "IV unavailable" when the chain contains any non-null IV values.
-
-[ATM_IV_COMPUTATION — populate options_setup IV fields]
-For each side (CE and PE) independently, apply this priority order:
-1. Use the pre-computed value shown above if non-null — use as-is.
-2. If null: check the nearest available strike within 1 step in Option Chain Last Day for that side
-   (one strike immediately above or below ATM, whichever has data). If found with non-null iv, use it
-   and note the substitution in iv_note (e.g. "atm_pe_iv sourced from 1045 PE — exact ATM 1040 PE row missing").
-3. If step 2 also yields null: set that side's IV field to null and state in iv_note that IV could not
-   be determined for the traded side. Do not substitute VIX for an individual side's IV field.
-
-Set iv_source_used = "vix_proxy" only after confirming every chain row has null iv.
-
-Do NOT average atm_ce_iv and atm_pe_iv — a trade uses only one side; averaging dilutes with the unused
-instrument and hides real skew/liquidity signals.
-- atm_iv_skew = atm_ce_iv − atm_pe_iv, rounded to 2 dp; null if either is null.
-- iv_used_for_trade = atm_ce_iv if direction == "LONG" (trade uses CE); atm_pe_iv if direction == "SHORT"
-  (trade uses PE). Derived deterministically from direction — same pattern as walls_checked_side.
-- If abs(atm_iv_skew) > 5 points, flag in iv_note as a possible liquidity/staleness signal on the thinner
-  side — state BOTH possibilities (genuine market skew vs. stale/thin quote), not just one.
-- When iv_source_used = "vix_proxy", set atm_ce_iv, atm_pe_iv, atm_iv_skew, and iv_used_for_trade all to null."""
+- Option Chain Last Day (for OI wall check only): {chain_compact}"""
     else:
-        options_text = "- Options: NOT AVAILABLE — use VIX as IV proxy for premium estimation"
+        options_text = "- Options chain data: NOT AVAILABLE — OI wall proximity check cannot be performed; set oi_wall_proximity_check.pass = null"
 
     prompt = f"""[SECTION A: ROLE AND TASK DEFINITION]
-You are a highly experienced hedge fund manager and swing trading mentor specializing in the Indian F&O (Futures & Options) markets. Your task is to perform a meticulous deep analysis on {symbol} for the session date {sec1["session_date"]}.
+You are an experienced Indian F&O swing trading analyst and mentor. You think like a disciplined proprietary trader — capital preservation first, high conviction setups only — and you teach like a mentor, always explaining your reasoning so the user can learn to spot these setups themselves. You specialise in Nifty 50 stock futures, 2-5 day swing trades, monthly Tuesday expiry.
 
-Your goal is to evaluate if there is a valid swing setup (2-5 days hold) on this stock matching the Turn 2 preliminary direction ({direction}).
+Your task is to perform a meticulous deep analysis on {symbol} for the session date {sec1["session_date"]}.
+
+Your goal is to evaluate if there is a valid swing setup (2-5 days hold) on this stock using stock futures (monthly expiry), matching the Turn 2 preliminary direction ({direction}).
 You must apply the 100-point Conviction Scoring Framework and enforce all operational hard gates to determine the trade readiness of the setup: TRADE_READY, WATCH, ON_RADAR, or REJECT.
 
 [SECTION B: STOCK CONTEXT]
@@ -2790,64 +2763,184 @@ COMMON ERROR TO AVOID:
 DIMENSION 4: STOCK F&O (max 5 pts)
 ───────────────────────────────────────────
 
-  Futures Basis (2 pts): Positive carry = 2 pts, negative carry = 0-1 pts.
-  PCR Context (2 pts): Contrarian extreme PCR checks.
+  FUTURES BASIS (2 pts):
+    Assess basis_current and basis_trend
+    from fut_setup.basis_note and the
+    active contract futures_30d series.
+    
+    2 pts: basis_current > 0
+           AND trend is EXPANDING or STABLE
+           Institutions paying premium to
+           carry longs forward and
+           commitment is growing or holding
+           Strongest bullish carry signal
+    
+    1 pt:  basis_current > 0
+           BUT trend is CONTRACTING
+           (positive but narrowing — longs
+           still carrying but with less
+           conviction than before)
+           
+           OR basis_current is near zero
+           (within ±2 pts of zero)
+           regardless of trend
+           Neutral — no clear carry signal
+    
+    0 pts: basis_current < 0
+           (backwardation)
+           Institutions carrying shorts
+           forward or dividend expectation
+           Warning signal for LONG setup
+           regardless of trend direction
+           
+  PRICE-OI REGIME (2 pts):
+
+    SOURCE:
+    Compute regime for the last 10 sessions
+    from the ACTIVE CONTRACT futures_30d
+    series in Section E.
+
+    Use near_month series if near_month_dte >= 6.
+    Use next_month series if near_month_dte < 6.
+
+    Do NOT use price_oi_regime_last_3 array
+    for scoring — that covers only 3 sessions.
+    Compute all 10 sessions yourself from
+    the raw futures_30d OHLCV data.
+
+    COMPUTATION PER SESSION:
+    For each of the last 10 rows in the
+    active contract series (most recent last):
+
+      price_change = (close_N - close_N-1)
+                     / close_N-1 × 100
+      oi_change    = (oi_N - oi_N-1)
+                     / oi_N-1 × 100
+
+      LONG_BUILDUP:   price_change > 0
+                      AND oi_change > 0
+      SHORT_BUILDUP:  price_change < 0
+                      AND oi_change > 0
+      SHORT_COVERING: price_change > 0
+                      AND oi_change < 0
+      LONG_UNWINDING: price_change < 0
+                      AND oi_change < 0
+      UNAVAILABLE:    prior row OI = 0
+                      or OI data missing
+
+    Exclude UNAVAILABLE sessions from count.
+    Apply scoring to remaining valid sessions.
+
+    DEFINITION OF BULLISH AND BEARISH:
+      Bullish session = LONG_BUILDUP
+                        OR SHORT_COVERING
+      Bearish session = SHORT_BUILDUP
+                        OR LONG_UNWINDING
+
+    FOR LONG SETUP — count bullish sessions:
+      2 pts: 7 or more bullish out of valid
+             Sustained institutional accumulation
+             over 10 sessions — strong signal
+
+      1 pt:  4 to 6 bullish out of valid
+             Mixed institutional positioning
+             No clear directional conviction
+
+      0 pts: 3 or fewer bullish out of valid
+             Institutions consistently
+             positioned against LONG thesis
+             Smart money fighting direction
+
+    FOR SHORT SETUP — count bearish sessions:
+      2 pts: 7 or more bearish out of valid
+             Sustained institutional distribution
+
+      1 pt:  4 to 6 bearish out of valid
+             Mixed — no clear conviction
+
+      0 pts: 3 or fewer bearish out of valid
+             Institutions positioned against
+             SHORT thesis
+
+    IF ALL 10 SESSIONS ARE UNAVAILABLE:
+      Score 1 pt (neutral)
+      Note: "OI data unavailable for regime
+      computation — neutral score applied"
+
+    IMPORTANT NOTES:
+      Rollover sessions (near expiry, very high
+      volume, large OI drop) can distort regime.
+      If a session shows OI change > 50% in one
+      day it is likely a rollover artifact.
+      Flag it in narrative but still include
+      in the count — do not exclude arbitrarily.
+
+      The regime reflects institutional intent
+      using futures data — more reliable than
+      PCR for individual stocks because futures
+      liquidity is significantly higher than
+      individual stock options OI.
+
   Rollover + DTE (1 pt): DTE < 6 trading days triggers options REJECT.
-
-OI WALL DEDUCTION — MANDATORY:
-  If oi_wall_proximity_check.pass == false:
-    PCR Context score is reduced by 1 pt
-    Minimum PCR Context score after
-    deduction = 0 (cannot go negative)
-
-    Show explicitly in narrative:
-    "PCR Context: X pts − 1 pt (OI wall
-     deduction) = Y pts"
-
-    Use Y (the adjusted value) in the
-    final sum — not X (the base value)
-    and NOT X + Y (both values)
 
 At the END of dimension_4_narrative,
 write this block exactly:
 
   "DIMENSION 4 FINAL SCORE:
    Futures Basis:              __/2
-   PCR Context base:           __/2
-   OI wall deduction:          −1 / 0
-     (−1 if wall check fails, 0 if passes)
-   PCR Context adjusted:       __/2
-     (= base − deduction, min 0)
+     basis_current: __ pts ([EXPANDING /
+     CONTRACTING / STABLE] trend)
+     Implication: [one line on what
+     basis means for trade direction]
+
+   Price-OI Regime:            __/2
+     10-session computation from
+     [near/next]-month futures_30d:
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     [date]: [REGIME] (price [+/-X.XX]%,
+                        OI [+/-X.XX]%)
+     Valid sessions: __ of 10
+     Bullish sessions (LONG or SHORT
+     setup): __ of __ valid
+     Threshold: 7+ = 2pts | 4-6 = 1pt
+                ≤3 = 0pts
+
    Rollover + DTE:             __/1
+     Active contract: [near/next]-month
+     DTE: __ trading days
+
    ─────────────────────────────────────
    SUM:                        __/5
-     (= Basis + PCR adjusted + DTE)
-   Verify Basis ≤ 2 ✓
-   Verify PCR adjusted ≤ 2 ✓
-   Verify DTE ≤ 1 ✓
-   Verify SUM = Basis + PCR adjusted + DTE ✓
-   Verify SUM ≤ 5 ✓"
+     (= Basis + Regime + DTE)
+   Verify Basis <= 2 ✓
+   Verify Regime <= 2 ✓
+   Verify DTE <= 1 ✓
+   Verify SUM = Basis + Regime + DTE ✓
+   Verify SUM <= 5 ✓"
 
 Constraints:
   Futures Basis: 0-2
-  PCR Context base: 0-2
-  PCR Context adjusted: 0-2 (after deduction)
+  Price-OI Regime: 0-2
   Rollover + DTE: 0-1
-  SUM = Basis + PCR_adjusted + DTE
+  SUM = Basis + Regime + DTE
   SUM must be ≤ 5
-
-COMMON ERROR TO AVOID:
-  ❌ SUM = Basis(2) + PCR_base(2)
-           + deduction(−1) + DTE(1) = 4
-     WRONG — deduction is applied TO PCR,
-     not added as a separate term
-
-  ❌ SUM = Basis(2) + PCR_base(2)
-           + PCR_adjusted(1) + DTE(1) = 6
-     WRONG — do not add both base and adjusted
-
-  ✅ SUM = Basis(2) + PCR_adjusted(1) + DTE(1) = 4
-     CORRECT
 
 ───────────────────────────────────────────
 SCORING_BREAKDOWN COMPUTATION
@@ -2975,7 +3068,7 @@ GATE 2: R:R < 1:1.5 at Target 2
     / (entry_mid - stop_loss) is less than 1.5,
     calculated using YOUR OWN target_2,
     entry_mid, and stop_loss values from the
-    trade_parameters and key_levels fields.
+    fut_setup and key_levels fields.
 
   SELF-CHECK BEFORE FINALISING:
     Compute this ratio explicitly:
@@ -2989,7 +3082,7 @@ GATE 2: R:R < 1:1.5 at Target 2
     Do NOT re-derive a different entry_mid
     or SL after the fact to try to pass
     the gate — use the values you committed
-    to in key_levels and trade_parameters.
+    to in key_levels and fut_setup.
 
   Action:
     stage = "REJECT"
@@ -3018,28 +3111,6 @@ GATE 2: R:R < 1:1.5 at Target 2
     ✅ stage = REJECT, hard_gate_triggered = true,
        full stop, no additional commentary
        about setup merit
-
-GATE 3: DTE < 6 trading days
-  Scope: OPTIONS INSTRUMENT PATH ONLY.
-
-  GATE 3 DOES NOT:
-    Set hard_gate_triggered = true
-    Change stage from its score-based value
-    Block the FUT instrument path
-    Prevent TRADE_READY, WATCH, or ON_RADAR
-
-  GATE 3 ONLY DOES:
-    Null out all options_setup fields
-    Set theta_cost_check = null
-      with note "N/A — Gate 3 (DTE < 6)"
-    Set liquidity_check = null
-      with note "N/A — Gate 3 (DTE < 6)"
-    Force instrument_recommendation to
-      evaluate FUT path only
-
-  hard_gate_triggered remains false.
-  stage is determined solely by
-  adjusted_score thresholds.
 
 GATE 4: Chart directly contradicts direction
   Condition: The price data in Section D
@@ -3118,13 +3189,7 @@ STEP 5: APPLY SCORE THRESHOLDS
                             hard_gate_reason = null
                             (score-based reject, not a gate)
 
-STEP 6: GATE 3 CHECK (independent of above)
-  Is near_month_dte < 6?
-  If YES → null out options_setup fields only
-            FUT path still evaluated normally
-            hard_gate_triggered unchanged
-
-STEP 7: PROCEED TO INSTRUMENT_DECISION
+STEP 6: PROCEED TO INSTRUMENT_DECISION
   Only if hard_gate_triggered == false.
   If hard_gate_triggered == true from any
   gate above → use hard gate short-circuit
@@ -3171,21 +3236,22 @@ Provide your analysis ONLY as a single valid JSON object. Do not include any mar
 [INSTRUMENT_DECISION COMPUTATION — evaluate ONLY when hard_gate_triggered == false]
 
 ORDERING CONSTRAINT: hard_gate_triggered is determined SOLELY by GATES 1, 2, and 4, and by adjusted_score < 35.
-It must be finalized BEFORE this block runs. The outcome of this block — including OI wall failures, GATE 3 firing,
+It must be finalized BEFORE this block runs. The outcome of this block — including OI wall failures
 or contract selection — must NEVER feed back into hard_gate_triggered or stage. Those fields are frozen at this point.
 
 HARD GATE SHORT-CIRCUIT: If hard_gate_triggered == true (stage == REJECT), skip all checks below.
-Set instrument_decision to: {{ "oi_wall_proximity_check": null, "theta_cost_check": null,
-  "liquidity_check": null, "criteria_passed_count": null, "instrument_recommendation": "NONE",
+Set instrument_decision to: {{ "oi_wall_proximity_check": null,
+  "instrument_recommendation": "NONE",
+  "instrument_reason": "<hard_gate_reason value> — no instrument recommended.",
   "margin_efficiency_note": null, "none_reason": "Hard gate triggered: <value from hard_gate_reason>" }}.
-Set all numeric and string fields inside options_setup and fut_setup to null (keep the object structures, null the values).
+Set all numeric and string fields inside fut_setup to null (keep the object structure, null the values).
 Set actionable_now = false, actionable_note = "Rejected — <hard_gate_reason value>".
 Then skip directly to writing the output schema.
 
 SELF-CHECK (run before finalizing output): Verify hard_gate_reason cites only GATE 1, GATE 2, GATE 4, or the
-adjusted_score threshold (< 35). If you find hard_gate_reason referencing GATE 3 or an OI wall failure,
+adjusted_score threshold (< 35). If you find hard_gate_reason referencing an OI wall failure,
 correct it: set hard_gate_triggered = false, restore the appropriate stage from the adjusted_score thresholds,
-and move the GATE 3 / wall information to instrument_decision.none_reason and actionable_now / actionable_note only.
+and move the wall information to instrument_decision.none_reason and actionable_now / actionable_note only.
 
 ═══════════════════════════════════════════════════
 STEP 0: FUTURES CONTRACT SELECTION AND
@@ -3270,8 +3336,6 @@ SCOPE OF CONTRACT SELECTION:
     hard_gate_triggered
     stage
     underlying_rr_t2 (always spot-based)
-    options_setup fields
-    OPTIONS rule evaluations
     scoring_breakdown
     key_levels
 
@@ -3398,10 +3462,10 @@ Populate fut_setup.basis_note:
    carrying or dividend expectation]."
 
 ═══════════════════════════════════════════════════
-STEP 1: THREE RR COMPUTATIONS
+STEP 1: TWO RR COMPUTATIONS
 ═══════════════════════════════════════════════════
 
-Compute all three explicitly before
+Compute both explicitly before
 running any gates or instrument rules.
 
 COMPUTATION 1: UNDERLYING RR (spot-based)
@@ -3419,7 +3483,7 @@ COMPUTATION 1: UNDERLYING RR (spot-based)
        - key_levels.stop_loss)
 
   Used for: Gate 2 only.
-  NOT used for FUT or OPTIONS rules.
+  NOT used for FUT rules.
 
 COMPUTATION 2: FUTURES RR
   Purpose: FUT instrument rule (F4)
@@ -3438,24 +3502,7 @@ COMPUTATION 2: FUTURES RR
   Store as: fut_setup.rr_t2
   Used for: FUT rule F4 only.
 
-COMPUTATION 3: PREMIUM RR
-  Purpose: OPTIONS instrument rule (O6)
-  Source: options_setup premium levels
-
-  entry_premium_mid =
-    (options_setup.entry_premium_low
-     + options_setup.entry_premium_high) / 2
-
-  rr_premium_t2 =
-    (options_setup.target_2_premium
-     - entry_premium_mid)
-    / (entry_premium_mid
-       - options_setup.sl_premium)
-
-  Store as: options_setup.rr_premium_t2
-  Used for: OPTIONS rule O6 only.
-
-Write all three explicitly at end of
+Write both explicitly at end of
 dimension_2_narrative:
 
   "RR COMPUTATIONS:
@@ -3466,12 +3513,7 @@ dimension_2_narrative:
 
    Futures RR ([near/next]-month contract):
      fut_entry_mid: __  fut_sl: __  fut_t2: __
-     fut_rr_t2: __
-
-   Premium RR (OPTIONS rule only):
-     entry_premium_mid: __  sl_premium: __
-     target_2_premium: __
-     rr_premium_t2: __"
+     fut_rr_t2: __"
 
 ═══════════════════════════════════════════════════
 STEP 2: GATE 2 CHECK (underlying RR)
@@ -3524,17 +3566,18 @@ pass = false if any strike obstructs
 
 If pass == false:
   instrument_recommendation = "NONE"
-  instrument_reason = "[strike] [CE/PE] wall —
-    OI [value] (~[ratio]x neighbor average [calc]).
-    OPTIONS: suppresses premium expansion toward
-    target_2. FUT: gamma-pinning resistance makes
-    [target_2] structurally difficult within
-    2-5 days. Neither path recommended.
-    Re-evaluate when [level] cleared on volume."
-  none_reason = "[strike] wall blocks both paths.
-    Revisit when cleared on volume."
+  instrument_reason = "[Strike] [CE/PE] wall —
+    OI [value] (~[ratio]x neighbor average [calculation]).
+    Wall sits between entry [level] and target_2 [level],
+    creating gamma-pinning resistance that makes [target_2]
+    structurally difficult within 2-5 days.
+    FUT not recommended with current target structure.
+    Re-evaluate when [level] cleared on volume or T2
+    revised below [strike] with acceptable RR."
+  none_reason = "[strike] wall blocks FUT target.
+    Revisit when cleared."
   actionable_now = false
-  Skip Steps 4 and 5.
+  Skip Step 4.
 
 If pass == true:
   Continue to Step 4.
@@ -3547,7 +3590,7 @@ All four rules evaluated using ACTIVE CONTRACT
 data (near or next month per Step 0A).
 
 If ALL four pass → FUT recommended. Stop.
-If ANY fails → evaluate OPTIONS in Step 5.
+If ANY fails → NONE. Skip to NONE outcome below.
 
 RULE F1: BASIS NOT NEGATIVE AND EXPANDING
   From fut_setup.basis_note (ACTIVE CONTRACT).
@@ -3616,159 +3659,28 @@ IF ALL FOUR PASS:
   actionable_note = null
 
 IF ANY FAIL:
-  Note which rules failed.
-  Continue to Step 5.
-
-═══════════════════════════════════════════════════
-STEP 5: OPTIONS RULES
-═══════════════════════════════════════════════════
-
-Only reached if Step 4 had any failure.
-ALL eight must pass for OPTIONS.
-ANY failure → NONE.
-
-Note: OPTIONS always uses near-month expiry
-if DTE >= 6 (Gate 3 has not fired).
-If near_month_dte < 6, Gate 3 has already
-nulled options_setup. In this case
-OPTIONS path is unavailable — skip to NONE.
-
-IF near_month_dte < 6:
-  OPTIONS path unavailable (Gate 3).
-  instrument_recommendation = "NONE"
-  Document that OPTIONS path is blocked
-  by Gate 3 in addition to any FUT
-  rule failures.
-  Skip remaining OPTIONS rules.
-  Go directly to NONE outcome below.
-
-IF near_month_dte >= 6:
-  Evaluate all eight rules:
-
-RULE O1: STAGE IS TRADE_READY
-  PASS: stage == "TRADE_READY"
-  FAIL: any other stage
-
-RULE O2: ADJUSTED SCORE >= 80
-  PASS: adjusted_score >= 80
-  FAIL: adjusted_score < 80
-
-RULE O3: IV IS GENUINELY LOW
-  Use iv_used_for_trade (atm_ce_iv if LONG,
-  atm_pe_iv if SHORT) from options_setup.
-
-  If iv_source_used = "chain_iv":
-    PASS: iv_used_for_trade < 20
-    FAIL: iv_used_for_trade >= 20
-
-  If iv_source_used = "vix_proxy":
-    PASS: VIX < 13
-    FAIL: VIX >= 13
-
-RULE O4: DTE >= 15 TRADING DAYS
-  PASS: days_to_expiry >= 15
-  FAIL: days_to_expiry < 15
-  (Gate 3 handles < 6 — O4 sets higher bar)
-
-RULE O5: STOCK SUFFICIENTLY VOLATILE
-  PASS: atr_pct >= 2.5%
-  FAIL: atr_pct < 2.5%
-
-RULE O6: PREMIUM RR >= 3.0
-  From options_setup.rr_premium_t2 (Step 1).
-
-  PASS: rr_premium_t2 >= 3.0
-  FAIL: rr_premium_t2 < 3.0
-
-  Show calculation:
-  "rr_premium_t2 = ([target_2_premium] -
-   [entry_premium_mid]) / ([entry_premium_mid]
-   - [sl_premium]) = [value]"
-
-RULE O7: LIQUIDITY ADEQUATE
-  PASS: ATM OI >= 1000 contracts
-        AND estimated bid-ask <= 3% of premium
-  FAIL: either condition not met
-
-  Set liquidity_check.pass and note.
-
-RULE O8: THETA COST MANAGEABLE
-  Estimate total theta over 5-day max hold:
-
-  daily_theta ≈ iv_used_for_trade
-    × entry_premium_mid
-    × sqrt(1 / days_to_expiry) / 100
-
-  total_theta_5d = daily_theta × 5
-
-  PASS: total_theta_5d < 20% of entry_premium_mid
-  FAIL: total_theta_5d >= 20% of entry_premium_mid
-
-  Set theta_cost_check.pass and note with
-  explicit calculation shown.
-
-IF ALL EIGHT PASS:
-  instrument_recommendation = "OPTIONS"
-
-  instrument_reason = "OPTIONS — all 8 stringent
-    criteria met: TRADE_READY [score] >= 80,
-    IV [value] < 20 (LOW), DTE [value] >= 15,
-    ATR [value]% >= 2.5, premium RR
-    [rr_premium_t2] >= 3.0, liquidity
-    [ATM OI] adequate, theta [value]%
-    manageable over 5-day hold.
-    FUT disqualified: [specific rule and value
-    that caused FUT failure in Step 4]."
-
-  none_reason = null
-  actionable_now = true
-  actionable_note = null
-
-IF ANY FAIL:
   instrument_recommendation = "NONE"
 
   Build complete failure summary:
 
-  instrument_reason = "NONE —
-    FUT disqualified (Step 4):
-      [For each failed FUT rule:]
-      F[n]: [rule name] — [specific value
-      that failed, e.g. 'basis -11.5
-      expanding' or 'fut_rr_t2 1.8 < 2.0'].
-    OPTIONS disqualified (Step 5):
-      [For each failed OPTIONS rule:]
-      O[n]: [rule name] — [specific value
-      that failed, e.g. 'adjusted score
-      68 < 80' or 'rr_premium_t2 2.1 < 3.0'].
+  instrument_reason = "FUT disqualified —
+    [For each failed FUT rule:]
+    F[n] FAIL: [rule name]: [specific value
+    that failed, e.g. 'basis -11.5
+    expanding' or 'fut_rr_t2 1.8 < 2.0'].
     Re-evaluate when: [most actionable
     condition — e.g. 'pullback to [level]
     improves fut_rr_t2 to 2.0+' or
     'price clears [level] to set new
     T2 with better RR']."
 
-  none_reason = "FUT: [first failed rule].
-    OPTIONS: [first failed rule].
+  none_reason = "FUT disqualified: [first failed rule].
     Revisit when [most actionable condition]."
 
   margin_efficiency_note = null
   actionable_now = false
-  actionable_note = "Neither FUT nor OPTIONS
-    passes instrument criteria — [single
+  actionable_note = "FUT criteria not met — [single
     most important reason]."
-
-═══════════════════════════════════════════════════
-STEP 6: CRITERIA_PASSED_COUNT
-═══════════════════════════════════════════════════
-
-criteria_passed_count = count of checks
-where pass == true (null excluded).
-
-Count:
-  oi_wall_proximity_check.pass
-  theta_cost_check.pass
-  liquidity_check.pass
-
-Range: 0-3. Null if hard_gate_triggered.
 
 ═══════════════════════════════════════════════════
 INSTRUMENT DECISION SELF-CHECK
@@ -3778,53 +3690,54 @@ Before writing instrument_decision JSON:
 
 IF near_month_dte < 6:
   fut_setup.contract_selected = "next_month" ✓
-  fut_setup uses next_month levels ✓
+  fut_setup uses next_month OHLCV levels ✓
   All FUT rules use next_month data ✓
-  Near-month reference block in
-    dimension_2_narrative ✓
-  options_setup all nulled (Gate 3) ✓
-  OPTIONS rules skipped ✓
-  If FUT also fails → NONE ✓
+  Near-month reference block present
+    in dimension_2_narrative ✓
 
 IF near_month_dte >= 6:
   fut_setup.contract_selected = "near_month" ✓
-  fut_setup uses near_month levels ✓
+  fut_setup uses near_month OHLCV levels ✓
 
 IF instrument_recommendation == "FUT":
   All four FUT rules passed ✓
   OI wall check passed ✓
+  instrument_reason cites all four rules
+    with specific values ✓
   instrument_reason cites contract
     (near or next month) and DTE ✓
-  instrument_reason cites all four rules ✓
   none_reason == null ✓
   actionable_now == true ✓
-
-IF instrument_recommendation == "OPTIONS":
-  All eight OPTIONS rules passed ✓
-  OI wall check passed ✓
-  At least one FUT rule failed ✓
-  near_month_dte >= 6 ✓
-  instrument_reason cites all 8 rules ✓
-  instrument_reason states FUT failure ✓
-  none_reason == null ✓
-  actionable_now == true ✓
+  options_setup does not exist in output ✓
 
 IF instrument_recommendation == "NONE":
-  instrument_reason NEVER null ✓
-  instrument_reason lists specific failed
-    rules with actual values ✓
+  instrument_reason is NEVER null ✓
+  instrument_reason states cause
+    (gate / wall / FUT rules failed)
+    with specific values ✓
+  none_reason populated ✓
+  actionable_now == false ✓
+  All fut_setup numeric fields null ✓
+
+IF hard_gate_triggered == true:
+  instrument_recommendation == "NONE" ✓
+  All fut_setup numeric fields null ✓
+  instrument_reason cites gate ✓
   none_reason populated ✓
   actionable_now == false ✓
 
 FORBIDDEN:
   ❌ instrument_reason == null (ever)
   ❌ none_reason == null when NONE chosen
-  ❌ Futures levels = spot + basis
+  ❌ Futures levels derived as spot + basis
   ❌ FUT recommended when any F rule fails
-  ❌ OPTIONS recommended when any O rule fails
-  ❌ OPTIONS evaluated when near_month_dte < 6
   ❌ FUT recommended when OI wall fails
-  ❌ OPTIONS recommended when OI wall fails
+  ❌ Any options_setup block in output
+  ❌ Any premium or IV fields in output
+  ❌ theta_cost_check in output
+  ❌ liquidity_check in output
+  ❌ criteria_passed_count in output
+  ❌ trade_parameters block in output
   ❌ Next-month contract selected when
      near_month_dte >= 6
   ❌ Near-month contract used when
@@ -3837,7 +3750,7 @@ Otherwise:
 - previous_score    = previous_setups[0].conviction_score  (may be null for legacy records)
 - direction_changed = true if current direction != previous_direction; false otherwise
 - score_delta       = (current conviction_score) − previous_score; set null if previous_score is null. When direction_changed == true this is a magnitude comparison across two different directional theses — a positive delta does not mean the thesis improved, only that today's score is numerically higher. Reflect this distinction in justification.
-- justification: Required only when direction_changed == true. Cite the specific new data visible in this session's inputs that was absent or contradicted the prior direction (e.g., "PCR contracted from 1.8 to 0.5; CE wall at 24500 present in prior chain is now absent from today's chain"). If you cannot identify specific new evidence from the data, write exactly: "NONE — treat with caution". Write null when direction_changed == false.
+- justification: Required only when direction_changed == true. Cite the specific new data visible in this session's inputs that was absent or contradicted the prior direction (e.g. e.g., "Basis turned from +4.5 to -2.1 — institutional longs no longer carrying; price_oi_regime_last_10 shows shift from LONG_BUILDUP dominant to SHORT_BUILDUP in last 3 sessions" OR "fut_rr_t2 improved from 1.4 to 2.3 following pullback to support zone; futures chart now shows clean entry at prior resistance-turned-support"). If you cannot identify specific new evidence from the data, write exactly: "NONE — treat with caution". Write null when direction_changed == false.
 
 [PRICE_OI_REGIME COMPUTATION — uses futures_30d_near_month from Section E: F&O DATA]
 Requires at least 4 rows in futures_30d_near_month to produce 3 day-over-day comparisons. If futures_30d_near_month has fewer than 4 rows or futures data is unavailable, set price_oi_regime_last_3 = [].
@@ -3854,6 +3767,18 @@ Classification rule:
 
 Output the 3 classified sessions most-recent-first in price_oi_regime_last_3.
 
+NOTE ON price_oi_regime_last_3:
+This pre-computed array covers the last 3 sessions only.
+It is provided as a quick reference for dimension_4_narrative
+opening context.
+
+For DIMENSION 4 SCORING, do NOT use this array.
+Compute all 10 sessions yourself from the raw futures_30d
+ACTIVE CONTRACT OHLCV data in Section E.
+
+The scoring threshold requires 10 sessions to be meaningful:
+7+ bullish = 2pts | 4-6 = 1pt | ≤3 = 0pts
+
 Your JSON output must match this exact schema:
 {{
   "symbol": "{symbol}",
@@ -3862,6 +3787,9 @@ Your JSON output must match this exact schema:
   "conviction_score": <raw_total_score_0_to_100>,
   "adjusted_score": <adjusted_score_raw_times_multiplier>,
   "conviction_multiplier_applied": {sec7["conviction_multiplier"]},
+  "spot_price": <underlying_close_price_for_session_date_as_number>,
+  "underlying_rr_t2": <number_or_null>,
+  "lot_size": <number_or_null>,
   "setup_summary": {{
     "pattern_name": "<Pattern name, e.g. Bull Flag or None>",
     "pattern_status": "COMPLETE | FORMING | NONE",
@@ -3887,44 +3815,20 @@ Your JSON output must match this exact schema:
     "stop_loss": <number>,
     "stop_loss_basis": "<basis>"
   }},
-  "trade_parameters": {{
-    "entry_low": <number>,
-    "entry_high": <number>,
-    "entry_mid": <number>,
-    "target_1": <number>,
-    "target_2": <number>,
-    "rr_t1": <number_ratio>,
-    "rr_t2": <number_ratio>
-  }},
-  "options_setup": {{
-    "strike": <number_or_null>,
-    "option_type": "CE | PE | null",
-    "expiry": "<YYYY-MM-DD_or_null>",
-    "days_to_expiry": <number_or_null>,
-    "entry_premium_low": <number_or_null>,
-    "entry_premium_high": <number_or_null>,
-    "sl_pct": <number_or_null>,
-    "sl_premium": <number_or_null>,
-    "target_1_premium": <number_or_null>,
-    "target_2_premium": <number_or_null>,
-    "atm_ce_iv": <number_or_null — CE IV at ATM strike; null unless iv_source_used = "chain_iv">,
-    "atm_pe_iv": <number_or_null — PE IV at ATM strike; null unless iv_source_used = "chain_iv">,
-    "atm_iv_skew": <number_or_null — atm_ce_iv minus atm_pe_iv; null if either is null>,
-    "iv_used_for_trade": <number_or_null — atm_ce_iv when LONG, atm_pe_iv when SHORT; null when chain_iv unavailable>,
-    "iv_note": "<State atm_ce_iv and atm_pe_iv, which was used for this trade (iv_used_for_trade) and why, IV level assessment (LOW/MEDIUM/HIGH), source used, and flag the skew if unusually wide (>5 pts) with both possible explanations (market skew vs. stale quote)>",
-    "iv_source_used": "chain_iv | summary_atm_iv | vix_proxy"
-  }},
   "fut_setup": {{
-    "expiry": "<YYYY-MM-DD_or_null — expiry of the selected contract (near or next month per contract_selected)>",
+    "expiry": "<YYYY-MM-DD or null>",
     "days_to_expiry": <number_or_null — DTE of the selected contract>,
     "entry_low": <number_or_null>,
     "entry_high": <number_or_null>,
+    "entry_mid": <number_or_null>,
     "sl_pct": <number_or_null — percentage distance from entry_mid to stop_loss>,
     "stop_loss": <number_or_null>,
     "target_1": <number_or_null>,
     "target_2": <number_or_null>,
-    "basis_note": "<basis value and trend for the selected contract; positive = contango/bullish carry, negative = backwardation>",
-    "contract_selected": "near_month | next_month",
+    "rr_t1": <number_or_null>,
+    "rr_t2": <number_or_null>,
+    "basis_note": "<basis value, trend, implication — positive = contango/bullish carry, negative = backwardation; or null>",
+    "contract_selected": "near_month | next_month | null",
     "contract_selection_note": "<one-line reason for choosing next-month; null when near_month is used by default>"
   }},
   "price_oi_regime_last_3": [
@@ -3937,26 +3841,18 @@ Your JSON output must match this exact schema:
   ],
   "instrument_decision": {{
     "oi_wall_proximity_check": {{
-      "walls_checked_side": "<CE if direction=LONG, PE if direction=SHORT — derived from direction, not chosen freely>",
+      "walls_checked_side": "CE | PE | null",
       "walls_between_entry_and_target2": [ {{ "strike": <number>, "oi": <number> }} ],
       "nearest_obstructing_wall_strike": <number_or_null>,
       "nearest_obstructing_wall_oi": <number_or_null>,
       "wall_oi_vs_neighbors_ratio": <number_or_null>,
-      "pass": <true_or_false>,
-      "note": "<one line: obstructing wall strike and OI vs neighbors ratio and impact on premium expansion or underlying pinning; or 'no obstructing wall between entry and T2'>"
-    }},
-    "theta_cost_check": {{
       "pass": <true_or_false_or_null>,
-      "note": "<theta decay assessment using iv_used_for_trade (the IV of the side actually being traded — CE for LONG, PE for SHORT) vs premium paid over the 2–5 day holding period; or 'N/A — Gate 3 (DTE < 6)' if Gate 3 triggered>"
+      "note": "<one line: wall impact or no wall found>"
     }},
-    "liquidity_check": {{
-      "pass": <true_or_false_or_null>,
-      "note": "<ATM OI and estimated bid-ask spread assessment; or 'N/A — FUT path' if Gate 3 triggered>"
-    }},
-    "criteria_passed_count": <0_to_3 — count_of_checks_where_pass_is_true_excluding_nulls>,
-    "instrument_recommendation": "OPTIONS | FUT | NONE",
-    "margin_efficiency_note": "<one concise observation on the capital or margin efficiency advantage of the recommended instrument; null if instrument_recommendation = NONE>",
-    "none_reason": "<concise explanation of why neither OPTIONS nor FUT is recommended; null if instrument_recommendation != NONE>"
+    "instrument_recommendation": "FUT | NONE",
+    "instrument_reason": "<always populated — never null>",
+    "margin_efficiency_note": "<one line or null if NONE>",
+    "none_reason": "<populated when NONE — null otherwise>"
   }},
   "hard_gate_triggered": <true_or_false>,
   "hard_gate_reason": "<name of hard gate triggered or null>",
@@ -3971,15 +3867,121 @@ Your JSON output must match this exact schema:
   "dimension_1_narrative": "<Meticulous detail. Assess S/R confluence, completed/forming patterns with dates/prices, candle body/wicks close position, candlestick patterns with location context, RSI divergence check, and volume trend. Every number/date must be chart-verifiable. Do not generalize.>",
   "dimension_2_narrative": "<Describe SL structural invalidation logic with ATR validation. Detail T1 and T2 levels and R:R parameters. Describe entry zone confluence basis.>",
   "dimension_3_narrative": "<Connect Nifty regime stance and bias to this trade's execution. Assess sector tailwind/headwind and stock relative strength/performance vs sector.>",
-  "dimension_4_narrative": "<REQUIRED OPENING: name each of the last 3 sessions' Price-OI regimes by label with supporting numbers, e.g. 'Jul-16→17: LONG_BUILDUP (price +0.7%, OI +0.9%); Jul-15→16: SHORT_COVERING (price +0.3%, OI −1.2%); Jul-14→15: SHORT_BUILDUP (price −0.5%, OI +2.1%)'. Then assess basis current/trend, PCR contrarian reading with any thin OI warning, and DTE/rollover phase significance. When fut_setup.contract_selected = 'next_month', state the contract switch explicitly before the basis discussion (e.g. 'Using next-month Aug-28 futures contract — near-month Jul-31 has only 4 DTE vs 2–5 day hold requirement') and base the basis/DTE commentary on the next-month contract's values. If instrument_decision.oi_wall_proximity_check.pass = false, explicitly name the obstructing wall strike, its OI vs neighbors ratio, and explain the impact on target_2 achievability (premium compression for options; gamma-pinning resistance for futures/spot) — state this even when instrument_recommendation = FUT.>",
+  "dimension_4_narrative": "<Structure your narrative in this order: PRICE-OI REGIME (open with this): Compute and state all 10 sessions from active contract futures_30d series. Name each regime explicitly with supporting numbers: e.g. 'Jul-29→30: LONG_BUILDUP (price +0.85%, OI +2.76%); Jul-28→29: LONG_BUILDUP (price +1.33%, OI +2.43%); Jul-27→28: SHORT_COVERING (price +1.4%, OI -3.2%)...' After listing all 10 sessions state: 'Bullish sessions: X of Y valid. [Assessment: e.g. Sustained institutional accumulation over 10 sessions — strong LONG_BUILDUP pattern confirms smart money adding to longs consistently.]' Flag any rollover artifact sessions (OI change > 50% in one day) and note their limited interpretive value. FUTURES BASIS: State basis_current value and trend. Explain what it means for the trade: positive expanding = institutions paying premium to carry longs forward (bullish). Negative = backwardation warning. Reference basis_note from fut_setup. ROLLOVER AND DTE: State active contract (near or next month), days_to_expiry, rollover phase. Confirm sufficient time for 2-5 day hold. If next_month selected, explicitly state why near_month was unsuitable. OI WALL NOTE (always include): If oi_wall_proximity_check.pass = false: Name the obstructing wall strike, its OI vs neighbors ratio, and explain gamma-pinning resistance impact on target_2 achievability for futures. If oi_wall_proximity_check.pass = true: Briefly confirm no obstructing wall found between entry and target_2. Do NOT assess PCR anywhere. Do NOT reference options IV or premium. Do NOT use price_oi_regime_last_3 for scoring — compute all 10 sessions from raw futures_30d data. End with the mandatory calculation block.>",
   "mentor_notes": "<Educational swing-trading takeaways taught by this specific setup. Why does it work and what visual cues verify it on the chart.>",
   "why_could_be_wrong": "<Three highly specific bearish scenarios with exact invalidation price levels where the trade goes wrong (e.g. 'If closes below 1828 on high volume'). No generic disclaimers.>",
   "key_thing_to_watch": "<Single, most critical actionable observation for the morning market open (e.g. entry boundary trigger, gap opens).>",
-  "spot_price": <underlying_close_price_for_session_date_as_number>,
   "rejection_reason": "<Detail reasons for REJECT or null>",
   "actionable_now": <true_or_false — false when instrument_decision.instrument_recommendation == "NONE", otherwise true>,
   "actionable_note": "<one line explaining why not actionable now; null if actionable_now is true>"
 }}
+
+SECTION G — OUTPUT FIELD RULES:
+
+TRADE_PARAMETERS REMOVED:
+  There is no trade_parameters block in this schema.
+  Do NOT create a trade_parameters object.
+  Spot levels for chart annotation live in key_levels
+  (support_zone, resistance, stop_loss).
+  Futures trade levels live in fut_setup
+  (entry_low, entry_high, entry_mid, stop_loss,
+  target_1, target_2, rr_t1, rr_t2).
+
+LOT_SIZE:
+  lot_size is the ONLY position sizing field you populate.
+  Set it to the correct NSE F&O lot size for this symbol
+  from your knowledge of current NSE lot sizes.
+  Examples: TCS: 150, INFY: 300, HDFCBANK: 550,
+  RELIANCE: 250, NIFTY: 75
+  If unsure, set to null and note it.
+  Python post-processing will validate against the
+  lot_sizes table.
+
+UNDERLYING_RR_T2:
+  underlying_rr_t2 is the spot-based RR computed in
+  Step 1 Computation 1. Populate at root level for
+  Gate 2 enforcement and Python validation.
+  = (key_levels.resistance_2 - entry_mid_spot)
+    / (entry_mid_spot - key_levels.stop_loss)
+
+─────────────────────────────────────────────
+INSTRUMENT_REASON — MANDATORY POPULATION RULES
+─────────────────────────────────────────────
+
+instrument_reason is NEVER null.
+It must always explain the recommendation
+with specific values from this analysis.
+
+WHEN FUT (all F rules passed):
+  Write covering ALL of:
+  - Active contract (near/next month) and DTE
+  - Basis value and trend (Rule F1 result)
+  - Price-OI regime summary (Rule F2 result)
+  - OI trend direction (Rule F3 result)
+  - Futures RR value (Rule F4 result)
+  - Why FUT is clean for this setup
+
+  Format:
+  "FUT ([near/next]-month, [DTE] days) —
+   basis [value] ([trend], F1 PASS),
+   regime shows [summary] (F2 PASS),
+   OI trend [value] (F3 PASS),
+   fut_rr_t2 [value] >= 2.0 (F4 PASS).
+   Clean directional exposure — full delta,
+   no theta drag on [DTE]-day hold."
+
+WHEN NONE — CAUSE A (hard gate triggered):
+  Write:
+  "[Gate name] triggered — [specific condition,
+   e.g. 'underlying_rr_t2 = 1.22 < 1.5 minimum'
+   or 'no structural SL identifiable'
+   or 'chart confirms downtrend contradicting
+   LONG thesis'].
+   No instrument recommended.
+   Re-evaluate when [specific condition
+   that would clear the gate]."
+
+WHEN NONE — CAUSE B (OI wall blocks):
+  Write:
+  "[Strike] [CE/PE] wall — OI [value]
+   (~[ratio]x neighbor average [calculation]).
+   Wall sits between entry [level] and
+   target_2 [level], creating gamma-pinning
+   resistance that makes [target_2]
+   structurally difficult within 2-5 days.
+   Neither FUT recommended with current
+   target structure.
+   Re-evaluate when [level] cleared on
+   volume or T2 revised below [strike]
+   with acceptable RR."
+
+WHEN NONE — CAUSE C (FUT rules failed):
+  Write listing EVERY failed rule:
+  "FUT disqualified —
+   [For each failed rule:]
+   F[n] FAIL: [rule name]: [specific value
+   that failed, e.g. 'basis -8.5 expanding'
+   or 'all 3 sessions SHORT_BUILDUP'
+   or 'fut_rr_t2 1.6 < 2.0 minimum'].
+   Re-evaluate when: [most actionable
+   condition that would clear the
+   most important failed rule]."
+
+NONE_REASON RULES:
+  Populated when instrument_recommendation = NONE.
+  One sentence maximum.
+  Cause A: "[Gate]: [condition]. Revisit when [clears]."
+  Cause B: "[Strike] wall blocks FUT target. Revisit when cleared."
+  Cause C: "FUT disqualified: [first failed rule]. Revisit when [condition]."
+  null when instrument_recommendation = FUT.
+
+FORBIDDEN:
+  ❌ instrument_reason = null (ever)
+  ❌ instrument_reason = "Hard gate triggered"
+     (too vague — cite specific gate and condition)
+  ❌ instrument_reason = "OI wall found"
+     (too vague — cite strike, OI, ratio, impact)
+  ❌ none_reason = null when NONE is chosen
 """
     return prompt
 

@@ -13,3 +13,5 @@ apscheduler
 pytz
 anthropic
 pandas-ta
+fredapi
+yfinance
