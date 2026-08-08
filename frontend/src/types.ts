@@ -189,15 +189,16 @@ export interface DeepAnalysisResponse {
 }
 
 export interface AnalyseResponse {
-  symbol: string;
-  session_date: string;
-  is_nifty50: boolean;
+  symbol:             string;
+  session_date:       string;
+  is_nifty50:         boolean;
   custom_symbol_note: string | null;
-  analysis: AnalysisResult;
+  analysis:           any;   // Turn 3 schema — see pipeline/claude_session.py
   estimated_cost_usd: number;
   data_quality_notes: string[];
-  duration_seconds: number;
-  setup_id: string | null;
+  duration_seconds:   number;
+  is_cached:          boolean;
+  setup_id:           string | null;
 }
 
 export interface IndicatorValRow {

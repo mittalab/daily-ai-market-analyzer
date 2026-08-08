@@ -24,11 +24,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 export function runAnalysis(
   symbol: string,
   direction: 'AUTO' | 'LONG' | 'SHORT',
-  save_to_ledger: boolean,
+  save_to_ledger: boolean = false,
+  force_refresh: boolean = false,
 ): Promise<AnalyseResponse> {
   return apiFetch<AnalyseResponse>('/api/analyse', {
     method: 'POST',
-    body: JSON.stringify({ symbol, direction, save_to_ledger }),
+    body: JSON.stringify({ symbol, direction, save_to_ledger, force_refresh }),
   });
 }
 

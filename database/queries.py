@@ -737,6 +737,51 @@ def get_claude_turn(session_id: str, turn_number: int) -> dict | None:
     return resp.data[0] if resp.data else None
 
 
+def get_turn_for_symbol(session_id: str, symbol: str, turn_type: str) -> dict | None:
+    """Return the most recent turn of a given type for a symbol in a session, or None."""
+    resp = (
+        get_client()
+        .table("session_claude_turns")
+        .select("*")
+        .eq("session_id", session_id)
+        .eq("turn_type", turn_type)
+        .eq("symbol", symbol)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def get_manual_turn_for_symbol(session_id: str, symbol: str) -> dict | None:
+    """Return the MANUAL turn for a specific symbol in a session, or None."""
+    resp = (
+        get_client()
+        .table("session_claude_turns")
+        .select("*")
+        .eq("session_id", session_id)
+        .eq("turn_type", "MANUAL")
+        .eq("symbol", symbol)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def get_next_manual_turn_number(session_id: str) -> int:
+    """Return the next available turn_number for MANUAL turns (1000-based) in a session."""
+    resp = (
+        get_client()
+        .table("session_claude_turns")
+        .select("turn_number")
+        .eq("session_id", session_id)
+        .gte("turn_number", 1000)
+        .order("turn_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return (resp.data[0]["turn_number"] + 1) if resp.data else 1000
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # trade_setups
 # ─────────────────────────────────────────────────────────────────────────────
