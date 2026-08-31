@@ -517,7 +517,7 @@ def run_daily_validation(
     symbol: str | None = None,
     include_indexes: bool = True,
     kite_validation_mandatory: bool = True,
-) -> bool:
+) -> tuple[bool, int]:
     """
     Validate symbols with pre-flight checks and (on full runs) FII/DII ingestion.
 
@@ -558,24 +558,25 @@ def run_daily_validation(
     # Symbol universe
     # 1. Standardize core tracking indices into a fixed list
     core_indices = ["INDIA_VIX", "NIFTY_50"] + list(other_indices)
-
+    total_stocks = 0
     if symbol is None:
         stocks_dict = get_stock_list_for_analysis(include_kite_trades=kite_ok)
         # Get a unique, alphabetized list of stocks
         sorted_stocks = sorted(set(stocks_dict.keys()))
         universe = core_indices + sorted_stocks
-
+        total_stocks = len(sorted_stocks)
     elif include_indexes:
         sorted_stocks = sorted({symbol})
         universe = core_indices + sorted_stocks
-
+        total_stocks = len(sorted_stocks)
     else:
         # No indices requested: just a sorted list of the symbols passed
         universe = sorted({symbol})
+        total_stocks = len(universe)
 
     logger.info("Validating %d symbol(s) for %s", len(universe), target_date)
 
-    passed_count, failed_symbols = 0, []
+    passed_count, failed_symbols, stocks_passed = 0, [], 0
 
     for idx, sym in enumerate(universe, 1):
         t_sym = time.time()
@@ -584,6 +585,8 @@ def run_daily_validation(
             ok = validate_and_heal(sym, target_date, holidays, other_indices)
             if ok:
                 passed_count += 1
+                if sym not in core_indices:
+                    stocks_passed += 1
             else:
                 failed_symbols.append(sym)
         except Exception as exc:
@@ -592,10 +595,10 @@ def run_daily_validation(
         logger.info("[%d/%d] %s finished in %.2fs", idx, len(universe), sym, time.time() - t_sym)
 
     logger.info(
-        "Validation complete: %d/%d passed. Failed: %s. Total time: %.2fs",
-        passed_count, len(universe), failed_symbols or "none", time.time() - start_time
+        "Validation complete: %d/%d passed (%d stocks). Failed: %s. Total time: %.2fs",
+        passed_count, len(universe), stocks_passed, failed_symbols or "none", time.time() - start_time
     )
-    return not failed_symbols
+    return not failed_symbols, stocks_passed
 
 
 # ── Convenience entry-point ───────────────────────────────────────────────────
@@ -638,7 +641,7 @@ def _ensure_file_logging() -> Path:
 
     return log_file
 
-def run_validation_now(kite_validation_mandatory: bool = True) -> bool:
+def run_validation_now(kite_validation_mandatory: bool = True) -> tuple[bool, int]:
     """
     Determine the correct validation target date and run full validation.
 
@@ -651,7 +654,8 @@ def run_validation_now(kite_validation_mandatory: bool = True) -> bool:
     Logs are written to  logs/validation.log  (rotating, max 10 MB × 5 files)
     in addition to any console handler already configured by the caller.
 
-    Returns True if all symbols passed, False otherwise.
+    Returns (all_passed, stocks_passed) where stocks_passed is the count of
+    non-index symbols that passed validation.
     """
     log_file = _ensure_file_logging()
 

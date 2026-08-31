@@ -566,6 +566,15 @@ def send_kite_fo_fetch_failed(error: str, fallback_count: int, trade_date: str) 
     return send_loud(text)
 
 
+def send_validation_no_stocks(trade_date: str) -> int | None:
+    text = (
+        f"🚨 <b>Validation: No Stocks Passed — {trade_date}</b>\n"
+        f"Data validation did not pass for any stock.\n"
+        f"Skipping tonight's analysis pipeline."
+    )
+    return send_loud(text)
+
+
 def send_fii_dii_data_missing(target_date: str, found_date: str) -> int | None:
     text = (
         f"❌ <b>FII/DII Data Missing — {target_date}</b>\n"

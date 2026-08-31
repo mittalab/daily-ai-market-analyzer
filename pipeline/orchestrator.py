@@ -28,6 +28,7 @@ from new_notifications.telegram import (
     send_prescan_pipeline_complete,
     send_validation_start,
     send_validation_complete,
+    send_validation_no_stocks,
 )
 from new_utils.stock_list import get_stock_list_for_analysis
 from pipeline.claude_session import run_claude_session
@@ -69,10 +70,16 @@ def run_pipeline(session_date: date, mandatory_stocks: list[str] | None = None, 
     from new_validation.run_validation import run_validation_now
     from database.queries import get_validation_state
     logger.info("Running pre-flight data validation and self-healing for all symbols...")
+    stocks_passed = 0
     try:
-        run_validation_now(kite_validation_mandatory=False)
+        _, stocks_passed = run_validation_now(kite_validation_mandatory=False)
     except Exception as exc:
         logger.error("Error during daily validation execution: %s", exc)
+
+    if stocks_passed == 0:
+        logger.error("Validation passed 0 stocks — skipping analysis for %s", session_date)
+        send_validation_no_stocks(str(session_date))
+        return {"error": "Validation passed 0 stocks — analysis skipped", "session_id": session_id}
 
     failed_validation = []
     for symbol in symbols:
