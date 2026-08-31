@@ -172,12 +172,12 @@ def job_analysis_pipeline(my_date: date | None = None) -> None:
             pass
         return
 
-    try:
-        from pipeline.paper_trade_engine import run_paper_trade_engine
-        summary = run_paper_trade_engine(today)
-        logger.info("Paper trade engine: %s", summary)
-    except Exception as exc:
-        logger.error("Paper trade engine failed: %s", exc)
+    # try:
+    #     from pipeline.paper_trade_engine import run_paper_trade_engine
+    #     summary = run_paper_trade_engine(today)
+    #     logger.info("Paper trade engine: %s", summary)
+    # except Exception as exc:
+    #     logger.error("Paper trade engine failed: %s", exc)
 
 
 # ── Registration ───────────────────────────────────────────────────────────────
