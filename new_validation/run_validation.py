@@ -280,15 +280,20 @@ def heal_and_recheck(
     holidays: set[date],
     other_indices: list[str],
     options_to_heal: bool,
+    force_historical: bool = False,
 ) -> tuple[bool, dict]:
     """
     Trigger ingestion for failed checks, then re-check using point queries.
     Updates cache in-place for any data that lands successfully.
     Returns (passed_after_healing, updated_results).
+
+    force_historical=True skips the Kite live path even when check_date==today,
+    using bhavcopy instead. Use this for batch jobs that run after market close
+    (e.g. 11 PM bhavcopy job) where Kite is not required.
     """
     logger.info("%s: Healing and check rechecking. Check date: %s, Today: %s", symbol, check_date, today)
     start_time = time.time()
-    is_today = (check_date == today)
+    is_today = (check_date == today) and not force_historical
 
     needs_ohlcv    = _needs(results, "stock_ohlcv", "nifty_ohlcv", "index_ohlcv", "vix_ohlcv")
     needs_futures  = _needs(results, "stock_futures")
@@ -395,10 +400,13 @@ def validate_and_heal(
     today: date,
     holidays: set[date],
     other_indices: list[str],
+    force_historical: bool = False,
 ) -> bool:
     """
     Validate and self-heal a symbol across all gap dates up to today.
     Returns True only if every date in the range passes validation.
+
+    force_historical=True forces the bhavcopy healing path even for today's date.
     """
     start_time = time.time()
     
@@ -454,7 +462,8 @@ def validate_and_heal(
                            check_date, failed_checks, options_to_check, today)
             t_heal = time.time()
             passed, results = heal_and_recheck(
-                symbol, check_date, results, cache, today, holidays, other_indices, options_to_check
+                symbol, check_date, results, cache, today, holidays, other_indices, options_to_check,
+                force_historical=force_historical,
             )
             healing_time += time.time() - t_heal
 
@@ -772,7 +781,7 @@ def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
 
         for attempt in range(1, _FO_VALIDATION_MAX_RETRIES + 1):
             try:
-                ok = validate_and_heal(sym, target_date, holidays, other_indices)
+                ok = validate_and_heal(sym, target_date, holidays, other_indices, force_historical=True)
                 if ok:
                     if attempt > 1:
                         logger.info("%s: passed on retry %d/%d", sym, attempt, _FO_VALIDATION_MAX_RETRIES)
