@@ -271,6 +271,6 @@ if __name__ == "__main__":
     from new_data_ingestion.nse_bhavcopy import last_trading_day
     target_date = last_trading_day()
     print("Running for date: ", target_date)
-    #job_evening_bhavcopy()
+    job_evening_bhavcopy()
     #job_analysis_pipeline(target_date)
-    run_pipeline(target_date)
+    #run_pipeline(target_date)
