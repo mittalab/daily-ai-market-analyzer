@@ -20,7 +20,7 @@ from key_levels.prompts import SATURDAY_SYSTEM_PROMPT, SATURDAY_USER_TEMPLATE
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
-_MAX_TOKENS = 8192
+_MAX_TOKENS = 12000
 
 
 def _load_image_b64(path: str) -> str | None:
@@ -89,7 +89,15 @@ def call_claude_batch(
     Raises on API error or JSON parse failure.
     """
     api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        logger.error("call_claude_batch: ANTHROPIC_API_KEY is not set — API call will fail")
+        raise RuntimeError("ANTHROPIC_API_KEY not set in environment")
+
     model = os.getenv("CLAUDE_MODEL", _DEFAULT_MODEL)
+
+    if not batch:
+        logger.warning("call_claude_batch: received empty batch — nothing to send")
+        return {"key_level_analysis": [], "run_summary": {"total_stocks_analyzed": 0, "high_conviction_zone_count": 0, "notable_observations": ""}}
 
     client = anthropic.Anthropic(api_key=api_key)
     content = build_batch_content(batch, sector_map)
@@ -108,6 +116,24 @@ def call_claude_batch(
         messages=[{"role": "user", "content": content}],
     )
 
+    if not response.content:
+        logger.error("call_claude_batch: Claude returned an empty content list — stop_reason=%s", response.stop_reason)
+        raise ValueError(f"Empty response from Claude (stop_reason={response.stop_reason})")
+
+    usage = response.usage
+    logger.info(
+        "Claude response received — input_tokens=%d, output_tokens=%d, stop_reason=%s",
+        usage.input_tokens,
+        usage.output_tokens,
+        response.stop_reason,
+    )
+
+    if response.stop_reason == "max_tokens":
+        logger.warning(
+            "call_claude_batch: response was TRUNCATED (hit max_tokens=%d) — JSON may be incomplete",
+            _MAX_TOKENS,
+        )
+
     raw = response.content[0].text.strip()
 
     # Strip accidental markdown fences if the model adds them despite instructions
@@ -115,5 +141,36 @@ def call_claude_batch(
         lines = raw.splitlines()
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
 
-    parsed: dict = json.loads(raw)
+    try:
+        parsed: dict = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        logger.error(
+            "call_claude_batch: JSON parse failed (%s). Raw response (first 500 chars): %r",
+            exc, raw[:500],
+        )
+        raise
+
+    if "key_level_analysis" not in parsed:
+        logger.error(
+            "call_claude_batch: 'key_level_analysis' key missing from response. Keys present: %s",
+            list(parsed.keys()),
+        )
+        raise ValueError("Claude response missing 'key_level_analysis' key")
+
+    n_returned = len(parsed["key_level_analysis"])
+    n_sent = len(batch)
+    if n_returned != n_sent:
+        logger.warning(
+            "call_claude_batch: sent %d stocks but got analysis for %d — missing: %s",
+            n_sent,
+            n_returned,
+            sorted(set(s["symbol"] for s in batch) - {e["symbol"] for e in parsed["key_level_analysis"]}),
+        )
+
+    run_summary = parsed.get("run_summary", {})
+    logger.info(
+        "Parsed: %d stocks, %d high-conviction zones",
+        n_returned,
+        run_summary.get("high_conviction_zone_count", 0),
+    )
     return parsed

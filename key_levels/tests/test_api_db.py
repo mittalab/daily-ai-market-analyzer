@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import json
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -100,6 +101,7 @@ def _make_batch() -> list[dict]:
 
 class TestCallClaudeBatch(unittest.TestCase):
 
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("key_levels.api_client.anthropic.Anthropic")
     def test_returns_parsed_dict(self, mock_anthropic_cls):
         """Mock API returns valid JSON → call_claude_batch returns parsed dict."""
@@ -116,6 +118,7 @@ class TestCallClaudeBatch(unittest.TestCase):
         self.assertIn("run_summary", result)
         self.assertEqual(len(result["key_level_analysis"]), 2)
 
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("key_levels.api_client.anthropic.Anthropic")
     def test_strips_markdown_fences(self, mock_anthropic_cls):
         """If model wraps JSON in markdown fences, they are stripped."""
@@ -130,6 +133,7 @@ class TestCallClaudeBatch(unittest.TestCase):
         result = call_claude_batch(_make_batch())
         self.assertIn("key_level_analysis", result)
 
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("key_levels.api_client.anthropic.Anthropic")
     def test_api_called_with_system_prompt(self, mock_anthropic_cls):
         """Verify messages.create is called with a system message."""

@@ -44,7 +44,11 @@ def _prep_df(df: Any) -> pd.DataFrame:
     for col in ("open", "high", "low", "close", "volume"):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+    before = len(df)
     df = df.dropna(subset=["close"]).reset_index(drop=True)
+    dropped = before - len(df)
+    if dropped > 0:
+        logger.warning("_prep_df: dropped %d row(s) with null close (had %d, now %d)", dropped, before, len(df))
     return df
 
 
@@ -77,21 +81,39 @@ def compute_technicals(ohlcv_df: Any) -> dict:
     df = _prep_df(ohlcv_df)
     n = len(df)
 
+    if n == 0:
+        logger.error("compute_technicals: received empty DataFrame — all metrics will be None")
+        return {"ema20": None, "ema50": None, "atr14": None, "hv20": None, "hv60": None}
+
     ema20 = ema50 = atr14 = hv20 = hv60 = None
 
     if n >= 20:
         ema20 = round(float(calculate_ema(df["close"], 20).iloc[-1]), 2)
+    else:
+        logger.warning("compute_technicals: only %d rows — EMA20 unavailable (need 20)", n)
+
     if n >= 50:
         ema50 = round(float(calculate_ema(df["close"], 50).iloc[-1]), 2)
+    else:
+        logger.warning("compute_technicals: only %d rows — EMA50 unavailable (need 50)", n)
+
     if n >= 15:
         val = calculate_atr(df, 14).iloc[-1]
         atr14 = round(float(val), 2) if pd.notnull(val) else None
+        if atr14 is None:
+            logger.warning("compute_technicals: ATR14 returned NaN despite %d rows", n)
+    else:
+        logger.warning("compute_technicals: only %d rows — ATR14 unavailable (need 15)", n)
 
     log_ret = np.log(df["close"] / df["close"].shift(1)).dropna()
     if len(log_ret) >= 20:
         hv20 = round(float(log_ret.iloc[-20:].std() * np.sqrt(252)), 2)
+    else:
+        logger.warning("compute_technicals: only %d log-return rows — HV20 unavailable (need 20)", len(log_ret))
     if len(log_ret) >= 60:
         hv60 = round(float(log_ret.iloc[-60:].std() * np.sqrt(252)), 2)
+    else:
+        logger.warning("compute_technicals: only %d log-return rows — HV60 unavailable (need 60)", len(log_ret))
 
     return {"ema20": ema20, "ema50": ema50, "atr14": atr14, "hv20": hv20, "hv60": hv60}
 
@@ -106,6 +128,10 @@ def detect_pivots(ohlcv_df: Any, window: int = 5) -> list[dict]:
     df = _prep_df(ohlcv_df)
     n = len(df)
     if n < 2 * window + 1:
+        logger.warning(
+            "detect_pivots: only %d rows — need at least %d for window=%d; returning no pivots",
+            n, 2 * window + 1, window,
+        )
         return []
 
     vol_20d = df["volume"].rolling(20, min_periods=1).mean()
@@ -138,7 +164,11 @@ def cluster_pivots(pivots: list[dict], atr14: float | None, tolerance_atr: float
     Group same-type pivots within tolerance_atr*atr14 of each other.
     Returns top 5 per type (touch_count DESC, last_touch_date DESC).
     """
-    if not pivots or atr14 is None or atr14 <= 0:
+    if not pivots:
+        logger.warning("cluster_pivots: received empty pivot list — returning no clusters")
+        return []
+    if atr14 is None or atr14 <= 0:
+        logger.warning("cluster_pivots: atr14=%s is None or ≤0 — cannot compute tolerance, returning no clusters", atr14)
         return []
 
     tolerance = tolerance_atr * atr14
@@ -147,6 +177,7 @@ def cluster_pivots(pivots: list[dict], atr14: float | None, tolerance_atr: float
     for ptype in ("LOW", "HIGH"):
         typed = sorted([p for p in pivots if p["type"] == ptype], key=lambda x: x["price"])
         if not typed:
+            logger.debug("cluster_pivots: no %s pivots to cluster", ptype)
             continue
 
         # Greedy single-pass merge
@@ -272,8 +303,21 @@ def tag_zone_character(clusters: list[dict], ohlcv_df: Any) -> list[dict]:
     df = _prep_df(ohlcv_df)
     n = len(df)
 
+    if n == 0:
+        logger.error("tag_zone_character: empty DataFrame — returning clusters with default character values")
+        return [
+            {**c, "reversal_speed": 0.0, "volume_expansion_on_reversal": 1.0,
+             "follow_through_strength": 0.0, "wick_rejection_count": 0}
+            for c in clusters
+        ]
+
     closes = df["close"].values
-    opens = df["open"].values
+    # Guard: 'open' may be missing if caller passed incomplete data
+    if "open" in df.columns:
+        opens = df["open"].values
+    else:
+        logger.warning("tag_zone_character: 'open' column missing — using close as proxy for body size")
+        opens = closes.copy()
     highs = df["high"].values
     lows = df["low"].values
     volumes = df["volume"].values.astype(float)
@@ -295,6 +339,10 @@ def tag_zone_character(clusters: list[dict], ohlcv_df: Any) -> list[dict]:
         touch_idx = np.where(touch_mask)[0]
 
         if len(touch_idx) == 0:
+            logger.warning(
+                "tag_zone_character: no touches found for %s zone [%.2f–%.2f] in %d rows — using defaults",
+                ptype, zlo, zhi, n,
+            )
             result.append({
                 **c,
                 "reversal_speed": 0.0,
@@ -395,6 +443,11 @@ def extract_oi_levels(
                 df = df.rename(columns={candidate: "oi"})
                 break
     if "oi" not in df.columns:
+        logger.warning("extract_oi_levels: no OI column found (tried 'oi', 'open_interest', 'openinterest') — returning empty")
+        return []
+
+    if spot <= 0:
+        logger.warning("extract_oi_levels: spot price is %.2f (invalid) — returning empty", spot)
         return []
 
     df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
@@ -403,6 +456,11 @@ def extract_oi_levels(
 
     band = spot * band_pct
     df = df[abs(df["strike"] - spot) <= band]
+    if df.empty:
+        logger.warning(
+            "extract_oi_levels: no strikes within %.0f%% of spot=%.2f — band=[%.2f, %.2f]",
+            band_pct * 100, spot, spot - band, spot + band,
+        )
 
     out: list[dict] = []
     for otype in ("PE", "CE"):
@@ -467,18 +525,53 @@ def build_stage1_output(symbol: str, ohlcv_df: Any, chain_df: Any) -> dict:
     Handles stocks with < 180 rows gracefully.
     """
     df = _prep_df(ohlcv_df)
+    n_rows = len(df)
+    logger.debug("[%s] prep: %d OHLCV rows available", symbol, n_rows)
 
+    if df.empty:
+        logger.error("[%s] build_stage1_output: OHLCV DataFrame is empty after prep — cannot proceed", symbol)
+        return {
+            "symbol": symbol, "last_close": 0.0,
+            "ema20": None, "ema50": None, "atr14": None, "hv20": None, "hv60": None,
+            "candidate_zones": [], "oi_levels": [], "chart_image_path": "",
+        }
+
+    if n_rows < 20:
+        logger.warning("[%s] only %d OHLCV rows — analysis quality will be degraded (ideal: 180)", symbol, n_rows)
+
+    logger.debug("[%s] computing technicals…", symbol)
     tech = compute_technicals(df)
     ema20 = tech["ema20"]
     ema50 = tech["ema50"]
     atr14 = tech["atr14"]
+    logger.debug(
+        "[%s] technicals: ema20=%.2f, ema50=%.2f, atr14=%.2f, hv20=%s, hv60=%s",
+        symbol,
+        ema20 or 0, ema50 or 0, atr14 or 0,
+        f"{tech['hv20']:.2f}" if tech["hv20"] else "n/a",
+        f"{tech['hv60']:.2f}" if tech["hv60"] else "n/a",
+    )
 
-    last_close = round(float(df["close"].iloc[-1]), 2) if not df.empty else 0.0
+    last_close = round(float(df["close"].iloc[-1]), 2)
+    if last_close <= 0:
+        logger.error("[%s] last_close is %.2f — price data appears corrupt", symbol, last_close)
 
-    # Stage 1→5: pivot detection, clustering, tagging
+    logger.debug("[%s] detecting pivots (window=5)…", symbol)
     pivots = detect_pivots(df)
+    n_low = sum(1 for p in pivots if p["type"] == "LOW")
+    n_high = sum(1 for p in pivots if p["type"] == "HIGH")
+    logger.debug("[%s] pivots found: %d LOW, %d HIGH", symbol, n_low, n_high)
+
+    logger.debug("[%s] clustering pivots (tolerance=0.75×ATR)…", symbol)
     clusters = cluster_pivots(pivots, atr14)
+    n_sup = sum(1 for c in clusters if c["type"] == "LOW")
+    n_res = sum(1 for c in clusters if c["type"] == "HIGH")
+    logger.debug("[%s] clusters: %d support, %d resistance", symbol, n_sup, n_res)
+
+    logger.debug("[%s] tagging confluence…", symbol)
     clusters = tag_confluence(clusters, ema20, ema50, df)
+
+    logger.debug("[%s] tagging zone character…", symbol)
     clusters = tag_zone_character(clusters, df)
 
     # Build candidate_zones list (add zone midpoint as 'price')
@@ -501,13 +594,20 @@ def build_stage1_output(symbol: str, ohlcv_df: Any, chain_df: Any) -> dict:
             "wick_rejection_count": c.get("wick_rejection_count", 0),
         })
 
+    logger.debug("[%s] extracting OI levels…", symbol)
     oi_levels = extract_oi_levels(chain_df, last_close)
+    logger.debug("[%s] OI levels: %d strikes", symbol, len(oi_levels))
 
+    if not candidate_zones:
+        logger.warning("[%s] no candidate zones produced — chart will have no zone bands", symbol)
+
+    logger.debug("[%s] rendering zone chart…", symbol)
     chart_path = ""
     try:
         chart_path = render_zone_chart(df, clusters, symbol)
+        logger.debug("[%s] chart saved: %s", symbol, chart_path)
     except Exception as exc:
-        logger.warning("render_zone_chart failed for %s: %s", symbol, exc)
+        logger.warning("[%s] render_zone_chart failed: %s", symbol, exc)
 
     return {
         "symbol": symbol,

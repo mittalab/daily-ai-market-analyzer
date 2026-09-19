@@ -87,6 +87,15 @@ def upsert_key_levels(claude_response: dict) -> dict:
         analysis_date: str = entry.get("analysis_date", "")
         levels: list[dict] = entry.get("levels", [])
 
+        if not analysis_date:
+            logger.warning("upsert_key_levels: analysis_date missing for %s — row will have empty date", symbol)
+
+        if not levels:
+            logger.warning(
+                "upsert_key_levels: no levels returned by Claude for %s — will supersede old rows but insert nothing",
+                symbol,
+            )
+
         try:
             # Step 1: supersede previous active rows
             client.table("key_levels").update(
