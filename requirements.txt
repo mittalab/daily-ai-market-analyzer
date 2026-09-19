@@ -15,3 +15,4 @@ anthropic
 pandas-ta
 fredapi
 yfinance
+mplfinance

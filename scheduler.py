@@ -180,6 +180,23 @@ def job_analysis_pipeline(my_date: date | None = None) -> None:
     #     logger.error("Paper trade engine failed: %s", exc)
 
 
+# ── Job 7: Weekly key-level analysis ──────────────────────────────────────────
+
+def job_weekly_key_levels() -> None:
+    """Saturday 10:00 IST — weekly support/resistance key-level analysis."""
+    from datetime import datetime
+    import pytz
+    from key_levels.weekly_job import run_weekly_key_levels_job
+
+    IST = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(IST).date()
+    try:
+        result = run_weekly_key_levels_job(today)
+        logger.info("Weekly key-levels complete: %s", result)
+    except Exception as exc:
+        logger.error("Weekly key-levels job failed: %s", exc)
+
+
 # ── Registration ───────────────────────────────────────────────────────────────
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
@@ -261,9 +278,19 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         misfire_grace_time=1800,
     )
 
+    # Saturday 10:00 — weekly key-level (support/resistance) analysis
+    scheduler.add_job(
+        job_weekly_key_levels,
+        CronTrigger(day_of_week="sat", hour=10, minute=0, **ist),
+        id="weekly_key_levels",
+        name="Weekly key levels",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     logger.info(
-        "Scheduler: 7 jobs registered "
-        "(keepalive, evening_bhavcopy, morning_brief, kite_check×3, analysis_pipeline)"
+        "Scheduler: 8 jobs registered "
+        "(keepalive, evening_bhavcopy, morning_brief, kite_check×3, analysis_pipeline, weekly_key_levels)"
     )
 
 
@@ -271,6 +298,7 @@ if __name__ == "__main__":
     from new_data_ingestion.nse_bhavcopy import last_trading_day
     target_date = last_trading_day()
     print("Running for date: ", target_date)
-    job_evening_bhavcopy()
+    job_weekly_key_levels()
+    #job_evening_bhavcopy()
     #job_analysis_pipeline(target_date)
     #run_pipeline(target_date)
