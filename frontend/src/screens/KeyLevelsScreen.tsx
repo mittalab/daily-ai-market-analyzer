@@ -3,6 +3,34 @@ import { fetchKeyLevelsCached } from '../api';
 import type { KeyLevelsResponse, KeyLevelsStock, KeyLevelsZone } from '../types';
 import LightweightChart, { type PriceBand } from '../components/chart/LightweightChart';
 import type { OHLCVRow } from '../components/chart/chartUtils';
+import ErrorBoundary from '../components/ErrorBoundary';
+
+// ── Confluence flags parser ──────────────────────────────────────────────────
+
+export function parseConfluenceFlags(flags: unknown): string[] {
+  if (Array.isArray(flags)) {
+    return flags.map(String).map(s => s.trim()).filter(Boolean);
+  }
+  if (typeof flags === 'string') {
+    const trimmed = flags.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map(String).map(s => s.trim()).filter(Boolean);
+        }
+      } catch {
+        // Fall through to comma split
+      }
+    }
+    return trimmed
+      .split(',')
+      .map(s => s.trim().replace(/^["']|["']$/g, ''))
+      .filter(Boolean);
+  }
+  return [];
+}
 
 // ── Conviction badge ──────────────────────────────────────────────────────────
 
@@ -26,6 +54,11 @@ function ZoneRow({ zone }: { zone: KeyLevelsZone }) {
   const typeColor = isSupport ? 'text-green-700'  : 'text-red-700';
   const typeBg    = isSupport ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100';
 
+  const zoneLowNum = zone.zone_low != null ? Number(zone.zone_low) : null;
+  const zoneHighNum = zone.zone_high != null ? Number(zone.zone_high) : null;
+  const hasValidZone = zoneLowNum != null && !isNaN(zoneLowNum) && zoneHighNum != null && !isNaN(zoneHighNum);
+  const confluenceFlags = parseConfluenceFlags(zone.confluence_flags);
+
   return (
     <div className={`rounded-lg border p-3 mb-2 ${typeBg}`}>
       <div className="flex items-center justify-between mb-1.5">
@@ -35,8 +68,8 @@ function ZoneRow({ zone }: { zone: KeyLevelsZone }) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
         <div>
           <span className="text-gray-400">Zone: </span>
-          {zone.zone_low != null && zone.zone_high != null
-            ? `₹${zone.zone_low.toFixed(1)} – ₹${zone.zone_high.toFixed(1)}`
+          {hasValidZone
+            ? `₹${zoneLowNum!.toFixed(1)} – ₹${zoneHighNum!.toFixed(1)}`
             : '—'}
         </div>
         <div>
@@ -49,10 +82,10 @@ function ZoneRow({ zone }: { zone: KeyLevelsZone }) {
             {zone.last_touch_date}
           </div>
         )}
-        {zone.confluence_flags.length > 0 && (
+        {confluenceFlags.length > 0 && (
           <div className="col-span-2">
             <span className="text-gray-400">Confluence: </span>
-            {zone.confluence_flags.join(', ')}
+            {confluenceFlags.join(', ')}
           </div>
         )}
       </div>
@@ -75,15 +108,17 @@ function StockCard({ stock }: { stock: KeyLevelsStock }) {
   const priceBands = useMemo<PriceBand[]>(() => {
     let sCount = 0;
     let rCount = 0;
-    return stock.zones
-      .filter(z => z.zone_low != null && z.zone_high != null)
+    return (stock.zones || [])
+      .filter(z => z && z.zone_low != null && z.zone_high != null && !isNaN(Number(z.zone_low)) && !isNaN(Number(z.zone_high)))
       .map(z => {
+        const low = Number(z.zone_low);
+        const high = Number(z.zone_high);
         if (z.level_type === 'SUPPORT') {
           sCount++;
-          return { low: z.zone_low!, high: z.zone_high!, label: `S${sCount}`, type: 'SUPPORT' as const };
+          return { low, high, label: `S${sCount}`, type: 'SUPPORT' as const };
         } else {
           rCount++;
-          return { low: z.zone_low!, high: z.zone_high!, label: `R${rCount}`, type: 'RESISTANCE' as const };
+          return { low, high, label: `R${rCount}`, type: 'RESISTANCE' as const };
         }
       });
   }, [stock.zones]);
@@ -91,54 +126,56 @@ function StockCard({ stock }: { stock: KeyLevelsStock }) {
   // Badge shows the highest conviction level across all zones
   const highestConviction = useMemo<string | null>(() => {
     const rank: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
-    return stock.zones.reduce<string | null>((best, z) => {
-      const zRank = z.conviction ? (rank[z.conviction] ?? 0) : 0;
+    return (stock.zones || []).reduce<string | null>((best, z) => {
+      const zRank = z?.conviction ? (rank[z.conviction] ?? 0) : 0;
       const bRank = best ? (rank[best] ?? 0) : 0;
       return zRank > bRank ? z.conviction : best;
     }, null);
   }, [stock.zones]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-2 overflow-hidden">
-      {/* Collapsed header — always visible */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-gray-900 text-sm">{stock.symbol}</span>
-          <ConvictionBadge conviction={highestConviction} />
-        </div>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <span>{stock.zones.length} zone{stock.zones.length !== 1 ? 's' : ''}</span>
-          <span className={`transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}>▼</span>
-        </div>
-      </button>
+    <ErrorBoundary fallbackTitle={`Error rendering ${stock.symbol}`}>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-2 overflow-hidden">
+        {/* Collapsed header — always visible */}
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900 text-sm">{stock.symbol}</span>
+            <ConvictionBadge conviction={highestConviction} />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span>{(stock.zones || []).length} zone{(stock.zones || []).length !== 1 ? 's' : ''}</span>
+            <span className={`transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}>▼</span>
+          </div>
+        </button>
 
-      {/* Expanded body */}
-      {expanded && (
-        <div className="border-t border-gray-100 px-4 pb-4 pt-3">
-          <p className="text-[11px] text-gray-400 mb-3">Analysis date: {stock.analysis_date}</p>
+        {/* Expanded body */}
+        {expanded && (
+          <div className="border-t border-gray-100 px-4 pb-4 pt-3">
+            <p className="text-[11px] text-gray-400 mb-3">Analysis date: {stock.analysis_date}</p>
 
-          {/* Zone details */}
-          {stock.zones.map((zone, i) => (
-            <ZoneRow key={i} zone={zone} />
-          ))}
+            {/* Zone details */}
+            {(stock.zones || []).map((zone, i) => (
+              <ZoneRow key={i} zone={zone} />
+            ))}
 
-          {/* Chart with zone bands overlaid */}
-          {stock.ohlcv_data.length > 0 && (
-            <div className="mt-3 h-[420px] sm:h-[500px] rounded-lg overflow-hidden border border-gray-100">
-              <LightweightChart
-                symbol={stock.symbol}
-                analysisData={null}
-                ohlcvData={stock.ohlcv_data as OHLCVRow[]}
-                priceBands={priceBands}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+            {/* Chart with zone bands overlaid */}
+            {Array.isArray(stock.ohlcv_data) && stock.ohlcv_data.length > 0 && (
+              <div className="mt-3 h-[420px] sm:h-[500px] rounded-lg overflow-hidden border border-gray-100">
+                <LightweightChart
+                  symbol={stock.symbol}
+                  analysisData={null}
+                  ohlcvData={stock.ohlcv_data as OHLCVRow[]}
+                  priceBands={priceBands}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }
 

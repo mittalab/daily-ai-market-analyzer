@@ -12,6 +12,7 @@ Caching:
   Saturday 11:00 AM IST (when the Saturday key-level job is expected
   to have written fresh rows).
 """
+import json
 import logging
 from datetime import date, datetime, timedelta
 
@@ -51,6 +52,24 @@ def _next_saturday_11am_ist(now: datetime | None = None) -> datetime:
         days_ahead = (5 - dow) % 7  # days until next Saturday (1–6 for Mon–Fri, 6 for Sun)
 
     return (now + timedelta(days=days_ahead)).replace(hour=11, minute=0, second=0, microsecond=0)
+
+
+def _parse_confluence_flags(raw_flags: any) -> list[str]:
+    """Parse confluence_flags whether stored as JSON string, list, comma-separated string, or null."""
+    if isinstance(raw_flags, list):
+        return [str(f) for f in raw_flags]
+    if isinstance(raw_flags, str):
+        cleaned = raw_flags.strip()
+        if not cleaned:
+            return []
+        try:
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, list):
+                return [str(f) for f in parsed]
+        except Exception:
+            pass
+        return [f.strip() for f in cleaned.split(",") if f.strip()]
+    return []
 
 
 @router.get("/key-levels")
@@ -110,7 +129,7 @@ async def get_key_levels():
             "conviction":       row.get("conviction"),
             "touch_count":      row.get("touch_count"),
             "last_touch_date":  str(row["last_touch_date"]) if row.get("last_touch_date") else None,
-            "confluence_flags": row.get("confluence_flags") or [],
+            "confluence_flags": _parse_confluence_flags(row.get("confluence_flags")),
             "reasoning":        row.get("reasoning"),
             "breached_at":      str(row["breached_at"]) if row.get("breached_at") else None,
         })

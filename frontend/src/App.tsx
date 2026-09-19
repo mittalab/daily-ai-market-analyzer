@@ -9,6 +9,8 @@ import DeepAnalysisScreen from './screens/DeepAnalysisScreen';
 import KeyLevelsScreen from './screens/KeyLevelsScreen';
 import { clearAllCache, isCachePresent } from './cache';
 
+import ErrorBoundary from './components/ErrorBoundary';
+
 export default function App() {
   const [screen,     setScreen]     = useState<Screen>('today');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -42,12 +44,36 @@ export default function App() {
 
         <main className="flex-1 overflow-y-auto pb-20">
           {/* All screens stay mounted — CSS hidden preserves state across tab switches */}
-          <div className={screen !== 'today'   ? 'hidden' : ''}><TodayScreen  refreshKey={refreshKey} /></div>
-          <div className={screen !== 'deep'    ? 'hidden' : ''}><DeepAnalysisScreen refreshKey={refreshKey} /></div>
-          <div className={screen !== 'active'  ? 'hidden' : ''}><ActiveTradesScreen refreshKey={refreshKey} /></div>
-          <div className={screen !== 'analyse' ? 'hidden' : ''}><AnalyseScreen active={screen === 'analyse'} /></div>
-          <div className={screen !== 'levels'  ? 'hidden' : ''}><KeyLevelsScreen /></div>
-          <div className={screen !== 'status'  ? 'hidden' : ''}><PerformanceScreen /></div>
+          <div className={screen !== 'today'   ? 'hidden' : ''}>
+            <ErrorBoundary fallbackTitle="Error loading Today screen">
+              <TodayScreen  refreshKey={refreshKey} />
+            </ErrorBoundary>
+          </div>
+          <div className={screen !== 'deep'    ? 'hidden' : ''}>
+            <ErrorBoundary fallbackTitle="Error loading Deep Analysis screen">
+              <DeepAnalysisScreen refreshKey={refreshKey} />
+            </ErrorBoundary>
+          </div>
+          <div className={screen !== 'active'  ? 'hidden' : ''}>
+            <ErrorBoundary fallbackTitle="Error loading Active Trades screen">
+              <ActiveTradesScreen refreshKey={refreshKey} />
+            </ErrorBoundary>
+          </div>
+          <div className={screen !== 'analyse' ? 'hidden' : ''}>
+            <ErrorBoundary fallbackTitle="Error loading Analyse screen">
+              <AnalyseScreen active={screen === 'analyse'} />
+            </ErrorBoundary>
+          </div>
+          <div className={screen !== 'levels'  ? 'hidden' : ''}>
+            <ErrorBoundary fallbackTitle="Error loading Key Levels screen">
+              <KeyLevelsScreen />
+            </ErrorBoundary>
+          </div>
+          <div className={screen !== 'status'  ? 'hidden' : ''}>
+            <ErrorBoundary fallbackTitle="Error loading Performance screen">
+              <PerformanceScreen />
+            </ErrorBoundary>
+          </div>
         </main>
         <BottomNav active={screen} onChange={setScreen} />
       </div>

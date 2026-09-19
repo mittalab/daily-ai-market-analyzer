@@ -866,7 +866,7 @@ def _format_chat_context(
     return "\n".join(lines)
 
 
-@router.get("/session/today/chat-context", response_class=PlainTextResponse)
+@router.api_route("/session/today/chat-context", methods=["GET", "HEAD"], response_class=PlainTextResponse)
 async def get_chat_context(response: Response):
     """
     Returns plain-text analysis context formatted for pasting into Claude.ai.
