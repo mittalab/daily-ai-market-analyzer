@@ -6,7 +6,13 @@ import {
   type CandlestickData,
   type HistogramData,
   type LineData,
+  type WhitespaceData,
   type Time,
+  type ISeriesPrimitive,
+  type SeriesAttachedParameter,
+  type ISeriesPrimitivePaneView,
+  type ISeriesPrimitivePaneRenderer,
+  type SeriesPrimitivePaneViewZOrder,
 } from 'lightweight-charts';
 import { type OHLCVRow, computeEMA, computeRSI } from './chartUtils';
 
@@ -18,12 +24,103 @@ export interface FutureLevels {
   t2?:        number | null;
 }
 
-/** A support or resistance zone rendered as two horizontal lines (low + high). */
+/** A support or resistance zone rendered as two horizontal lines (low + high) and a shaded area. */
 export interface PriceBand {
-  low:   number;
-  high:  number;
-  label: string;
-  type:  'SUPPORT' | 'RESISTANCE';
+  low:        number;
+  high:       number;
+  label:      string;
+  type:       'SUPPORT' | 'RESISTANCE';
+  fillColor?: string;
+  lineColor?: string;
+}
+
+// ── Shaded zones primitive for LightweightCharts ──────────────────────────────
+
+class ShadedZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
+  private _source: ShadedZonesPrimitive;
+
+  constructor(source: ShadedZonesPrimitive) {
+    this._source = source;
+  }
+
+  public draw(target: any): void {
+    const series = this._source.series;
+    const bands = this._source.bands;
+    if (!series || !bands || bands.length === 0) return;
+
+    target.useMediaCoordinateSpace(({ context, mediaSize }: { context: CanvasRenderingContext2D; mediaSize: { width: number; height: number } }) => {
+      for (const band of bands) {
+        if (band.low == null || band.high == null) continue;
+        const y1 = series.priceToCoordinate(band.high);
+        const y2 = series.priceToCoordinate(band.low);
+        if (y1 == null || y2 == null) continue;
+
+        const top = Math.min(y1, y2);
+        const height = Math.abs(y1 - y2);
+        if (height <= 0) continue;
+
+        context.fillStyle = band.fillColor ?? (
+          band.type === 'SUPPORT' ? 'rgba(38, 166, 154, 0.15)' : 'rgba(239, 83, 80, 0.15)'
+        );
+        context.fillRect(0, top, mediaSize.width, height);
+      }
+    });
+  }
+}
+
+class ShadedZonesPaneView implements ISeriesPrimitivePaneView {
+  private _renderer: ShadedZonesPaneRenderer;
+
+  constructor(source: ShadedZonesPrimitive) {
+    this._renderer = new ShadedZonesPaneRenderer(source);
+  }
+
+  public zOrder(): SeriesPrimitivePaneViewZOrder {
+    return 'bottom';
+  }
+
+  public renderer(): ISeriesPrimitivePaneRenderer {
+    return this._renderer;
+  }
+}
+
+class ShadedZonesPrimitive implements ISeriesPrimitive<Time> {
+  private _series: any = null;
+  private _requestUpdate: (() => void) | null = null;
+  private _bands: PriceBand[];
+  private _paneViews: [ISeriesPrimitivePaneView];
+
+  constructor(bands: PriceBand[]) {
+    this._bands = bands;
+    this._paneViews = [new ShadedZonesPaneView(this)];
+  }
+
+  public attached(param: SeriesAttachedParameter<Time>): void {
+    this._series = param.series;
+    this._requestUpdate = param.requestUpdate;
+    if (this._requestUpdate) {
+      this._requestUpdate();
+    }
+  }
+
+  public detached(): void {
+    this._series = null;
+    this._requestUpdate = null;
+  }
+
+  public updateAllViews(): void {}
+
+  public paneViews(): readonly ISeriesPrimitivePaneView[] {
+    return this._paneViews;
+  }
+
+  public get series(): any {
+    return this._series;
+  }
+
+  public get bands(): PriceBand[] {
+    return this._bands;
+  }
 }
 
 interface LightweightChartProps {
@@ -161,10 +258,17 @@ export default function LightweightChart({
     // Key-level price bands — two lines per zone (low + high) in zone color
     // SUPPORT = green (#26a69a), RESISTANCE = red (#ef5350)
     (priceBands ?? []).forEach(band => {
-      const color = band.type === 'SUPPORT' ? '#26a69a' : '#ef5350';
+      const defaultColor = band.type === 'SUPPORT' ? '#26a69a' : '#ef5350';
+      const color = band.lineColor ?? defaultColor;
       candleSeries.createPriceLine({ price: band.low,  color, lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true,  title: `${band.label}↓` });
       candleSeries.createPriceLine({ price: band.high, color, lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true,  title: `${band.label}↑` });
     });
+
+    // Shaded area for key-level support and resistance zones
+    if (priceBands && priceBands.length > 0) {
+      const shadedPrimitive = new ShadedZonesPrimitive(priceBands);
+      candleSeries.attachPrimitive(shadedPrimitive);
+    }
 
     // ── Volume chart ────────────────────────────────────────────────────────────
     const volChart = createChart(volumeEl, {
@@ -189,19 +293,18 @@ export default function LightweightChart({
     // 20-day avg volume line
     const volumes = ohlcvData.map(r => r.volume);
     const avgVol20Arr = computeEMA(volumes, 20);
-    const avgVolData: LineData<Time>[] = ohlcvData
-      .map((r, i) => ({ time: r.date as Time, value: avgVol20Arr[i] }))
-      .filter(d => !isNaN(d.value));
-    if (avgVolData.length > 0) {
-      const avgVolSeries = volChart.addLineSeries({
-        color: '#9E9E9E',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        title: '20d avg',
-        priceScaleId: 'right',
-      });
-      avgVolSeries.setData(avgVolData);
-    }
+    const avgVolData: (LineData<Time> | WhitespaceData<Time>)[] = ohlcvData.map((r, i) => {
+      const val = avgVol20Arr[i];
+      return isNaN(val) ? { time: r.date as Time } : { time: r.date as Time, value: val };
+    });
+    const avgVolSeries = volChart.addLineSeries({
+      color: '#9E9E9E',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      title: '20d avg',
+      priceScaleId: 'right',
+    });
+    avgVolSeries.setData(avgVolData);
 
     // ── RSI chart ───────────────────────────────────────────────────────────────
     const rsiChart = createChart(rsiEl, {
@@ -224,9 +327,10 @@ export default function LightweightChart({
     });
 
     const rsiArr  = computeRSI(closes, 14);
-    const rsiData: LineData<Time>[] = ohlcvData
-      .map((r, i) => ({ time: r.date as Time, value: rsiArr[i] }))
-      .filter(d => !isNaN(d.value));
+    const rsiData: (LineData<Time> | WhitespaceData<Time>)[] = ohlcvData.map((r, i) => {
+      const val = rsiArr[i];
+      return isNaN(val) ? { time: r.date as Time } : { time: r.date as Time, value: val };
+    });
     rsiSeries.setData(rsiData);
 
     rsiSeries.createPriceLine({ price: 70, color: '#ef5350', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'OB' });

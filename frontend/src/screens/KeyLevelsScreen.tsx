@@ -47,12 +47,87 @@ function ConvictionBadge({ conviction }: { conviction: string | null }) {
   );
 }
 
+// ── Zone styling with increasing intensity ───────────────────────────────────
+
+export interface ZoneStyle {
+  bg: string;
+  badge: string;
+  textColor: string;
+  fillColor: string;
+  lineColor: string;
+}
+
+export function getZoneStyle(type: 'SUPPORT' | 'RESISTANCE', index: number): ZoneStyle {
+  if (type === 'SUPPORT') {
+    if (index === 0) {
+      return {
+        bg: 'bg-emerald-50/70 border-emerald-200',
+        badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        textColor: 'text-emerald-700',
+        fillColor: 'rgba(38, 166, 154, 0.12)',
+        lineColor: '#26a69a',
+      };
+    } else if (index === 1) {
+      return {
+        bg: 'bg-emerald-100/70 border-emerald-300',
+        badge: 'bg-emerald-200 text-emerald-900 border-emerald-400',
+        textColor: 'text-emerald-800',
+        fillColor: 'rgba(38, 166, 154, 0.24)',
+        lineColor: '#1e8e82',
+      };
+    } else {
+      const alpha = Math.min(0.36 + (index - 2) * 0.10, 0.55);
+      return {
+        bg: 'bg-emerald-200/70 border-emerald-400',
+        badge: 'bg-emerald-300 text-emerald-950 border-emerald-500',
+        textColor: 'text-emerald-900',
+        fillColor: `rgba(38, 166, 154, ${alpha.toFixed(2)})`,
+        lineColor: '#136e64',
+      };
+    }
+  }
+
+  // RESISTANCE
+  if (index === 0) {
+    return {
+      bg: 'bg-rose-50/70 border-rose-200',
+      badge: 'bg-rose-100 text-rose-800 border-rose-300',
+      textColor: 'text-rose-700',
+      fillColor: 'rgba(239, 83, 80, 0.12)',
+      lineColor: '#ef5350',
+    };
+  } else if (index === 1) {
+    return {
+      bg: 'bg-rose-100/70 border-rose-300',
+      badge: 'bg-rose-200 text-rose-900 border-rose-400',
+      textColor: 'text-rose-800',
+      fillColor: 'rgba(239, 83, 80, 0.24)',
+      lineColor: '#e53935',
+    };
+  } else {
+    const alpha = Math.min(0.36 + (index - 2) * 0.10, 0.55);
+    return {
+      bg: 'bg-rose-200/70 border-rose-400',
+      badge: 'bg-rose-300 text-rose-950 border-rose-500',
+      textColor: 'text-rose-900',
+      fillColor: `rgba(239, 83, 80, ${alpha.toFixed(2)})`,
+      lineColor: '#c62828',
+    };
+  }
+}
+
 // ── Zone row ──────────────────────────────────────────────────────────────────
 
-function ZoneRow({ zone }: { zone: KeyLevelsZone }) {
-  const isSupport = zone.level_type === 'SUPPORT';
-  const typeColor = isSupport ? 'text-green-700'  : 'text-red-700';
-  const typeBg    = isSupport ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100';
+function ZoneRow({
+  zone,
+  zoneLabel,
+  style,
+}: {
+  zone: KeyLevelsZone;
+  zoneLabel?: string;
+  style?: ZoneStyle;
+}) {
+  const defaultStyle = style ?? getZoneStyle(zone.level_type, 0);
 
   const zoneLowNum = zone.zone_low != null ? Number(zone.zone_low) : null;
   const zoneHighNum = zone.zone_high != null ? Number(zone.zone_high) : null;
@@ -60,9 +135,16 @@ function ZoneRow({ zone }: { zone: KeyLevelsZone }) {
   const confluenceFlags = parseConfluenceFlags(zone.confluence_flags);
 
   return (
-    <div className={`rounded-lg border p-3 mb-2 ${typeBg}`}>
+    <div className={`rounded-lg border p-3 mb-2 transition-colors ${defaultStyle.bg}`}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className={`text-xs font-bold ${typeColor}`}>{zone.level_type}</span>
+        <div className="flex items-center gap-1.5">
+          {zoneLabel && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${defaultStyle.badge}`}>
+              {zoneLabel}
+            </span>
+          )}
+          <span className={`text-xs font-bold ${defaultStyle.textColor}`}>{zone.level_type}</span>
+        </div>
         <ConvictionBadge conviction={zone.conviction} />
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
@@ -104,24 +186,32 @@ function ZoneRow({ zone }: { zone: KeyLevelsZone }) {
 function StockCard({ stock }: { stock: KeyLevelsStock }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Derive PriceBands from zones, numbering supports and resistances separately
-  const priceBands = useMemo<PriceBand[]>(() => {
-    let sCount = 0;
-    let rCount = 0;
-    return (stock.zones || [])
-      .filter(z => z && z.zone_low != null && z.zone_high != null && !isNaN(Number(z.zone_low)) && !isNaN(Number(z.zone_high)))
-      .map(z => {
-        const low = Number(z.zone_low);
-        const high = Number(z.zone_high);
-        if (z.level_type === 'SUPPORT') {
-          sCount++;
-          return { low, high, label: `S${sCount}`, type: 'SUPPORT' as const };
-        } else {
-          rCount++;
-          return { low, high, label: `R${rCount}`, type: 'RESISTANCE' as const };
-        }
-      });
+  // Precompute labels (S1, S2..., R1, R2...) and increasing intensity styles per zone
+  const zoneMeta = useMemo(() => {
+    let sIdx = 0;
+    let rIdx = 0;
+    return (stock.zones || []).map(zone => {
+      const isSupport = zone.level_type === 'SUPPORT';
+      const index = isSupport ? sIdx++ : rIdx++;
+      const label = `${isSupport ? 'S' : 'R'}${index + 1}`;
+      const style = getZoneStyle(zone.level_type, index);
+      return { zone, label, style, index };
+    });
   }, [stock.zones]);
+
+  // Derive PriceBands from zones with increasing intensity of red and green
+  const priceBands = useMemo<PriceBand[]>(() => {
+    return zoneMeta
+      .filter(({ zone }) => zone && zone.zone_low != null && zone.zone_high != null && !isNaN(Number(zone.zone_low)) && !isNaN(Number(zone.zone_high)))
+      .map(({ zone, label, style }) => ({
+        low: Number(zone.zone_low),
+        high: Number(zone.zone_high),
+        label,
+        type: zone.level_type,
+        fillColor: style.fillColor,
+        lineColor: style.lineColor,
+      }));
+  }, [zoneMeta]);
 
   // Badge shows the highest conviction level across all zones
   const highestConviction = useMemo<string | null>(() => {
@@ -135,11 +225,15 @@ function StockCard({ stock }: { stock: KeyLevelsStock }) {
 
   return (
     <ErrorBoundary fallbackTitle={`Error rendering ${stock.symbol}`}>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-2 overflow-hidden">
-        {/* Collapsed header — always visible */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-2">
+        {/* Header — sticky when expanded so scrolling down keeps it in view */}
         <button
           onClick={() => setExpanded(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+          className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+            expanded
+              ? 'sticky top-0 z-10 bg-white rounded-t-xl border-b border-gray-100 shadow-xs'
+              : 'rounded-xl hover:bg-gray-50'
+          }`}
         >
           <div className="flex items-center gap-2">
             <span className="font-semibold text-gray-900 text-sm">{stock.symbol}</span>
@@ -153,12 +247,12 @@ function StockCard({ stock }: { stock: KeyLevelsStock }) {
 
         {/* Expanded body */}
         {expanded && (
-          <div className="border-t border-gray-100 px-4 pb-4 pt-3">
+          <div className="px-4 pb-4 pt-3 rounded-b-xl">
             <p className="text-[11px] text-gray-400 mb-3">Analysis date: {stock.analysis_date}</p>
 
             {/* Zone details */}
-            {(stock.zones || []).map((zone, i) => (
-              <ZoneRow key={i} zone={zone} />
+            {zoneMeta.map(({ zone, label, style }, i) => (
+              <ZoneRow key={i} zone={zone} zoneLabel={label} style={style} />
             ))}
 
             {/* Chart with zone bands overlaid */}
