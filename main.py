@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from api.manual_analysis import router as manual_analysis_router
 from api.dashboard import router as dashboard_router
+from api.key_levels import router as key_levels_router
 from database.client import get_client
 
 load_dotenv()
@@ -81,6 +82,7 @@ app.add_middleware(
 
 app.include_router(manual_analysis_router)
 app.include_router(dashboard_router)
+app.include_router(key_levels_router)
 
 
 @app.get("/health", tags=["system"])

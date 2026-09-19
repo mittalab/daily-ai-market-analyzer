@@ -1,13 +1,14 @@
-export type Screen = 'today' | 'deep' | 'active' | 'analyse' | 'status';
+export type Screen = 'today' | 'deep' | 'active' | 'analyse' | 'levels' | 'status';
 
 interface Tab { id: Screen; label: string; icon: string; }
 
 const TABS: Tab[] = [
-  { id: 'today',       label: 'Today',   icon: '🏠' },
-  { id: 'deep',        label: 'Deep',    icon: '🧠' },
-  { id: 'active',      label: 'Active',  icon: '💼' },
-  { id: 'analyse',     label: 'Analyse', icon: '🔍' },
-  { id: 'status',      label: 'Settings',  icon: '⚙️' },
+  { id: 'today',   label: 'Today',    icon: '🏠' },
+  { id: 'deep',    label: 'Deep',     icon: '🧠' },
+  { id: 'active',  label: 'Active',   icon: '💼' },
+  { id: 'analyse', label: 'Analyse',  icon: '🔍' },
+  { id: 'levels',  label: 'Levels',   icon: '📊' },
+  { id: 'status',  label: 'Settings', icon: '⚙️' },
 ];
 
 interface Props { active: Screen; onChange: (s: Screen) => void; }

@@ -18,6 +18,14 @@ export interface FutureLevels {
   t2?:        number | null;
 }
 
+/** A support or resistance zone rendered as two horizontal lines (low + high). */
+export interface PriceBand {
+  low:   number;
+  high:  number;
+  label: string;
+  type:  'SUPPORT' | 'RESISTANCE';
+}
+
 interface LightweightChartProps {
   symbol: string;
   analysisData: any;
@@ -27,6 +35,8 @@ interface LightweightChartProps {
   futureLevels?: FutureLevels;
   /** Expiry date string (YYYY-MM-DD) shown as a badge on the chart. */
   futureExpiry?: string;
+  /** Support/resistance zones rendered as paired horizontal price lines. */
+  priceBands?: PriceBand[];
 }
 
 export default function LightweightChart({
@@ -36,6 +46,7 @@ export default function LightweightChart({
   entryPrice,
   futureLevels,
   futureExpiry,
+  priceBands,
 }: LightweightChartProps) {
   const mainRef    = useRef<HTMLDivElement>(null);
   const volumeRef  = useRef<HTMLDivElement>(null);
@@ -146,6 +157,14 @@ export default function LightweightChart({
     if (t2  != null) candleSeries.createPriceLine({ price: t2,  color: '#2E7D32', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'T2' });
     // Active entry (Active tab): dark blue solid
     if (entryPrice != null) candleSeries.createPriceLine({ price: entryPrice, color: '#1565C0', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'Your Entry' });
+
+    // Key-level price bands — two lines per zone (low + high) in zone color
+    // SUPPORT = green (#26a69a), RESISTANCE = red (#ef5350)
+    (priceBands ?? []).forEach(band => {
+      const color = band.type === 'SUPPORT' ? '#26a69a' : '#ef5350';
+      candleSeries.createPriceLine({ price: band.low,  color, lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true,  title: `${band.label}↓` });
+      candleSeries.createPriceLine({ price: band.high, color, lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true,  title: `${band.label}↑` });
+    });
 
     // ── Volume chart ────────────────────────────────────────────────────────────
     const volChart = createChart(volumeEl, {
@@ -261,7 +280,7 @@ export default function LightweightChart({
       syncCharts.forEach(c => c.remove());
       chartsRef.current = [];
     };
-  }, [symbol, ohlcvData, entryPrice, futureLevels]);
+  }, [symbol, ohlcvData, entryPrice, futureLevels, priceBands]);
 
   const lastDate = ohlcvData.length > 0 ? ohlcvData[ohlcvData.length - 1].date : null;
 
@@ -313,6 +332,12 @@ export default function LightweightChart({
           {t1 != null && <div className="flex items-center gap-1"><span className="w-5 border-b border-dashed" style={{ borderColor: '#66BB6A' }} />T1</div>}
           {t2 != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2" style={{ borderColor: '#2E7D32' }} />T2</div>}
           {entryPrice != null && <div className="flex items-center gap-1"><span className="w-5 border-b-2" style={{ borderColor: '#1565C0' }} />Your Entry</div>}
+          {(priceBands ?? []).map(band => (
+            <div key={band.label} className="flex items-center gap-1">
+              <span className="w-5 border-b-2" style={{ borderColor: band.type === 'SUPPORT' ? '#26a69a' : '#ef5350' }} />
+              {band.label} {band.type === 'SUPPORT' ? 'Sup' : 'Res'}
+            </div>
+          ))}
         </div>
       )}
 

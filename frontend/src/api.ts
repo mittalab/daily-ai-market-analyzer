@@ -1,5 +1,5 @@
-import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse, IndicatorValidation, ActiveTradesResponse } from './types';
-import { getCached, setCached } from './cache';
+import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse, IndicatorValidation, ActiveTradesResponse, KeyLevelsResponse } from './types';
+import { getCached, setCached, nextSaturday11amIST } from './cache';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -225,6 +225,18 @@ export async function fetchActiveTradesCached(): Promise<ActiveTradesResponse> {
   if (cached) return cached;
   const data = await fetchActiveTrades();
   setCached('active-trades', data);
+  return data;
+}
+
+export function fetchKeyLevels(): Promise<KeyLevelsResponse> {
+  return apiFetch<KeyLevelsResponse>('/api/key-levels');
+}
+
+export async function fetchKeyLevelsCached(): Promise<KeyLevelsResponse> {
+  const cached = getCached<KeyLevelsResponse>('key-levels');
+  if (cached) return cached;
+  const data = await fetchKeyLevels();
+  setCached('key-levels', data, nextSaturday11amIST());
   return data;
 }
 

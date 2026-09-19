@@ -6,6 +6,7 @@ import ActiveTradesScreen from './screens/ActiveTradesScreen';
 import AnalyseScreen from './screens/AnalyseScreen';
 import PerformanceScreen from './screens/PerformanceScreen';
 import DeepAnalysisScreen from './screens/DeepAnalysisScreen';
+import KeyLevelsScreen from './screens/KeyLevelsScreen';
 import { clearAllCache, isCachePresent } from './cache';
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
           <div className={screen !== 'deep'    ? 'hidden' : ''}><DeepAnalysisScreen refreshKey={refreshKey} /></div>
           <div className={screen !== 'active'  ? 'hidden' : ''}><ActiveTradesScreen refreshKey={refreshKey} /></div>
           <div className={screen !== 'analyse' ? 'hidden' : ''}><AnalyseScreen active={screen === 'analyse'} /></div>
+          <div className={screen !== 'levels'  ? 'hidden' : ''}><KeyLevelsScreen /></div>
           <div className={screen !== 'status'  ? 'hidden' : ''}><PerformanceScreen /></div>
         </main>
         <BottomNav active={screen} onChange={setScreen} />

@@ -260,3 +260,36 @@ export interface DeepAnalysisStatus {
   already_analyzed: boolean;
 }
 
+// ── Key Levels tab types ───────────────────────────────────────────────────────
+
+export interface KeyLevelsZone {
+  level_type: 'SUPPORT' | 'RESISTANCE';
+  zone_low: number | null;
+  zone_high: number | null;
+  conviction: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  touch_count: number | null;
+  last_touch_date: string | null;
+  confluence_flags: string[];
+  reasoning: string | null;
+  breached_at: string | null;
+}
+
+export interface KeyLevelsStock {
+  symbol: string;
+  analysis_date: string;
+  zones: KeyLevelsZone[];
+  ohlcv_data: {
+    date: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }[];
+}
+
+export interface KeyLevelsResponse {
+  earliest_analysis_date: string | null;
+  stocks: KeyLevelsStock[];
+}
+
