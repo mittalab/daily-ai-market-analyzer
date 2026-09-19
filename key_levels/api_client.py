@@ -20,7 +20,7 @@ from key_levels.prompts import SATURDAY_SYSTEM_PROMPT, SATURDAY_USER_TEMPLATE
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
-_MAX_TOKENS = 12000
+_MAX_TOKENS = 16384
 
 
 def _load_image_b64(path: str) -> str | None:
@@ -76,6 +76,27 @@ def build_batch_content(batch: list[dict], sector_map: dict | None = None) -> li
     return content
 
 
+def _merge_responses(a: dict, b: dict) -> dict:
+    """Merge two call_claude_batch results into one combined response."""
+    sa, sb = a.get("run_summary", {}), b.get("run_summary", {})
+    return {
+        "key_level_analysis": (
+            a.get("key_level_analysis", []) + b.get("key_level_analysis", [])
+        ),
+        "run_summary": {
+            "total_stocks_analyzed": (
+                sa.get("total_stocks_analyzed", 0) + sb.get("total_stocks_analyzed", 0)
+            ),
+            "high_conviction_zone_count": (
+                sa.get("high_conviction_zone_count", 0) + sb.get("high_conviction_zone_count", 0)
+            ),
+            "notable_observations": " | ".join(
+                filter(None, [sa.get("notable_observations", ""), sb.get("notable_observations", "")])
+            ),
+        },
+    }
+
+
 def call_claude_batch(
     batch: list[dict],
     sector_map: dict | None = None,
@@ -129,8 +150,19 @@ def call_claude_batch(
     )
 
     if response.stop_reason == "max_tokens":
+        if len(batch) > 1:
+            mid = len(batch) // 2
+            logger.warning(
+                "call_claude_batch: TRUNCATED (max_tokens=%d) with %d stocks — "
+                "auto-splitting into sub-batches of %d + %d",
+                _MAX_TOKENS, len(batch), mid, len(batch) - mid,
+            )
+            left = call_claude_batch(batch[:mid], sector_map)
+            right = call_claude_batch(batch[mid:], sector_map)
+            return _merge_responses(left, right)
         logger.warning(
-            "call_claude_batch: response was TRUNCATED (hit max_tokens=%d) — JSON may be incomplete",
+            "call_claude_batch: TRUNCATED (max_tokens=%d) on single-stock batch — "
+            "JSON may be incomplete; proceeding with partial parse",
             _MAX_TOKENS,
         )
 

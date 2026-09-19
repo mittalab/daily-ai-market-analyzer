@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchSystemStatus, fetchFoStocks, fetchIndicatorValidation, fetchStockSources, saveStockSources, fetchDeepAnalysisStatusForRun, triggerDeepAnalysis } from '../api';
+import { fetchSystemStatus, fetchFoStocks, fetchIndicatorValidation, fetchStockSources, saveStockSources, fetchClaudeAnalysisSettings, saveClaudeAnalysisSettings, fetchDeepAnalysisStatusForRun, triggerDeepAnalysis } from '../api';
 import type { CostInfo, SessionTurn, SystemStatus, IndicatorValidation, DeepAnalysisStatus } from '../types';
 
 function StatusDot({ ok }: { ok: boolean }) {
@@ -600,6 +600,122 @@ function StocksToEvaluateSection() {
   );
 }
 
+// ── Claude Analysis Settings Section ─────────────────────────────────────────
+
+type ClaudeFlag = 'daily_prescan' | 'daily_deep_analysis' | 'saturday_weekly_run';
+
+const CLAUDE_FLAGS: { key: ClaudeFlag; label: string; description: string }[] = [
+  { key: 'daily_prescan',       label: 'Daily Pre-scan',       description: 'Claude Turn 2 — shortlists stocks each evening' },
+  { key: 'daily_deep_analysis', label: 'Daily Deep Analysis',  description: 'Claude Turn 3+ — per-stock detailed analysis' },
+  { key: 'saturday_weekly_run', label: 'Saturday Weekly Run',  description: 'Key level (support/resistance) analysis each Saturday' },
+];
+
+function ClaudeAnalysisSettingsSection() {
+  const [open, setOpen]     = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [flags, setFlags]   = useState({ daily_prescan: true, daily_deep_analysis: true, saturday_weekly_run: true });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+  const [saved, setSaved]     = useState(false);
+
+  useEffect(() => {
+    if (!open || loaded) return;
+    setLoading(true);
+    setError(null);
+    fetchClaudeAnalysisSettings()
+      .then(data => { setFlags(data); setLoaded(true); })
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+      .finally(() => setLoading(false));
+  }, [open, loaded]);
+
+  const toggle = (key: keyof typeof flags) =>
+    setFlags(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      await saveClaudeAnalysisSettings(flags);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          Claude Analysis
+        </p>
+        <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="mt-4">
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            </div>
+          )}
+
+          {!loading && (
+            <>
+              <div className="mb-4 space-y-1">
+                {CLAUDE_FLAGS.map(({ key, label, description }) => (
+                  <label key={key} className="flex items-start gap-2.5 py-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={flags[key]}
+                      onChange={() => toggle(key)}
+                      className="w-4 h-4 mt-0.5 rounded text-blue-500 focus:ring-blue-400 shrink-0"
+                    />
+                    <div>
+                      <p className="text-sm text-gray-700 font-medium leading-tight">{label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 mb-3">
+                  {error}
+                </div>
+              )}
+
+              {saved && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-xs text-green-700 mb-3">
+                  Settings saved successfully
+                </div>
+              )}
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function PerformanceScreen() {
@@ -805,6 +921,7 @@ export default function PerformanceScreen() {
 
       <div className="px-4 mt-4 space-y-3">
         <StocksToEvaluateSection />
+        <ClaudeAnalysisSettingsSection />
 
         <button
           onClick={() => setShowRunModal(true)}

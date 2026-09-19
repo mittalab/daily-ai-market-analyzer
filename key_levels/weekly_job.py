@@ -3,7 +3,7 @@ Phase 5 — Saturday orchestrator for weekly key-level analysis.
 
 Entry point: run_weekly_key_levels_job(analysis_date=None) -> dict
 
-Flow per batch (8-12 stocks):
+Flow per batch (~5 stocks):
   1. Fetch OHLCV + option chain for each stock.
   2. Run Phase-1 build_stage1_output() per stock.
   3. Build and send the multimodal Claude API request (Phase 3).
@@ -20,7 +20,7 @@ from datetime import date
 from typing import Any
 
 from database.client import get_client
-from database.queries import get_latest_snapshot_date, get_price_history
+from database.queries import get_claude_analysis_settings, get_latest_snapshot_date, get_price_history
 from key_levels.api_client import call_claude_batch
 from key_levels.db import upsert_key_levels
 from key_levels.stage1 import build_stage1_output
@@ -28,7 +28,7 @@ from new_utils.stock_list import get_stock_list_for_analysis
 
 logger = logging.getLogger(__name__)
 
-_BATCH_SIZE = 10
+_BATCH_SIZE = 5
 _RETRY_DELAY_SECS = 30
 _SECTOR_MAP_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "sector_map.json")
 
@@ -269,6 +269,12 @@ def run_weekly_key_levels_job(analysis_date: date | None = None) -> dict:
     """
     if analysis_date is None:
         analysis_date = date.today()
+
+    # Settings gate
+    settings = get_claude_analysis_settings()
+    if not settings.get("saturday_weekly_run", True):
+        logger.info("run_weekly_key_levels_job: saturday_weekly_run disabled via settings — skipping")
+        return {"analysis_date": str(analysis_date), "updated_count": 0, "failed_symbols": [], "skipped": True}
 
     # Pre-flight: fail fast if API key is missing
     if not os.getenv("ANTHROPIC_API_KEY"):

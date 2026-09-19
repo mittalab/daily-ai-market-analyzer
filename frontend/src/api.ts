@@ -185,6 +185,23 @@ export function saveStockSources(config: StockSourcesConfig): Promise<{ ok: bool
   });
 }
 
+export interface ClaudeAnalysisSettings {
+  daily_prescan: boolean;
+  daily_deep_analysis: boolean;
+  saturday_weekly_run: boolean;
+}
+
+export function fetchClaudeAnalysisSettings(): Promise<ClaudeAnalysisSettings> {
+  return apiFetch<ClaudeAnalysisSettings>('/api/settings/claude-analysis');
+}
+
+export function saveClaudeAnalysisSettings(config: ClaudeAnalysisSettings): Promise<{ ok: boolean } & ClaudeAnalysisSettings> {
+  return apiFetch('/api/settings/claude-analysis', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
 // ── Cache-aware variants ───────────────────────────────────────────────────────
 
 export async function fetchTodayCached(): Promise<TodayResponse> {

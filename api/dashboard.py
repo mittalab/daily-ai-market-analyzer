@@ -1382,6 +1382,23 @@ async def save_stock_sources_config(body: dict):
     return {"ok": True, "stock_sources": sources, "interested_stocks": interested}
 
 
+# ── GET /api/settings/claude-analysis ────────────────────────────────────────
+
+@router.get("/settings/claude-analysis")
+async def get_claude_analysis_settings_endpoint():
+    """Return the three Claude analysis enable/disable flags."""
+    from database.queries import get_claude_analysis_settings
+    return get_claude_analysis_settings()
+
+
+@router.post("/settings/claude-analysis")
+async def save_claude_analysis_settings_endpoint(body: dict):
+    """Persist the three Claude analysis enable/disable flags."""
+    from database.queries import set_claude_analysis_settings, get_claude_analysis_settings
+    set_claude_analysis_settings(body)
+    return {"ok": True, **get_claude_analysis_settings()}
+
+
 @router.get("/validate/indicators", tags=["validation"])
 def validate_indicators(symbol: str, date: str | None = None):
     """

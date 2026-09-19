@@ -25,6 +25,7 @@ from config.constants import SYMBOL_NIFTY_50, SYMBOL_INDIA_VIX, SYMBOL_NIFTY_BAN
 from database.queries import (
     create_trade_setup,
     get_all_system_config,
+    get_claude_analysis_settings,
     get_claude_turn,
     get_continuous_oi,
     get_fii_dii_flows,
@@ -4688,13 +4689,25 @@ def run_claude_session(
         )
 
     # ── Turn 2: Pre-scan ──────────────────────────────────────────────────────
-    final_forward_list, turn2_results, t2_cost = _run_turn2(
-        client=client,
-        session_id=session_id,
-        session_date=session_date,
-        turn1_result=turn1_result,
-        mandatory_stocks=list(mandatory_stocks or []),
-    )
+    claude_settings = get_claude_analysis_settings()
+
+    if claude_settings.get("daily_prescan", True):
+        final_forward_list, turn2_results, t2_cost = _run_turn2(
+            client=client,
+            session_id=session_id,
+            session_date=session_date,
+            turn1_result=turn1_result,
+            mandatory_stocks=list(mandatory_stocks or []),
+        )
+    else:
+        logger.info("run_claude_session: daily_prescan disabled — skipping Turn 2")
+        final_forward_list = [
+            {"symbol": s, "direction": "AUTO", "is_watchlist_reanalysis": False, "days_in_stage": 0}
+            for s in (mandatory_stocks or [])
+        ]
+        turn2_results = []
+        t2_cost = {"input_tokens": 0, "output_tokens": 0}
+
     turn_costs.append(t2_cost)
     total_input += t2_cost["input_tokens"]
     total_output += t2_cost["output_tokens"]
@@ -4730,7 +4743,13 @@ def run_claude_session(
     total_turn3_input = 0
     total_turn3_output = 0
 
+    if not claude_settings.get("daily_deep_analysis", True):
+        logger.info("run_claude_session: daily_deep_analysis disabled — skipping Turn 3+")
+
     for i, prescan_stock in enumerate(final_queue):
+        if not claude_settings.get("daily_deep_analysis", True):
+            break
+
         symbol    = prescan_stock.get("symbol", "")
         direction = prescan_stock.get("direction", "AUTO")
         is_re     = prescan_stock.get("is_watchlist_reanalysis", False)

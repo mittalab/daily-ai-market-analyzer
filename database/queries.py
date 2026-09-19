@@ -64,6 +64,35 @@ def set_system_config(key: str, value: str) -> None:
     ).execute()
 
 
+_CLAUDE_ANALYSIS_DEFAULTS = {
+    "daily_prescan": True,
+    "daily_deep_analysis": True,
+    "saturday_weekly_run": True,
+}
+
+
+def get_claude_analysis_settings() -> dict:
+    """Return {daily_prescan, daily_deep_analysis, saturday_weekly_run} booleans.
+    Defaults all to True so existing behaviour is unchanged until explicitly toggled."""
+    import json as _json
+    raw = get_system_config("claude_analysis_settings") or ""
+    if raw:
+        try:
+            stored = _json.loads(raw)
+            return {**_CLAUDE_ANALYSIS_DEFAULTS, **stored}
+        except Exception:
+            pass
+    return dict(_CLAUDE_ANALYSIS_DEFAULTS)
+
+
+def set_claude_analysis_settings(settings: dict) -> None:
+    """Persist {daily_prescan, daily_deep_analysis, saturday_weekly_run} to system_config."""
+    import json as _json
+    valid_keys = set(_CLAUDE_ANALYSIS_DEFAULTS)
+    cleaned = {k: bool(v) for k, v in settings.items() if k in valid_keys}
+    set_system_config("claude_analysis_settings", _json.dumps(cleaned))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # kite_tokens
 # ─────────────────────────────────────────────────────────────────────────────
