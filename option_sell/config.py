@@ -31,3 +31,7 @@ ATR_PERIOD          = int(  os.getenv("OPTSELL_ATR_PERIOD",          "14"))
 
 # OHLCV lookback in days for ATR computation
 OHLCV_LOOKBACK      = int(  os.getenv("OPTSELL_OHLCV_LOOKBACK",      "60"))
+
+# Fallback annualized IV (%) used when options chain has no IV stored
+# NSE large-cap F&O stocks typically trade 20-35% annualized IV
+FALLBACK_IV_PCT     = float(os.getenv("OPTSELL_FALLBACK_IV_PCT",     "25.0"))

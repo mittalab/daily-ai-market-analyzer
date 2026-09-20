@@ -87,8 +87,8 @@ def _build_rec(
         logger.debug("%s %s: skipped — no premium (strike=%s)", symbol, action, strike)
         return None
     if iv_pct is None or iv_pct <= 0:
-        logger.debug("%s %s: skipped — no IV (strike=%s)", symbol, action, strike)
-        return None
+        iv_pct = config.FALLBACK_IV_PCT
+        logger.debug("%s %s: IV missing — using fallback %.1f%%", symbol, action, iv_pct)
     if oi < config.MIN_OI:
         logger.debug("%s %s: skipped — OI %d < %d (strike=%s)", symbol, action, oi, config.MIN_OI, strike)
         return None
