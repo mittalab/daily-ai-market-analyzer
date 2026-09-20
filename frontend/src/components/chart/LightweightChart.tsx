@@ -34,12 +34,18 @@ export interface PriceBand {
   lineColor?: string;
 }
 
+export interface ChartAnnotation {
+  price: number;
+  label: string;
+  color: string;
+}
+
 // ── Shaded zones primitive for LightweightCharts ──────────────────────────────
 
 class ShadedZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
-  private _source: ShadedZonesPrimitive;
+  private _source: ChartOverlayPrimitive;
 
-  constructor(source: ShadedZonesPrimitive) {
+  constructor(source: ChartOverlayPrimitive) {
     this._source = source;
   }
 
@@ -71,7 +77,7 @@ class ShadedZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
 class ShadedZonesPaneView implements ISeriesPrimitivePaneView {
   private _renderer: ShadedZonesPaneRenderer;
 
-  constructor(source: ShadedZonesPrimitive) {
+  constructor(source: ChartOverlayPrimitive) {
     this._renderer = new ShadedZonesPaneRenderer(source);
   }
 
@@ -84,15 +90,144 @@ class ShadedZonesPaneView implements ISeriesPrimitivePaneView {
   }
 }
 
-class ShadedZonesPrimitive implements ISeriesPrimitive<Time> {
+// ── Left-side annotations renderer with collision avoidance ───────────────────
+
+class ChartAnnotationsPaneRenderer implements ISeriesPrimitivePaneRenderer {
+  private _source: ChartOverlayPrimitive;
+
+  constructor(source: ChartOverlayPrimitive) {
+    this._source = source;
+  }
+
+  public draw(target: any): void {
+    const series = this._source.series;
+    const annotations = this._source.annotations;
+    if (!series || !annotations || annotations.length === 0) return;
+
+    target.useMediaCoordinateSpace(({ context, mediaSize }: { context: CanvasRenderingContext2D; mediaSize: { width: number; height: number } }) => {
+      interface PlacedItem {
+        y: number;
+        price: number;
+        label: string;
+        text: string;
+        color: string;
+        width: number;
+        height: number;
+        x: number;
+      }
+
+      const items: PlacedItem[] = [];
+      context.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+      for (const ann of annotations) {
+        if (ann.price == null || isNaN(ann.price)) continue;
+        const y = series.priceToCoordinate(ann.price);
+        if (y == null) continue;
+        if (y < -10 || y > mediaSize.height + 10) continue;
+
+        const priceStr = ann.price.toFixed(2);
+        const text = `${ann.label} ${priceStr}`;
+        const textWidth = context.measureText(text).width;
+        const paddingX = 4;
+        const width = Math.round(textWidth + paddingX * 2);
+        const height = 15;
+
+        items.push({
+          y,
+          price: ann.price,
+          label: ann.label,
+          text,
+          color: ann.color,
+          width,
+          height,
+          x: 6,
+        });
+      }
+
+      if (items.length === 0) return;
+
+      // Sort by y ascending (from top of chart to bottom)
+      items.sort((a, b) => a.y - b.y);
+
+      const placed: PlacedItem[] = [];
+
+      for (const item of items) {
+        // Avoid overlapping the (i) info button at top-left (y < 28)
+        const minStartX = item.y < 28 ? 28 : 6;
+        let x = minStartX;
+
+        const overlapping = placed.filter(p => Math.abs(p.y - item.y) < 15);
+        if (overlapping.length > 0) {
+          const maxX = Math.max(...overlapping.map(p => p.x + p.width));
+          x = Math.max(minStartX, maxX + 4);
+        }
+
+        if (x + item.width > mediaSize.width - 60) {
+          x = minStartX;
+        }
+
+        item.x = x;
+        placed.push(item);
+      }
+
+      for (const item of placed) {
+        const top = Math.round(item.y - item.height / 2);
+
+        context.save();
+
+        // Pill background
+        context.fillStyle = item.color;
+        context.beginPath();
+        if (typeof (context as any).roundRect === 'function') {
+          (context as any).roundRect(item.x, top, item.width, item.height, 3);
+        } else {
+          context.rect(item.x, top, item.width, item.height);
+        }
+        context.fill();
+
+        // Text
+        context.fillStyle = '#ffffff';
+        context.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(item.text, item.x + item.width / 2, item.y);
+
+        context.restore();
+      }
+    });
+  }
+}
+
+class ChartAnnotationsPaneView implements ISeriesPrimitivePaneView {
+  private _renderer: ChartAnnotationsPaneRenderer;
+
+  constructor(source: ChartOverlayPrimitive) {
+    this._renderer = new ChartAnnotationsPaneRenderer(source);
+  }
+
+  public zOrder(): SeriesPrimitivePaneViewZOrder {
+    return 'top';
+  }
+
+  public renderer(): ISeriesPrimitivePaneRenderer {
+    return this._renderer;
+  }
+}
+
+class ChartOverlayPrimitive implements ISeriesPrimitive<Time> {
   private _series: any = null;
   private _requestUpdate: (() => void) | null = null;
   private _bands: PriceBand[];
-  private _paneViews: [ISeriesPrimitivePaneView];
+  private _annotations: ChartAnnotation[];
+  private _paneViews: [ISeriesPrimitivePaneView, ISeriesPrimitivePaneView];
 
-  constructor(bands: PriceBand[]) {
+  constructor(bands: PriceBand[], annotations: ChartAnnotation[]) {
     this._bands = bands;
-    this._paneViews = [new ShadedZonesPaneView(this)];
+    this._annotations = annotations;
+    this._paneViews = [
+      new ShadedZonesPaneView(this),
+      new ChartAnnotationsPaneView(this),
+    ];
   }
 
   public attached(param: SeriesAttachedParameter<Time>): void {
@@ -120,6 +255,10 @@ class ShadedZonesPrimitive implements ISeriesPrimitive<Time> {
 
   public get bands(): PriceBand[] {
     return this._bands;
+  }
+
+  public get annotations(): ChartAnnotation[] {
+    return this._annotations;
   }
 }
 
@@ -149,7 +288,7 @@ export default function LightweightChart({
   const volumeRef  = useRef<HTMLDivElement>(null);
   const rsiRef     = useRef<HTMLDivElement>(null);
   const chartsRef  = useRef<IChartApi[]>([]);
-  const [showLegend, setShowLegend] = useState(window.innerWidth >= 768);
+  const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => {
     const mainEl   = mainRef.current;
@@ -232,10 +371,21 @@ export default function LightweightChart({
     const ema50Val  = lastValid(ema50Arr);
     const ema200Val = lastValid(ema200Arr);
 
+    const annotations: ChartAnnotation[] = [];
+
     // EMAs — LargeDashed so they're visually distinct from trade-level lines
-    if (ema20Val  != null) candleSeries.createPriceLine({ price: ema20Val,  color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA20' });
-    if (ema50Val  != null) candleSeries.createPriceLine({ price: ema50Val,  color: '#FF9800', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA50' });
-    if (ema200Val != null) candleSeries.createPriceLine({ price: ema200Val, color: '#9C27B0', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: true, title: 'EMA200' });
+    if (ema20Val != null && !isNaN(ema20Val)) {
+      candleSeries.createPriceLine({ price: ema20Val, color: '#2196F3', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: false, title: '' });
+      annotations.push({ price: ema20Val, label: 'EMA20', color: '#2196F3' });
+    }
+    if (ema50Val != null && !isNaN(ema50Val)) {
+      candleSeries.createPriceLine({ price: ema50Val, color: '#FF9800', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: false, title: '' });
+      annotations.push({ price: ema50Val, label: 'EMA50', color: '#FF9800' });
+    }
+    if (ema200Val != null && !isNaN(ema200Val)) {
+      candleSeries.createPriceLine({ price: ema200Val, color: '#9C27B0', lineWidth: 1, lineStyle: LineStyle.LargeDashed, axisLabelVisible: false, title: '' });
+      annotations.push({ price: ema200Val, label: 'EMA200', color: '#9C27B0' });
+    }
 
     // Trade level lines — sourced from futureLevels (futures tabs) or key_levels (spot tab)
     const sl = futureLevels ? futureLevels.sl  : analysisData?.key_levels?.stop_loss;
@@ -245,30 +395,54 @@ export default function LightweightChart({
     const t2 = futureLevels ? futureLevels.t2  : analysisData?.key_levels?.resistance_2;
 
     // SL: red solid — most critical, most prominent
-    if (sl  != null) candleSeries.createPriceLine({ price: sl,  color: '#EF5350', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'SL' });
+    if (sl != null && !isNaN(sl)) {
+      candleSeries.createPriceLine({ price: sl, color: '#EF5350', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' });
+      annotations.push({ price: sl, label: 'SL', color: '#EF5350' });
+    }
     // Entry zone: cyan/teal — clearly different from EMA20 blue
-    if (el  != null) candleSeries.createPriceLine({ price: el,  color: '#00ACC1', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: futureLevels ? 'FUT Entry Low'  : 'Entry Low' });
-    if (eh  != null) candleSeries.createPriceLine({ price: eh,  color: '#00ACC1', lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: futureLevels ? 'FUT Entry High' : 'Entry High' });
+    if (el != null && !isNaN(el)) {
+      const label = futureLevels ? 'FUT Entry Low' : 'Entry Low';
+      candleSeries.createPriceLine({ price: el, color: '#00ACC1', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '' });
+      annotations.push({ price: el, label, color: '#00ACC1' });
+    }
+    if (eh != null && !isNaN(eh)) {
+      const label = futureLevels ? 'FUT Entry High' : 'Entry High';
+      candleSeries.createPriceLine({ price: eh, color: '#00ACC1', lineWidth: 2, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '' });
+      annotations.push({ price: eh, label, color: '#00ACC1' });
+    }
     // T1: light green dashed; T2: dark green solid — solid makes T2 the definitive target
-    if (t1  != null) candleSeries.createPriceLine({ price: t1,  color: '#66BB6A', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: 'T1' });
-    if (t2  != null) candleSeries.createPriceLine({ price: t2,  color: '#2E7D32', lineWidth: 2, lineStyle: LineStyle.Solid,  axisLabelVisible: true, title: 'T2' });
+    if (t1 != null && !isNaN(t1)) {
+      candleSeries.createPriceLine({ price: t1, color: '#66BB6A', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '' });
+      annotations.push({ price: t1, label: 'T1', color: '#66BB6A' });
+    }
+    if (t2 != null && !isNaN(t2)) {
+      candleSeries.createPriceLine({ price: t2, color: '#2E7D32', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' });
+      annotations.push({ price: t2, label: 'T2', color: '#2E7D32' });
+    }
     // Active entry (Active tab): dark blue solid
-    if (entryPrice != null) candleSeries.createPriceLine({ price: entryPrice, color: '#1565C0', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'Your Entry' });
+    if (entryPrice != null && !isNaN(entryPrice)) {
+      candleSeries.createPriceLine({ price: entryPrice, color: '#1565C0', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' });
+      annotations.push({ price: entryPrice, label: 'Your Entry', color: '#1565C0' });
+    }
 
     // Key-level price bands — two lines per zone (low + high) in zone color
     // SUPPORT = green (#26a69a), RESISTANCE = red (#ef5350)
     (priceBands ?? []).forEach(band => {
       const defaultColor = band.type === 'SUPPORT' ? '#26a69a' : '#ef5350';
       const color = band.lineColor ?? defaultColor;
-      candleSeries.createPriceLine({ price: band.low,  color, lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true,  title: `${band.label}↓` });
-      candleSeries.createPriceLine({ price: band.high, color, lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true,  title: `${band.label}↑` });
+      if (band.high != null && !isNaN(band.high)) {
+        candleSeries.createPriceLine({ price: band.high, color, lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' });
+        annotations.push({ price: band.high, label: `${band.label}↑`, color });
+      }
+      if (band.low != null && !isNaN(band.low) && band.low !== band.high) {
+        candleSeries.createPriceLine({ price: band.low, color, lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' });
+        annotations.push({ price: band.low, label: `${band.label}↓`, color });
+      }
     });
 
-    // Shaded area for key-level support and resistance zones
-    if (priceBands && priceBands.length > 0) {
-      const shadedPrimitive = new ShadedZonesPrimitive(priceBands);
-      candleSeries.attachPrimitive(shadedPrimitive);
-    }
+    // Shaded areas and left-side annotations
+    const overlayPrimitive = new ChartOverlayPrimitive(priceBands ?? [], annotations);
+    candleSeries.attachPrimitive(overlayPrimitive);
 
     // ── Volume chart ────────────────────────────────────────────────────────────
     const volChart = createChart(volumeEl, {
@@ -384,7 +558,7 @@ export default function LightweightChart({
       syncCharts.forEach(c => c.remove());
       chartsRef.current = [];
     };
-  }, [symbol, ohlcvData, entryPrice, futureLevels, priceBands]);
+  }, [symbol, ohlcvData, entryPrice, futureLevels, priceBands, analysisData]);
 
   const lastDate = ohlcvData.length > 0 ? ohlcvData[ohlcvData.length - 1].date : null;
 
