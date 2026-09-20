@@ -197,6 +197,23 @@ def job_weekly_key_levels() -> None:
         logger.error("Weekly key-levels job failed: %s", exc)
 
 
+# ── Job 8: Daily option sell recommendations ───────────────────────────────────
+
+def job_option_sell() -> None:
+    """08:00 Mon-Fri IST — mechanical option SELL recommendation engine."""
+    from option_sell.job import run_option_sell_job
+
+    try:
+        result = run_option_sell_job()
+        logger.info("Option sell job complete: %s", result)
+    except Exception as exc:
+        logger.error("Option sell job failed: %s", exc)
+        from datetime import datetime
+        import pytz
+        from option_sell.notifications import send_option_sell_failed
+        send_option_sell_failed(datetime.now(pytz.timezone("Asia/Kolkata")).date(), str(exc))
+
+
 # ── Registration ───────────────────────────────────────────────────────────────
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
@@ -288,9 +305,20 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         misfire_grace_time=3600,
     )
 
+    # 08:00 Mon-Fri — option sell recommendations (mechanical, no LLM)
+    scheduler.add_job(
+        job_option_sell,
+        CronTrigger(day_of_week="mon-fri", hour=8, minute=0, **ist),
+        id="option_sell",
+        name="Option sell recommendations",
+        replace_existing=True,
+        misfire_grace_time=1800,
+    )
+
     logger.info(
-        "Scheduler: 8 jobs registered "
-        "(keepalive, evening_bhavcopy, morning_brief, kite_check×3, analysis_pipeline, weekly_key_levels)"
+        "Scheduler: 9 jobs registered "
+        "(keepalive, evening_bhavcopy, morning_brief, kite_check×3, analysis_pipeline, "
+        "weekly_key_levels, option_sell)"
     )
 
 
