@@ -319,10 +319,10 @@ export default function KeyLevelsScreen() {
     <div className="pb-20">
       <h1 className="text-xl font-semibold text-gray-900 px-4 pt-5 pb-3">Key S/R Levels</h1>
 
-      {/* Banner — week of earliest analysis date */}
+      {/* Banner — earliest analysis (job run) date */}
       {data?.earliest_analysis_date && (
         <div className="mx-4 mb-3 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-indigo-700 font-medium">
-          Levels as of week of {data.earliest_analysis_date}
+          Levels as of {data.earliest_analysis_date}
         </div>
       )}
 

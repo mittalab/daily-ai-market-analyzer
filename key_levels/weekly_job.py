@@ -246,7 +246,7 @@ def _process_batch(
     )
 
     logger.info("Writing to key_levels table…")
-    upsert_result = upsert_key_levels(claude_resp)
+    upsert_result = upsert_key_levels(claude_resp, analysis_date=str(analysis_date))
     logger.info(
         "DB write done — updated: %s, failed: %s",
         upsert_result.get("updated", []),

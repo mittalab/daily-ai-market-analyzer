@@ -66,9 +66,12 @@ def _build_row(symbol: str, level: dict, analysis_date: str) -> dict:
     }
 
 
-def upsert_key_levels(claude_response: dict) -> dict:
+def upsert_key_levels(claude_response: dict, analysis_date: str | None = None) -> dict:
     """
     Write Claude's key-level analysis to the key_levels table.
+
+    analysis_date, when given, overrides the per-stock date in Claude's response
+    (Claude doesn't know the current date and may hallucinate one).
 
     Strategy (per symbol):
       Step 1 — Mark existing ACTIVE rows as SUPERSEDED.
@@ -84,10 +87,10 @@ def upsert_key_levels(claude_response: dict) -> dict:
 
     for entry in claude_response.get("key_level_analysis", []):
         symbol: str = entry["symbol"]
-        analysis_date: str = entry.get("analysis_date", "")
+        row_date: str = analysis_date or entry.get("analysis_date", "")
         levels: list[dict] = entry.get("levels", [])
 
-        if not analysis_date:
+        if not row_date:
             logger.warning("upsert_key_levels: analysis_date missing for %s — row will have empty date", symbol)
 
         if not levels:
@@ -104,7 +107,7 @@ def upsert_key_levels(claude_response: dict) -> dict:
 
             # Step 2: insert new rows
             if levels:
-                rows = [_build_row(symbol, lv, analysis_date) for lv in levels]
+                rows = [_build_row(symbol, lv, row_date) for lv in levels]
                 client.table("key_levels").insert(rows).execute()
 
             results["updated"].append(symbol)
