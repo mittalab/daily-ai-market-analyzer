@@ -89,9 +89,12 @@ export default function StockChartPanel({
   const hasNextFut = nextFutOhlcv.length > 0;
 
   // Derive futures price levels from fut_setup.
-  // contract_selected tells us which expiry Claude's levels apply to.
+  // fut_setup_expiry (resolved by the backend) is the actual contract Claude
+  // analysed; contract_selected is relative to the session date and goes stale
+  // once near/next roll after an expiry, so it's only a fallback.
   const futSetup = analysisData?.fut_setup;
   const contractSelected: string | undefined = futSetup?.contract_selected; // 'near_month' | 'next_month'
+  const futSetupExpiry: string | undefined = analysisData?.fut_setup_expiry;
 
   const claudeFutureLevels: FutureLevels | undefined = futSetup
     ? {
@@ -104,8 +107,11 @@ export default function StockChartPanel({
     : undefined;
 
   // Only apply Claude's levels to the tab matching the contract Claude analysed
-  const nearFutLevels = contractSelected === 'near_month' ? claudeFutureLevels : undefined;
-  const nextFutLevels = contractSelected === 'next_month' ? claudeFutureLevels : undefined;
+  // (none, if that contract has since expired).
+  const appliesTo = (expiry: string | undefined, slot: 'near_month' | 'next_month') =>
+    futSetupExpiry ? futSetupExpiry === expiry : contractSelected === slot;
+  const nearFutLevels = appliesTo(nearExpiry, 'near_month') ? claudeFutureLevels : undefined;
+  const nextFutLevels = appliesTo(nextExpiry, 'next_month') ? claudeFutureLevels : undefined;
 
   // ── Tabs config ─────────────────────────────────────────────────────────────
   type TabDef = { id: ChartMode; label: string; show: boolean };

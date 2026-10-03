@@ -723,6 +723,28 @@ def _load_fo_stocks_fallback() -> list[str]:
     return data.get("symbols", [])
 
 
+def _save_fo_stocks_fallback(symbols: list[str]) -> bool:
+    """Dynamically update config/fo_stocks_fallback.json with the freshly fetched F&O stock list."""
+    if not symbols:
+        return False
+    try:
+        unique_symbols = sorted(set(symbols))
+        payload = {
+            "generated_at": date.today().isoformat(),
+            "count": len(unique_symbols),
+            "symbols": unique_symbols,
+        }
+        _FO_STOCKS_FALLBACK_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        logger.info(
+            "run_fo_stocks_validation: dynamically updated %s with %d F&O symbols from Kite",
+            _FO_STOCKS_FALLBACK_PATH.name, len(unique_symbols),
+        )
+        return True
+    except Exception as exc:
+        logger.error("run_fo_stocks_validation: failed to update fallback file: %s", exc)
+        return False
+
+
 def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
     """
     Validate all Kite F&O stocks for target_date (OHLCV + futures + options).
@@ -767,6 +789,10 @@ def run_fo_stocks_validation(target_date: date) -> tuple[int, int, list[str]]:
         except Exception as fallback_exc:
             logger.error("run_fo_stocks_validation: fallback also failed: %s", fallback_exc)
             return 0, 0, []
+    else:
+        # Kite fetch succeeded — dynamically update static fallback file
+        if symbols:
+            _save_fo_stocks_fallback(symbols)
 
     if not symbols:
         logger.error("run_fo_stocks_validation: no symbols available even from fallback")

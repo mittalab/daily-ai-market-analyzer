@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 
+from api.chart_data import attach_chart_data
 from database.queries import (
     get_all_system_config,
     get_claude_turn,
@@ -75,38 +76,6 @@ class AnalyseResponse(BaseModel):
     setup_id:           str | None
 
 
-# ── OHLCV helper ─────────────────────────────────────────────────────────────
-
-def _fetch_ohlcv(symbol: str, session_date: date) -> list:
-    """Fetch OHLCV rows from price_history for chart rendering."""
-    from datetime import timedelta
-    from database.client import get_client
-    try:
-        cutoff = str(session_date - timedelta(days=200))
-        res = (
-            get_client()
-            .table("price_history")
-            .select("date,open,high,low,close,volume")
-            .eq("symbol", symbol)
-            .gte("date", cutoff)
-            .order("date", desc=True)
-            .execute()
-        )
-        rows = list(reversed(res.data))
-        return [
-            {
-                "date":   r["date"],
-                "open":   float(r["open"]),
-                "high":   float(r["high"]),
-                "low":    float(r["low"]),
-                "close":  float(r["close"]),
-                "volume": int(r["volume"] or 0),
-            }
-            for r in rows
-        ]
-    except Exception as exc:
-        logger.warning("ohlcv_data fetch failed for %s: %s", symbol, exc)
-        return []
 
 
 # ── Claude helpers ────────────────────────────────────────────────────────────
@@ -199,8 +168,8 @@ async def analyse_stock(req: AnalyseRequest) -> AnalyseResponse:
                     turn_type, symbol, latest_session_id,
                 )
                 analysis = json.loads(cached_turn["output_text"])
-                analysis["symbol"]     = symbol
-                analysis["ohlcv_data"] = _fetch_ohlcv(symbol, session_date)
+                analysis["symbol"] = symbol
+                attach_chart_data([(symbol, analysis)], session_date)
                 source_note = (
                     "Returned from cache (manual re-analysis)"
                     if turn_type == "MANUAL"
@@ -278,9 +247,6 @@ async def analyse_stock(req: AnalyseRequest) -> AnalyseResponse:
     # ── 8. Position sizing ────────────────────────────────────────────────────
     analysis = _validate_position_sizing_turn3(analysis, config)
 
-    # ── 8.5. Attach OHLCV data for chart rendering ────────────────────────────
-    analysis["ohlcv_data"] = _fetch_ohlcv(symbol, session_date)
-
     # ── 9. Persist as MANUAL turn in session_claude_turns ────────────────────
     turn_number = get_next_manual_turn_number(latest_session_id)
     try:
@@ -301,6 +267,9 @@ async def analyse_stock(req: AnalyseRequest) -> AnalyseResponse:
     except Exception as exc:
         logger.warning("Could not persist MANUAL turn: %s", exc)
         quality_notes.append(f"Warning: result not cached — {exc}")
+
+    # ── 9.5. Attach chart data (after persist — the cache path re-fetches it) ─
+    attach_chart_data([(symbol, analysis)], session_date)
 
     cost_usd = round(input_tok / 1_000_000 * 3.00 + output_tok / 1_000_000 * 15.00, 6)
     logger.info(

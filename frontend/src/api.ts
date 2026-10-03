@@ -1,5 +1,5 @@
 import type { AnalyseResponse, TodayResponse, WatchlistEntry, SystemStatus, DeepAnalysisResponse, IndicatorValidation, ActiveTradesResponse, KeyLevelsResponse } from './types';
-import { getCached, setCached, nextSaturday11amIST } from './cache';
+import { getCached, setCached } from './cache';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
@@ -236,7 +236,17 @@ export async function fetchKeyLevelsCached(): Promise<KeyLevelsResponse> {
   const cached = getCached<KeyLevelsResponse>('key-levels');
   if (cached) return cached;
   const data = await fetchKeyLevels();
-  setCached('key-levels', data, nextSaturday11amIST());
+  // Invalidate cache after 1 day (24 hours)
+  setCached('key-levels', data, Date.now() + 24 * 60 * 60 * 1000);
   return data;
 }
+
+export function triggerSaturdayLevels(): Promise<{ ok: boolean; message: string }> {
+  return apiFetch('/api/pipeline/saturday-levels/run', { method: 'POST' });
+}
+
+export function triggerNightlyValidation(): Promise<{ ok: boolean; message: string }> {
+  return apiFetch('/api/pipeline/nightly-validation/run', { method: 'POST' });
+}
+
 

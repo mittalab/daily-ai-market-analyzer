@@ -7,6 +7,7 @@ import { useState } from 'react';
 import ConvictionBar from './ConvictionBar';
 import Expander from './Expander';
 import StockChartPanel from './chart/StockChartPanel';
+import { getFutContract, dteSuffix } from './futuresContract';
 
 // ── Text highlighters ─────────────────────────────────────────────────────────
 
@@ -249,6 +250,7 @@ export function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalys
   const [reasonExpanded, setReasonExpanded] = useState(false);
   const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
   const scenarios     = s.why_could_be_wrong ? splitScenarios(s.why_could_be_wrong) : [];
+  const futContract   = getFutContract(s);
 
   return (
     <div className="px-4 py-3 space-y-4">
@@ -345,8 +347,8 @@ export function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalys
         {!s.options_setup && s.fut_setup && (
           <div className="mt-1 space-y-0.5">
             <p className="text-[10px] text-gray-500">
-              Futures · {s.fut_setup.contract_selected === 'next_month' ? 'Next-Month' : 'Near-Month'}
-              {s.fut_setup.expiry ? ` · Expiry: ${s.fut_setup.expiry} (${s.fut_setup.days_to_expiry} DTE)` : ''}
+              Futures · {futContract.name}
+              {futContract.expiry ? ` · Expiry: ${futContract.expiry}${dteSuffix(futContract)}` : ''}
             </p>
             {s.fut_setup.contract_selection_note && (
               <p className="text-[10px] text-indigo-600">{s.fut_setup.contract_selection_note}</p>
@@ -447,6 +449,7 @@ export function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalys
 
 export function AnalysisView({ s }: { s: any }) {
   const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
+  const futContract   = getFutContract(s);
 
   return (
     <div className="px-4 py-3 divide-y divide-gray-100">
@@ -613,8 +616,8 @@ export function AnalysisView({ s }: { s: any }) {
           <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Futures Trade Setup</p>
           <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs mb-2.5">
             <div className="flex justify-between mb-1.5">
-              <span>Contract: <strong>{s.fut_setup.contract_selected === 'next_month' ? 'Next-Month ↩' : 'Near-Month'}</strong></span>
-              <span>Expiry: <strong>{s.fut_setup.expiry || '—'}</strong>{s.fut_setup.days_to_expiry != null && ` (${s.fut_setup.days_to_expiry} DTE)`}</span>
+              <span>Contract: <strong>{futContract.name}</strong></span>
+              <span>Expiry: <strong>{futContract.expiry || '—'}</strong>{dteSuffix(futContract)}</span>
             </div>
             {s.fut_setup.basis_note && (
               <div className="pt-1 border-t border-indigo-100/50 mb-1.5">

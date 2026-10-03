@@ -206,10 +206,26 @@ def fetch_kite_fo_stocks() -> list[str]:
             logger.info("Found %d F&O stocks (%d excluded: %s)", len(fo_stocks), len(_FO_EXCLUSIONS), sorted(_FO_EXCLUSIONS))
         else:
             logger.info("Found %d F&O stocks", len(fo_stocks))
+
+        if fo_stocks:
+            try:
+                from new_validation.run_validation import _save_fo_stocks_fallback
+                _save_fo_stocks_fallback(fo_stocks)
+            except Exception:
+                pass
+
         return fo_stocks
 
     except Exception as exc:
         logger.error("Could not fetch Kite F&O stocks: %s", exc)
+        try:
+            from new_validation.run_validation import _load_fo_stocks_fallback
+            fallback = _load_fo_stocks_fallback()
+            if fallback:
+                logger.info("fetch_kite_fo_stocks: using fallback list (%d symbols from fo_stocks_fallback.json)", len(fallback))
+                return fallback
+        except Exception:
+            pass
         return []
 
 

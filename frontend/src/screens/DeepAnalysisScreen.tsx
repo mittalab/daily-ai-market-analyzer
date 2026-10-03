@@ -3,6 +3,7 @@ import { fetchDeepAnalysisCached } from '../api';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
 import StockChartPanel from '../components/chart/StockChartPanel';
+import { getFutContract, dteSuffix } from '../components/futuresContract';
 import type { DeepAnalysisResponse, DeepAnalysisTurn } from '../types';
 
 const INR = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -298,6 +299,7 @@ function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () 
   const [reasonExpanded, setReasonExpanded] = useState(false);
   const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
   const scenarios     = s.why_could_be_wrong ? splitScenarios(s.why_could_be_wrong) : [];
+  const futContract   = getFutContract(s);
 
   return (
     <div className="px-4 py-3 space-y-4">
@@ -401,8 +403,8 @@ function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () 
         {!s.options_setup && s.fut_setup && (
           <div className="mt-1 space-y-0.5">
             <p className="text-[10px] text-gray-500">
-              Futures · {s.fut_setup.contract_selected === 'next_month' ? 'Next-Month' : 'Near-Month'}
-              {s.fut_setup.expiry ? ` · Expiry: ${s.fut_setup.expiry} (${s.fut_setup.days_to_expiry} DTE)` : ''}
+              Futures · {futContract.name}
+              {futContract.expiry ? ` · Expiry: ${futContract.expiry}${dteSuffix(futContract)}` : ''}
             </p>
             {s.fut_setup.contract_selection_note && (
               <p className="text-[10px] text-indigo-600">{s.fut_setup.contract_selection_note}</p>
@@ -506,6 +508,7 @@ function ActionView({ s, onSwitchToAnalysis }: { s: any; onSwitchToAnalysis: () 
 
 function AnalysisView({ s }: { s: any }) {
   const recInstrument = s.instrument_decision?.instrument_recommendation || s.instrument || 'NONE';
+  const futContract   = getFutContract(s);
 
   return (
     <div className="px-4 py-3 divide-y divide-gray-100">
@@ -712,14 +715,11 @@ function AnalysisView({ s }: { s: any }) {
             <div className="flex justify-between mb-1.5">
               <span>
                 Contract:{' '}
-                <strong>
-                  {s.fut_setup.contract_selected === 'next_month' ? 'Next-Month ↩' :
-                   s.fut_setup.contract_selected === 'near_month' ? 'Near-Month' : '—'}
-                </strong>
+                <strong>{futContract.name}</strong>
               </span>
               <span>
-                Expiry: <strong>{s.fut_setup.expiry || '—'}</strong>
-                {s.fut_setup.days_to_expiry != null && ` (${s.fut_setup.days_to_expiry} DTE)`}
+                Expiry: <strong>{futContract.expiry || '—'}</strong>
+                {dteSuffix(futContract)}
               </span>
             </div>
             {s.fut_setup.contract_selection_note && (

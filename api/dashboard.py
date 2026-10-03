@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
+from api.chart_data import attach_chart_data
 from database.queries import (
     get_latest_fii_dii,
     get_latest_session,
@@ -65,121 +66,12 @@ def _is_stale(session: dict | None) -> bool:
     return hours is None or hours > 24
 
 
-def _backfill_futures_ohlcv(turns: list[dict], session_date_str: str) -> None:
-    """
-    For each symbol, fetch futures OHLCV from futures_snapshots for the two active
-    expiries (near and next month) and attach to the turn's analysis as:
-      near_futures_ohlcv / near_futures_expiry
-      next_futures_ohlcv / next_futures_expiry
-
-    Only called for stock symbols with F&O data; silently skips if nothing found.
-    """
-    from datetime import timedelta
-
-    symbols = [t["symbol"] for t in turns if t.get("symbol")]
-    if not symbols:
-        return
-    try:
-        from database.client import get_client
-        session_date = date.fromisoformat(session_date_str)
-        cutoff = str(session_date - timedelta(days=90))
-        client = get_client()
-
-        for turn in turns:
-            sym = turn.get("symbol")
-            if not sym:
-                continue
-
-            res = (
-                client
-                .table("futures_snapshots")
-                .select("snapshot_date,expiry_date,open_price,high_price,low_price,close_price,volume")
-                .eq("symbol", sym)
-                .gte("snapshot_date", cutoff)
-                .order("snapshot_date", desc=False)
-                .execute()
-            )
-            if not res.data:
-                continue
-
-            # Pick the two nearest expiries that haven't expired before session_date
-            min_expiry = str(session_date - timedelta(days=5))
-            active_expiries = sorted({r["expiry_date"] for r in res.data if r["expiry_date"] >= min_expiry})[:2]
-            if not active_expiries:
-                continue
-
-            def _rows(expiry: str) -> list[dict]:
-                return [
-                    {
-                        "date":   r["snapshot_date"],
-                        "open":   float(r["open_price"]  or 0),
-                        "high":   float(r["high_price"]  or 0),
-                        "low":    float(r["low_price"]   or 0),
-                        "close":  float(r["close_price"] or 0),
-                        "volume": int(r["volume"]        or 0),
-                    }
-                    for r in res.data
-                    if r["expiry_date"] == expiry and r["open_price"] and r["close_price"]
-                ]
-
-            turn["analysis"]["near_futures_expiry"] = active_expiries[0]
-            turn["analysis"]["near_futures_ohlcv"]  = _rows(active_expiries[0])
-            if len(active_expiries) > 1:
-                turn["analysis"]["next_futures_expiry"] = active_expiries[1]
-                turn["analysis"]["next_futures_ohlcv"]  = _rows(active_expiries[1])
-
-    except Exception as exc:
-        logger.warning("futures_ohlcv backfill failed: %s", exc)
-
-
-def _backfill_ohlcv(turns: list[dict], session_date_str: str) -> None:
-    """
-    Fetch the 120 most recent OHLCV rows per symbol from price_history.
-    One query per symbol so limit(120) is applied at the DB level — avoids
-    PostgREST's default 1000-row cap silently truncating a batch query.
-    """
-    from datetime import timedelta
-
-    symbols = [t["symbol"] for t in turns if t.get("symbol")]
-    if not symbols:
-        return
-    try:
-        from database.client import get_client
-        session_date = date.fromisoformat(session_date_str)
-        cutoff = str(session_date - timedelta(days=200))
-        client = get_client()
-
-        ohlcv_map: dict[str, list] = {}
-        for sym in symbols:
-            res = (
-                client
-                .table("price_history")
-                .select("date,open,high,low,close,volume")
-                .eq("symbol", sym)
-                .gte("date", cutoff)
-                .order("date", desc=True)
-                .execute()
-            )
-            rows = res.data
-            rows.reverse()  # back to chronological order for the chart
-            ohlcv_map[sym] = [
-                {
-                    "date":   r["date"],
-                    "open":   float(r["open"]),
-                    "high":   float(r["high"]),
-                    "low":    float(r["low"]),
-                    "close":  float(r["close"]),
-                    "volume": int(r["volume"] or 0),
-                }
-                for r in rows
-            ]
-
-        for turn in turns:
-            sym = turn["symbol"]
-            if sym and sym in ohlcv_map:
-                turn["analysis"]["ohlcv_data"] = ohlcv_map[sym]
-    except Exception as exc:
-        logger.warning("ohlcv_data backfill failed: %s", exc)
+def _attach_chart_data(turns: list[dict], session_date_str: str) -> None:
+    """Attach spot + futures OHLCV to each turn's analysis for chart rendering."""
+    attach_chart_data(
+        [(t.get("symbol"), t["analysis"]) for t in turns],
+        date.fromisoformat(session_date_str),
+    )
 
 
 # ── GET /api/today ────────────────────────────────────────────────────────────
@@ -313,8 +205,7 @@ async def get_deep_analysis_turns():
             except Exception as price_exc:
                 logger.warning("spot_price backfill failed: %s", price_exc)
 
-        _backfill_ohlcv(turns, str(session["session_date"]))
-        _backfill_futures_ohlcv(turns, str(session["session_date"]))
+        _attach_chart_data(turns, str(session["session_date"]))
 
         return {"turns": turns, "session_id": session_id, "session_date": str(session["session_date"])}
     except Exception as exc:
@@ -503,8 +394,7 @@ async def get_active_trades():
         })
 
     if session and turns:
-        _backfill_ohlcv(turns, str(session["session_date"]))
-        _backfill_futures_ohlcv(turns, str(session["session_date"]))
+        _attach_chart_data(turns, str(session["session_date"]))
 
     return {
         "turns": turns,
@@ -1321,6 +1211,13 @@ async def run_deep_analysis():
     import threading
     from new_data_ingestion.nse_bhavcopy import last_trading_day
     from database.queries import get_client
+    from new_utils.mutex import JobMutex
+
+    # Refuse if pipeline is already in progress
+    mutex = JobMutex("analysis_pipeline")
+    if not mutex.acquire():
+        raise HTTPException(status_code=409, detail="Pipeline analysis is already in progress.")
+    mutex.release()
 
     trading_day = last_trading_day()
 
@@ -1337,15 +1234,73 @@ async def run_deep_analysis():
         raise HTTPException(status_code=409, detail=f"Session already exists for {trading_day}")
 
     def _run():
-        try:
-            from pipeline.orchestrator import run_pipeline
-            result = run_pipeline(trading_day)
-            logger.info("Pipeline completed via API for %s: %s", trading_day, result)
-        except Exception as exc:
-            logger.error("Pipeline background run failed for %s: %s", trading_day, exc)
+        with JobMutex("analysis_pipeline") as ok:
+            if not ok:
+                logger.warning("Pipeline background run aborted: mutex already held")
+                return
+            try:
+                from pipeline.orchestrator import run_pipeline
+                result = run_pipeline(trading_day)
+                logger.info("Pipeline completed via API for %s: %s", trading_day, result)
+            except Exception as exc:
+                logger.error("Pipeline background run failed for %s: %s", trading_day, exc)
 
     threading.Thread(target=_run, daemon=True).start()
     return {"ok": True, "message": f"Pipeline started for {trading_day}"}
+
+
+@router.post("/pipeline/saturday-levels/run")
+async def run_saturday_levels():
+    """Run the weekly Saturday key-levels job in a background thread."""
+    import threading
+    from new_utils.mutex import JobMutex
+
+    mutex = JobMutex("weekly_key_levels")
+    if not mutex.acquire():
+        raise HTTPException(status_code=409, detail="Saturday key-levels analysis is already in progress.")
+    mutex.release()
+
+    def _run():
+        with JobMutex("weekly_key_levels") as ok:
+            if not ok:
+                logger.warning("Saturday key-levels background run aborted: mutex already held")
+                return
+            try:
+                from scheduler import job_weekly_key_levels
+                logger.info("Starting Saturday key-levels job via API trigger")
+                job_weekly_key_levels()
+            except Exception as exc:
+                logger.error("Saturday key-levels background run failed: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "message": "Saturday stock levels run started in background"}
+
+
+@router.post("/pipeline/nightly-validation/run")
+async def run_nightly_validation():
+    """Run the nightly FO bhavcopy validation job in a background thread."""
+    import threading
+    from new_utils.mutex import JobMutex
+
+    mutex = JobMutex("evening_bhavcopy")
+    if not mutex.acquire():
+        raise HTTPException(status_code=409, detail="Nightly validation run is already in progress.")
+    mutex.release()
+
+    def _run():
+        with JobMutex("evening_bhavcopy") as ok:
+            if not ok:
+                logger.warning("Nightly validation background run aborted: mutex already held")
+                return
+            try:
+                from scheduler import job_evening_bhavcopy
+                logger.info("Starting nightly validation job via API trigger")
+                job_evening_bhavcopy()
+            except Exception as exc:
+                logger.error("Nightly validation background run failed: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "message": "Nightly validation run started in background"}
 
 
 # ── GET /api/settings/stock-sources ──────────────────────────────────────────

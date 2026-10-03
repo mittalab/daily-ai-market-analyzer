@@ -286,6 +286,13 @@ export interface KeyLevelsStock {
     close: number;
     volume: number;
   }[];
+  technicals?: {
+    ema20?: number | null;
+    ema50?: number | null;
+    atr14?: number | null;
+    hv20?: number | null;
+    hv60?: number | null;
+  } | null;
 }
 
 export interface KeyLevelsResponse {

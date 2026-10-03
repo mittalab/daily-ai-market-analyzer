@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from pipeline.orchestrator import run_pipeline
+from new_utils.mutex import job_mutex
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ def is_trading_day(for_date: date) -> bool:
 
 # ── Job 1: Supabase keepalive ──────────────────────────────────────────────────
 
+@job_mutex("keepalive")
 def job_keepalive() -> None:
     """06:00 daily — ping Supabase to keep the free-tier connection alive."""
     from database.queries import keepalive
@@ -44,6 +46,7 @@ def job_keepalive() -> None:
 
 # ── Job 2: Evening bhavcopy ────────────────────────────────────────────────────
 
+@job_mutex("evening_bhavcopy")
 def job_evening_bhavcopy() -> None:
     """
     20:00 Mon-Fri (trading day) — download equity + FO bhavcopy for the last
@@ -76,6 +79,7 @@ def job_evening_bhavcopy() -> None:
 
 # ── Job 3: Morning brief + Kite token deletion ────────────────────────────────
  
+@job_mutex("morning_brief")
 def job_morning_brief_and_kite_check() -> None:
     """
     07:00 daily — send the morning brief for the latest session, then delete
@@ -106,6 +110,7 @@ def job_morning_brief_and_kite_check() -> None:
 
 # ── Job 4 & 5: Intraday Kite token checks ─────────────────────────────────────
 
+@job_mutex("kite_check")
 def job_kite_check(is_morning: bool = False) -> None:
     """
     09:00, 11:00, and 13:00 Mon-Fri (trading day) — validate Kite token and send
@@ -133,6 +138,7 @@ def job_kite_check(is_morning: bool = False) -> None:
 
 # ── Job 6: 4 PM analysis pipeline ─────────────────────────────────────────────
 
+@job_mutex("analysis_pipeline")
 def job_analysis_pipeline(my_date: date | None = None) -> None:
     """
     20:00 Mon-Fri (trading day) — run full validation + Claude analysis.
@@ -182,6 +188,7 @@ def job_analysis_pipeline(my_date: date | None = None) -> None:
 
 # ── Job 7: Weekly key-level analysis ──────────────────────────────────────────
 
+@job_mutex("weekly_key_levels")
 def job_weekly_key_levels() -> None:
     """Saturday 10:00 IST — weekly support/resistance key-level analysis."""
     from datetime import datetime
@@ -199,6 +206,7 @@ def job_weekly_key_levels() -> None:
 
 # ── Job 8: Daily option sell recommendations ───────────────────────────────────
 
+@job_mutex("option_sell")
 def job_option_sell() -> None:
     """08:00 Mon-Fri IST — mechanical option SELL recommendation engine."""
     from option_sell.job import run_option_sell_job

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchSystemStatus, fetchFoStocks, fetchIndicatorValidation, fetchStockSources, saveStockSources, fetchClaudeAnalysisSettings, saveClaudeAnalysisSettings, fetchDeepAnalysisStatusForRun, triggerDeepAnalysis } from '../api';
+import { fetchSystemStatus, fetchFoStocks, fetchIndicatorValidation, fetchStockSources, saveStockSources, fetchClaudeAnalysisSettings, saveClaudeAnalysisSettings, fetchDeepAnalysisStatusForRun, triggerDeepAnalysis, triggerSaturdayLevels, triggerNightlyValidation } from '../api';
 import type { CostInfo, SessionTurn, SystemStatus, IndicatorValidation, DeepAnalysisStatus } from '../types';
 
 function StatusDot({ ok }: { ok: boolean }) {
@@ -431,6 +431,130 @@ function DeepAnalysisModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Saturday Key Levels Modal ────────────────────────────────────────────────
+
+function SaturdayLevelsModal({ onClose }: { onClose: () => void }) {
+  const [running, setRunning] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  const handleRun = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      await triggerSaturdayLevels();
+      setStarted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start Saturday stock levels job');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-base font-semibold text-gray-800 mb-2">Run Saturday Stock Levels</h2>
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          Runs the weekly Claude analysis for key support and resistance zones across all active stocks.
+        </p>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mb-4">
+            {error}
+          </div>
+        )}
+
+        {started && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700 mb-4">
+            Saturday key levels analysis started in the background. Telegram updates will be sent as batches complete.
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          {!started && (
+            <button
+              onClick={handleRun}
+              disabled={running}
+              className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors"
+            >
+              {running ? 'Starting…' : 'Run'}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-2.5 text-sm font-semibold transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Nightly Validation Modal ─────────────────────────────────────────────────
+
+function NightlyValidationModal({ onClose }: { onClose: () => void }) {
+  const [running, setRunning] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  const handleRun = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      await triggerNightlyValidation();
+      setStarted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start nightly validation job');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-base font-semibold text-gray-800 mb-2">Run Nightly Validation</h2>
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          Runs the nightly F&O universe validation (equity + FO bhavcopy, futures, and options verification).
+        </p>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mb-4">
+            {error}
+          </div>
+        )}
+
+        {started && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700 mb-4">
+            Nightly validation job started in the background. Telegram notifications will be sent on progress and completion.
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          {!started && (
+            <button
+              onClick={handleRun}
+              disabled={running}
+              className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors"
+            >
+              {running ? 'Starting…' : 'Run'}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-2.5 text-sm font-semibold transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Stocks to Evaluate Section ────────────────────────────────────────────────
 
 function StocksToEvaluateSection() {
@@ -722,7 +846,9 @@ export default function PerformanceScreen() {
   const [status, setStatus]         = useState<SystemStatus | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
-  const [showRunModal, setShowRunModal] = useState(false);
+  const [showRunModal, setShowRunModal]           = useState(false);
+  const [showSaturdayModal, setShowSaturdayModal] = useState(false);
+  const [showNightlyModal, setShowNightlyModal]   = useState(false);
 
   useEffect(() => {
     fetchSystemStatus()
@@ -929,9 +1055,25 @@ export default function PerformanceScreen() {
         >
           Run Deep Analysis Again
         </button>
+
+        <button
+          onClick={() => setShowSaturdayModal(true)}
+          className="w-full bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-xl py-3 text-sm font-medium transition-colors shadow-sm"
+        >
+          Run Saturday Stock Levels
+        </button>
+
+        <button
+          onClick={() => setShowNightlyModal(true)}
+          className="w-full bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-xl py-3 text-sm font-medium transition-colors shadow-sm"
+        >
+          Run Nightly Validation
+        </button>
       </div>
 
       {showRunModal && <DeepAnalysisModal onClose={() => setShowRunModal(false)} />}
+      {showSaturdayModal && <SaturdayLevelsModal onClose={() => setShowSaturdayModal(false)} />}
+      {showNightlyModal && <NightlyValidationModal onClose={() => setShowNightlyModal(false)} />}
 
       <p className="text-xs text-gray-400 text-center mt-4 mb-4">
         Server time: {fmtTime(status?.server_time_ist)}

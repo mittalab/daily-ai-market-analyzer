@@ -70,10 +70,16 @@ app = FastAPI(
 
 # Dashboard origin only. During local dev override CORS via environment if needed.
 _dashboard_origin = "https://trading.abhishekmittal.in"
+_allowed_origins = [
+    _dashboard_origin,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[_dashboard_origin],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "HEAD"],
     allow_headers=["*"],

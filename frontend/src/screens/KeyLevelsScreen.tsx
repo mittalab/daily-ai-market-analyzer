@@ -255,6 +255,27 @@ function StockCard({ stock }: { stock: KeyLevelsStock }) {
               <ZoneRow key={i} zone={zone} zoneLabel={label} style={style} />
             ))}
 
+            {/* Recomputed technical indicators from latest stock data */}
+            {stock.technicals && (stock.technicals.ema20 != null || stock.technicals.ema50 != null || stock.technicals.atr14 != null) && (
+              <div className="flex flex-wrap gap-2 my-2 text-[11px] font-mono">
+                {stock.technicals.ema20 != null && (
+                  <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded">
+                    EMA20: ₹{stock.technicals.ema20.toFixed(1)}
+                  </span>
+                )}
+                {stock.technicals.ema50 != null && (
+                  <span className="bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded">
+                    EMA50: ₹{stock.technicals.ema50.toFixed(1)}
+                  </span>
+                )}
+                {stock.technicals.atr14 != null && (
+                  <span className="bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded">
+                    ATR14: ₹{stock.technicals.atr14.toFixed(1)}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Chart with zone bands overlaid */}
             {Array.isArray(stock.ohlcv_data) && stock.ohlcv_data.length > 0 && (
               <div className="mt-3 h-[420px] sm:h-[500px] rounded-lg overflow-hidden border border-gray-100">

@@ -5,7 +5,7 @@ GET /api/key-levels
   Returns all ACTIVE support/resistance zones grouped by symbol,
   with per-symbol analysis_date = MAX(analysis_date) and overall
   earliest_analysis_date = MIN(analysis_date) across all active symbols.
-  Also backfills 120 days of OHLCV per symbol for chart rendering.
+  Also attaches OHLCV per symbol for chart rendering (see api/chart_data.py).
 
 Caching:
   In-memory cache keyed by 'key-levels:all', expiring at the next
@@ -14,11 +14,12 @@ Caching:
 """
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytz
 from fastapi import APIRouter
 
+from api.chart_data import attach_chart_data
 from database.client import get_client
 
 logger = logging.getLogger(__name__)
@@ -139,61 +140,38 @@ async def get_key_levels():
     all_dates = [s["analysis_date"] for s in stocks if s.get("analysis_date")]
     earliest_analysis_date = min(all_dates) if all_dates else None
 
-    _backfill_ohlcv(stocks)
+    attach_chart_data(
+        [(s["symbol"], s) for s in stocks],
+        datetime.now(IST).date(),
+        include_futures=False,
+    )
+
+    # Recompute indicators via static code from latest stock data
+    from key_levels.stage1 import compute_technicals
+    for s in stocks:
+        ohlcv = s.get("ohlcv_data") or []
+        if ohlcv:
+            try:
+                s["technicals"] = compute_technicals(ohlcv)
+            except Exception as exc:
+                logger.warning("Failed computing technicals for %s: %s", s.get("symbol"), exc)
+                s["technicals"] = None
+        else:
+            s["technicals"] = None
 
     response = {
         "earliest_analysis_date": earliest_analysis_date,
         "stocks": stocks,
     }
 
-    expires_at = _next_saturday_11am_ist(now)
+    # Invalidate cache after 1 day (24 hours)
+    expires_at = now + timedelta(days=1)
     _cache[cache_key] = {"data": response, "expires_at": expires_at}
     logger.info(
-        "key-levels cached %d stocks until %s IST",
+        "key-levels cached %d stocks for 1 day until %s IST",
         len(stocks),
         expires_at.strftime("%Y-%m-%d %H:%M"),
     )
 
     return response
 
-
-def _backfill_ohlcv(stocks: list[dict]) -> None:
-    """Fetch up to 120 days of OHLCV per symbol for chart rendering."""
-    symbols = [s["symbol"] for s in stocks]
-    if not symbols:
-        return
-    try:
-        client   = get_client()
-        cutoff   = str(date.today() - timedelta(days=120))
-        ohlcv_map: dict[str, list] = {}
-
-        for sym in symbols:
-            res = (
-                client
-                .table("price_history")
-                .select("date,open,high,low,close,volume")
-                .eq("symbol", sym)
-                .gte("date", cutoff)
-                .order("date", desc=True)
-                .limit(120)
-                .execute()
-            )
-            rows = list(reversed(res.data or []))
-            ohlcv_map[sym] = [
-                {
-                    "date":   r["date"],
-                    "open":   float(r["open"]),
-                    "high":   float(r["high"]),
-                    "low":    float(r["low"]),
-                    "close":  float(r["close"]),
-                    "volume": int(r.get("volume") or 0),
-                }
-                for r in rows
-                if r.get("open") and r.get("close")
-            ]
-    except Exception as exc:
-        logger.warning("ohlcv backfill for key-levels failed: %s", exc)
-        ohlcv_map = {}
-
-    for stock in stocks:
-        stock["ohlcv_data"] = ohlcv_map.get(stock["symbol"], [])

@@ -3,6 +3,7 @@ import { fetchActiveTradesCached } from '../api';
 import ConvictionBar from '../components/ConvictionBar';
 import Expander from '../components/Expander';
 import StockChartPanel from '../components/chart/StockChartPanel';
+import { getFutContract, dteSuffix } from '../components/futuresContract';
 import type { ActiveTradesResponse, DeepAnalysisTurn, KiteHolding, KitePosition } from '../types';
 
 const INR = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -282,6 +283,7 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
   const [isExpanded, setIsExpanded] = useState(false);
   const { symbol } = turn;
   const s = turn.analysis;
+  const futContract = getFutContract(s);
 
   const dirClass =
     s.direction === 'LONG'  ? 'bg-green-100 text-green-800' :
@@ -523,14 +525,11 @@ function StockCard({ turn, holding, positions }: { turn: DeepAnalysisTurn; holdi
                 <div className="flex justify-between mb-1.5">
                   <span>
                     Contract:{' '}
-                    <strong>
-                      {s.fut_setup.contract_selected === 'next_month' ? 'Next-Month ↩' :
-                       s.fut_setup.contract_selected === 'near_month' ? 'Near-Month' : '—'}
-                    </strong>
+                    <strong>{futContract.name}</strong>
                   </span>
                   <span>
-                    Expiry: <strong>{s.fut_setup.expiry || '—'}</strong>
-                    {s.fut_setup.days_to_expiry != null && ` (${s.fut_setup.days_to_expiry} DTE)`}
+                    Expiry: <strong>{futContract.expiry || '—'}</strong>
+                    {dteSuffix(futContract)}
                   </span>
                 </div>
                 {s.fut_setup.contract_selection_note && (
