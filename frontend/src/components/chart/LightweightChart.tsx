@@ -515,6 +515,24 @@ export default function LightweightChart({
     const syncCharts = [mainChart, volChart, rsiChart];
     chartsRef.current = syncCharts;
 
+    // Logical-range sync only lines bars up if every pane's plot area is the same
+    // width. Each right price scale sizes itself to its labels (prices vs "16.7M"
+    // vs RSI "OB"/"OS"), so pin all of them to the widest. Re-run on zoom/scroll
+    // and resize since label widths change with the visible price range.
+    // All panes (including the widest) get the same floor, so if the widest one's
+    // labels later shrink it stays pinned rather than drifting out of line.
+    let alignFrame = 0;
+    let alignedWidth = 0;
+    const alignPriceScales = () => {
+      cancelAnimationFrame(alignFrame);
+      alignFrame = requestAnimationFrame(() => {
+        const target = Math.max(...syncCharts.map(c => c.priceScale('right').width()));
+        if (target <= 0 || target === alignedWidth) return;
+        alignedWidth = target;
+        syncCharts.forEach(c => c.applyOptions({ rightPriceScale: { minimumWidth: target } }));
+      });
+    };
+
     let syncing = false;
     const syncHandlers = syncCharts.map((chart, idx) => {
       const handler = (range: any) => {
@@ -524,6 +542,7 @@ export default function LightweightChart({
           if (otherIdx !== idx) other.timeScale().setVisibleLogicalRange(range);
         });
         syncing = false;
+        alignPriceScales();
       };
       chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
       return { chart, handler };
@@ -545,12 +564,15 @@ export default function LightweightChart({
       const ro = new ResizeObserver(entries => {
         const { width, height } = entries[0].contentRect;
         (chart as IChartApi).resize(width, height);
+        alignPriceScales();
       });
       ro.observe(el as Element);
       observers.push(ro);
     });
+    alignPriceScales();
 
     return () => {
+      cancelAnimationFrame(alignFrame);
       syncHandlers.forEach(({ chart, handler }) =>
         chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler)
       );
