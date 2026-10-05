@@ -1260,17 +1260,16 @@ async def run_saturday_levels():
         raise HTTPException(status_code=409, detail="Saturday key-levels analysis is already in progress.")
     mutex.release()
 
+    # job_weekly_key_levels is wrapped in @job_mutex("weekly_key_levels") — do NOT
+    # take the mutex here too, or the job's own (non-reentrant) acquire fails and
+    # the run silently aborts.
     def _run():
-        with JobMutex("weekly_key_levels") as ok:
-            if not ok:
-                logger.warning("Saturday key-levels background run aborted: mutex already held")
-                return
-            try:
-                from scheduler import job_weekly_key_levels
-                logger.info("Starting Saturday key-levels job via API trigger")
-                job_weekly_key_levels()
-            except Exception as exc:
-                logger.error("Saturday key-levels background run failed: %s", exc)
+        try:
+            from scheduler import job_weekly_key_levels
+            logger.info("Starting Saturday key-levels job via API trigger")
+            job_weekly_key_levels(force=True)
+        except Exception as exc:
+            logger.error("Saturday key-levels background run failed: %s", exc)
 
     threading.Thread(target=_run, daemon=True).start()
     return {"ok": True, "message": "Saturday stock levels run started in background"}
@@ -1287,17 +1286,15 @@ async def run_nightly_validation():
         raise HTTPException(status_code=409, detail="Nightly validation run is already in progress.")
     mutex.release()
 
+    # job_evening_bhavcopy is wrapped in @job_mutex("evening_bhavcopy") — see note
+    # in run_saturday_levels above.
     def _run():
-        with JobMutex("evening_bhavcopy") as ok:
-            if not ok:
-                logger.warning("Nightly validation background run aborted: mutex already held")
-                return
-            try:
-                from scheduler import job_evening_bhavcopy
-                logger.info("Starting nightly validation job via API trigger")
-                job_evening_bhavcopy()
-            except Exception as exc:
-                logger.error("Nightly validation background run failed: %s", exc)
+        try:
+            from scheduler import job_evening_bhavcopy
+            logger.info("Starting nightly validation job via API trigger")
+            job_evening_bhavcopy()
+        except Exception as exc:
+            logger.error("Nightly validation background run failed: %s", exc)
 
     threading.Thread(target=_run, daemon=True).start()
     return {"ok": True, "message": "Nightly validation run started in background"}

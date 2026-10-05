@@ -189,8 +189,12 @@ def job_analysis_pipeline(my_date: date | None = None) -> None:
 # ── Job 7: Weekly key-level analysis ──────────────────────────────────────────
 
 @job_mutex("weekly_key_levels")
-def job_weekly_key_levels() -> None:
-    """Saturday 10:00 IST — weekly support/resistance key-level analysis."""
+def job_weekly_key_levels(force: bool = False) -> None:
+    """
+    Saturday 10:00 IST — weekly support/resistance key-level analysis.
+
+    force=True (manual trigger from Settings) bypasses the saturday_weekly_run toggle.
+    """
     from datetime import datetime
     import pytz
     from key_levels.weekly_job import run_weekly_key_levels_job
@@ -198,10 +202,22 @@ def job_weekly_key_levels() -> None:
     IST = pytz.timezone("Asia/Kolkata")
     today = datetime.now(IST).date()
     try:
-        result = run_weekly_key_levels_job(today)
+        result = run_weekly_key_levels_job(today, force=force)
         logger.info("Weekly key-levels complete: %s", result)
     except Exception as exc:
         logger.error("Weekly key-levels job failed: %s", exc)
+        try:
+            from new_notifications.telegram import send_loud
+            send_loud(f"🚨 <b>Key Levels job FAILED — {today}</b>\n<code>{str(exc)[:300]}</code>")
+        except Exception as tg_exc:
+            logger.warning("Telegram loud send failed: %s", tg_exc)
+    finally:
+        # Drop the Levels page cache so fresh rows show immediately
+        try:
+            from api.key_levels import _cache
+            _cache.clear()
+        except Exception:
+            pass
 
 
 # ── Job 8: Daily option sell recommendations ───────────────────────────────────

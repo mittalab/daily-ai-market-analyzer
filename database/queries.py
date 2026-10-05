@@ -293,17 +293,17 @@ def get_options_snapshot(symbol: str, snapshot_date: date, expiry_date: date) ->
     return resp.data
 
 
-def get_latest_snapshot_date(symbol: str) -> date | None:
-    """Return the most recent snapshot date for a symbol. Used for fallback logic."""
-    resp = (
+def get_latest_snapshot_date(symbol: str, on_or_before: date | None = None) -> date | None:
+    """Return the most recent snapshot date for a symbol (optionally capped at on_or_before)."""
+    query = (
         get_client()
         .table("options_snapshots")
         .select("snapshot_date")
         .eq("symbol", symbol)
-        .order("snapshot_date", desc=True)
-        .limit(1)
-        .execute()
     )
+    if on_or_before is not None:
+        query = query.lte("snapshot_date", str(on_or_before))
+    resp = query.order("snapshot_date", desc=True).limit(1).execute()
     if resp.data:
         return date.fromisoformat(resp.data[0]["snapshot_date"])
     return None

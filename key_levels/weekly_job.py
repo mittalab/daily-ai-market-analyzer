@@ -129,14 +129,15 @@ def _load_sector_map() -> dict:
         return {}
 
 
-def _fetch_chain(symbol: str, snapshot_date: date | None) -> list[dict]:
+def _fetch_chain(symbol: str, as_of: date | None) -> list[dict]:
     """
-    Fetch the full option chain for symbol on snapshot_date (all expiries).
+    Fetch the full option chain (all expiries) from the latest snapshot on or
+    before as_of. The job runs on Saturday, when no snapshot exists, so an exact
+    date match would always return an empty chain.
     Returns list of dicts with keys: date, strike, type, oi, iv, premium.
     """
-    if snapshot_date is None:
-        logger.debug("%s: resolving latest snapshot date…", symbol)
-        snapshot_date = get_latest_snapshot_date(symbol)
+    logger.debug("%s: resolving latest snapshot date on/before %s…", symbol, as_of)
+    snapshot_date = get_latest_snapshot_date(symbol, on_or_before=as_of)
     if snapshot_date is None:
         logger.debug("%s: no snapshot found — chain will be empty", symbol)
         return []
@@ -260,9 +261,11 @@ def _process_batch(
 
 # ── Public entry point ─────────────────────────────────────────────────────────
 
-def run_weekly_key_levels_job(analysis_date: date | None = None) -> dict:
+def run_weekly_key_levels_job(analysis_date: date | None = None, force: bool = False) -> dict:
     """
     Run the full Saturday key-level analysis job.
+
+    force=True skips the saturday_weekly_run settings gate (manual trigger).
 
     Returns:
       {"analysis_date": str, "updated_count": int, "failed_symbols": list[str]}
@@ -272,8 +275,9 @@ def run_weekly_key_levels_job(analysis_date: date | None = None) -> dict:
 
     # Settings gate
     settings = get_claude_analysis_settings()
-    if not settings.get("saturday_weekly_run", True):
+    if not force and not settings.get("saturday_weekly_run", True):
         logger.info("run_weekly_key_levels_job: saturday_weekly_run disabled via settings — skipping")
+        _tg_silent(f"⏭️ Key Levels job skipped — saturday_weekly_run disabled in settings ({analysis_date})")
         return {"analysis_date": str(analysis_date), "updated_count": 0, "failed_symbols": [], "skipped": True}
 
     # Pre-flight: fail fast if API key is missing
